@@ -55,6 +55,36 @@ jobs:
       - name: Rust tests
         run: cargo test -p toolbox-core
 
+      - name: Library checks (both systems)
+        shell: bash
+        run: |
+          for e in check_pty check_hostkeys check_ftp check_serial check_keychain check_win_agent; do
+            echo "== $e"
+            cargo run -q -p toolbox-core --example "$e"
+          done
+
+      - name: Library checks (Linux, against a test SSH server and Docker)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          cargo build -q -p toolbox-core --examples
+          docker build -t toolbox-sshd tests/containers/sshd
+          mkdir -p "$RUNNER_TEMP/keys"
+          ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/keys/id_test"
+          cp "$RUNNER_TEMP/keys/id_test.pub" "$RUNNER_TEMP/keys/authorized_keys"
+          docker run -d --name sshd -p 127.0.0.1:2222:22 -v "$RUNNER_TEMP/keys:/keys:ro" toolbox-sshd
+          for i in $(seq 1 30); do
+            (echo > /dev/tcp/127.0.0.1/2222) 2>/dev/null && break
+            sleep 1
+          done
+          eval "$(ssh-agent -s)"
+          ssh-add "$RUNNER_TEMP/keys/id_test"
+          export SSH_TEST_HOST=127.0.0.1 SSH_TEST_PORT=2222 SSH_TEST_USER=tester
+          export SSH_TEST_PASSWORD=toolbox-test-only SSH_TEST_KEY="$RUNNER_TEMP/keys/id_test" SSH_TEST_AGENT=1
+          cargo run -q -p toolbox-core --example check_ssh
+          cargo run -q -p toolbox-core --example check_docker
+          docker rm -f sshd
+
       - name: Interface checks (types and import boundary)
         run: npm run check
 
