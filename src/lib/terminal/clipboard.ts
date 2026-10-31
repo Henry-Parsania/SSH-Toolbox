@@ -18,6 +18,16 @@ function lines(text: string): string[] {
   return text.split(/\r\n|\n|\r/);
 }
 
+/**
+ * Removes control characters from text about to be pasted, other than tab and line breaks. An
+ * escape character in the clipboard could otherwise end the terminal's protected paste early and
+ * make the rest run as typed commands.
+ */
+export function sanitizePaste(text: string): string {
+  // C0 controls except tab, line feed and carriage return; DEL; and the C1 controls.
+  return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "");
+}
+
 export function checkPaste(text: string): PasteCheck {
   const all = lines(text);
   // A single trailing line break doesn't make it multi-line: it's one line plus Enter. Still

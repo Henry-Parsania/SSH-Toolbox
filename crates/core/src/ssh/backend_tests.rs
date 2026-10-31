@@ -484,3 +484,69 @@ async fn a_jump_host_that_refuses_forwarding_gives_a_clear_failure_naming_the_st
     })
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn two_jump_hosts_are_used_one_after_the_other() {
+    let w = world();
+    let keys = [
+        key(KEY_A),
+        key(super::testing::KEY_B),
+        key(super::testing::KEY_C),
+    ];
+    let mut servers = Vec::new();
+    for (i, host_key) in keys.iter().enumerate() {
+        let server = spawn_server(
+            host_key.clone(),
+            Accepts {
+                user: "tester".into(),
+                password: Some("pw".into()),
+                allow_forwarding: i < 2, // The last one is the target.
+                ..Default::default()
+            },
+        )
+        .await;
+        learn(
+            "127.0.0.1",
+            server.port,
+            &public_of(host_key),
+            &w.known_hosts,
+        )
+        .unwrap();
+        servers.push(server);
+    }
+    for id in ["first", "second", "target"] {
+        w.secrets
+            .items
+            .lock()
+            .unwrap()
+            .insert(format!("session:{id}:password"), "pw".into());
+    }
+    let ssh = |id: &str, port: u16, via: &str| SavedSession::Ssh {
+        id: id.into(),
+        name: id.into(),
+        folder: String::new(),
+        host: "127.0.0.1".into(),
+        port,
+        user: "tester".into(),
+        auth: SshAuth::Password,
+        key_path: String::new(),
+        jump: via.into(),
+    };
+    let mut file = w.store.load().file;
+    file.sessions.push(ssh("first", servers[0].port, ""));
+    file.sessions.push(ssh("second", servers[1].port, "first"));
+    file.sessions.push(ssh("target", servers[2].port, "second"));
+    w.store.save(&file).unwrap();
+
+    let (session, sink) = open(&w, "target").await;
+    until("the shell on the target", || {
+        text(&sink).contains("welcome-banner")
+    })
+    .await;
+    echoes(&w, &session, &sink, "two-hops").await;
+    // The first jump host forwarded only to the second, and the second forwarded to the target.
+    // Going straight from the first to the target would make the first count 2 and the second 0.
+    assert_eq!(servers[0].stats.forwarded.load(Ordering::SeqCst), 1);
+    assert_eq!(servers[1].stats.forwarded.load(Ordering::SeqCst), 1);
+    assert_eq!(servers[2].stats.shells.load(Ordering::SeqCst), 1);
+}

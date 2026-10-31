@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { checkPaste, isCopyKey, isPasteKey } from "./clipboard";
+import { checkPaste, isCopyKey, isPasteKey, sanitizePaste } from "./clipboard";
+
+describe("sanitizePaste", () => {
+  it("keeps ordinary text, tabs and line breaks", () => {
+    expect(sanitizePaste("ls -la\tfile\r\nnext\n")).toBe("ls -la\tfile\r\nnext\n");
+    expect(sanitizePaste("héllo ✓ 日本語")).toBe("héllo ✓ 日本語");
+  });
+
+  it("removes the escape that could end a protected paste early", () => {
+    expect(sanitizePaste("a\u001b[201~rm -rf ~")).toBe("a[201~rm -rf ~");
+  });
+
+  it("removes other control characters, DEL and the 8-bit controls", () => {
+    expect(sanitizePaste("a\u0000b\u0007c\u007fd\u009be")).toBe("abcde");
+  });
+});
 
 describe("checkPaste", () => {
   it("does not ask for a single line", () => {

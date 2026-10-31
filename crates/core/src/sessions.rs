@@ -240,7 +240,7 @@ impl SessionsFile {
                 } => {
                     if host.trim().is_empty()
                         || !clean_text(host)
-                        || host.contains(char::is_whitespace)
+                        || host.contains(|c: char| c.is_whitespace() || ",[]\"'".contains(c))
                     {
                         return Err(invalid("The host isn't valid."));
                     }
@@ -282,7 +282,7 @@ impl SessionsFile {
                 } => {
                     if host.trim().is_empty()
                         || !clean_text(host)
-                        || host.contains(char::is_whitespace)
+                        || host.contains(|c: char| c.is_whitespace() || ",[]\"'".contains(c))
                     {
                         return Err(invalid("The host isn't valid."));
                     }

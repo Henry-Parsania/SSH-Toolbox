@@ -23,7 +23,7 @@
     type TerminalStatus,
   } from "../backend";
   import PromptDialog from "./PromptDialog.svelte";
-  import { checkPaste, isCopyKey, isPasteKey, type PasteCheck } from "./clipboard";
+  import { checkPaste, isCopyKey, isPasteKey, sanitizePaste, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
   import { settings } from "../settings.svelte";
   import { broadcastInput, registerReceiver } from "./broadcast";
@@ -150,6 +150,15 @@
       theme: terminalTheme(settings.theme),
       allowProposedApi: true, // Needed for the Unicode 11 addon.
       cursorBlink: true,
+      // Links the program in the terminal marks up itself (OSC 8) follow the same rule as
+      // plain addresses: Ctrl+click only, and through the backend, which allows only http and
+      // https (SEC9). Without this, xterm would open them itself on a plain click.
+      linkHandler: {
+        activate: (event, uri) => {
+          if (event.ctrlKey || event.metaKey) void openLink(uri).catch(() => {});
+        },
+        allowNonHttpProtocols: false,
+      },
       ...(platform.os === "windows" && platform.windows_build !== null
         ? { windowsPty: { backend: "conpty" as const, buildNumber: platform.windows_build } }
         : {}),
@@ -225,7 +234,8 @@
 
     // Copy and paste (T2). Every paste goes through here, whatever started it, so the
     // multi-line warning can't be skipped.
-    function requestPaste(text: string) {
+    function requestPaste(raw: string) {
+      const text = sanitizePaste(raw);
       if (!text) return;
       const check = checkPaste(text);
       if (check.needsConfirm) pending = { text, check };

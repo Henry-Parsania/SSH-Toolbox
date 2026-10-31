@@ -82,10 +82,9 @@ fn check_spec(spec: &ForwardSpec, confirmed_external: bool) -> Result<(), AppErr
     {
         return Err(invalid("The destination isn't valid."));
     }
-    // A remote forward listens on the server, where the server's own rules apply. For the
-    // others, anything but loopback needs the user to have been warned.
-    if !matches!(spec.kind, ForwardKind::Remote { .. }) && !is_loopback(host) && !confirmed_external
-    {
+    // Anything but loopback lets other computers use the connection (for a remote forward,
+    // that depends on the server's settings), so the user must have been warned.
+    if !is_loopback(host) && !confirmed_external {
         return Err(invalid(
             "Listening on that address lets other computers on your network use this connection. \
              Confirm that you want this.",

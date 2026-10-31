@@ -104,7 +104,8 @@ pub async fn connect_chain(
     let mut earlier: Vec<Connection> = Vec::new();
     let mut last: Option<Connection> = None;
     for (i, hop) in chain.iter().enumerate() {
-        let mut connection = match earlier.last().or(last.as_ref()) {
+        // Each hop is reached through the one just before it.
+        let mut connection = match last.as_ref() {
             None => connect(
                 &hop.host,
                 hop.port,

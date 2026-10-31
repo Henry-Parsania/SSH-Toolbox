@@ -76,7 +76,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.10 Key install on Windows servers (K5, K7).** The script in IF section 15. Unit-test the generated script and its encoding. Real testing is on the owner's list.
 - [x] **2.11 Import and jump hosts (S4, S6).** IF section 7. Test parsing with sample config files. Integration-test a jump host with two containers.
 - [x] **2.12 Port forwarding (S7).** IF section 7. Integration-test local, remote and SOCKS.
-- [ ] **2.13 Security review (SEC7).** Run the review in PLAN.md section 5 and fix what's serious.
+- [x] **2.13 Security review (SEC7).** Run the review in PLAN.md section 5 and fix what's serious.
 - [ ] **2.14 Owner tries it** on real servers.
 
 ## Phase 3: File transfer

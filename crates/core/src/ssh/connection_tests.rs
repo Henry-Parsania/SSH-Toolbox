@@ -251,3 +251,35 @@ async fn a_server_that_is_not_there_gives_a_plain_error() {
     assert_eq!(err.code, ErrorCode::ConnectionFailed);
     assert!(err.message.contains("127.0.0.1"), "{}", err.message);
 }
+
+#[tokio::test]
+async fn taking_longer_than_the_connect_timeout_to_answer_a_question_does_not_fail_it() {
+    // In tests the timeout is 0.6 seconds, and this answer takes 1.5.
+    let s = setup();
+    let port = start_server(key(KEY_A)).await;
+    let broker = s.broker.clone();
+    let sink = s.sink.clone();
+    tokio::spawn(async move {
+        while prompts(&sink).is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        for item in sink.all() {
+            if let Sent::Status(TerminalStatus::Prompt { prompt_id, .. }) = item {
+                let _ = broker.respond(
+                    &prompt_id,
+                    PromptResponse {
+                        accepted: true,
+                        text: None,
+                        save: false,
+                    },
+                );
+            }
+        }
+    });
+    go(&s, port).await.unwrap();
+    assert_eq!(
+        recorded(&s.known_hosts, port, KEY_A),
+        HostKeyDecision::Trusted
+    );
+}

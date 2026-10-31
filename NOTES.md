@@ -29,3 +29,16 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - 2.11: Jump hosts are tested with two in-process servers (the jump host forwards, and the target is reached only through it; closing the pane closes both connections). A jump host that refuses forwarding gives a failure that names the step ("step 2 of 2"). Up to 3 jump hosts; each logs in with its own saved method and has its host key checked.
 - 2.11: Config import reads `Host`, `HostName`, `Port`, `User`, `IdentityFile`, `ProxyJump` and `Include` (one level). Settings in `Host *` blocks are not applied to other hosts (a simplification), `Match` blocks are skipped, and `IdentityFile` values with `%` tokens are dropped. A host with no key file imports as an SSH-agent session. The ⇩ button in the sidebar opens the import dialog; the user's file is only read.
 - 2.12: Forwards (local, remote, SOCKS5 with no-auth and CONNECT only) are tested against the in-process server and a small echo server. A listener on anything but loopback needs the user to confirm a warning, enforced in the backend as well as shown in the dialog. A forward ends when its connection drops; forwards are not saved to disk and don't come back after a restart. Deleting a session stops its forwards. The ⇄ button on an SSH session opens the dialog.
+- 2.13 security review (a separate reviewer that read the code cold; no critical findings). Fixed, each with a test where it can be tested:
+  - The "host key changed" message gave the wrong line when the file had comment lines above the entry (the library skips comments when counting). It now counts physical lines and also gives the `ssh-keygen -R` command for that host.
+  - Chains of two or more jump hosts went through the oldest connection instead of the newest. Fixed, with a two-hop test.
+  - Terminal hyperlinks (OSC 8) bypassed the Ctrl+click and http/https-only rule. They now go through the same handler and the backend check.
+  - `known_hosts` lines the library can't read but OpenSSH honours (tabs, wildcards, `@cert-authority`, `@revoked`) no longer make a pinned host look new: the connection stops with an explanation. Host names are compared without regard to case.
+  - The 20 s connect timeout no longer runs while the user is looking at a host key question.
+  - One slow question no longer freezes every other SSH pane: the connection lock is now per saved session.
+  - The Windows key script adds a line break first if `administrators_authorized_keys` doesn't end with one.
+  - New keys: the private key file is locked to the owner before the key is written, and a `.pub` file the call didn't create is never deleted.
+  - Pasted text has control characters (including Escape) removed before the multi-line check.
+  - Channels a server opens towards this computer (session, agent, X11, direct) are refused; only the remote forwards the user asked for are accepted.
+  - Host names with `, [ ] " '` are refused when saving a session; a remote forward on a non-loopback address needs the same confirmation as the others.
+  - Installing an existing key now works: its own comment (for example `me@laptop`) is replaced by `sshtoolbox`.

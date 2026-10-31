@@ -27,9 +27,13 @@ impl SharedConnection {
     }
 }
 
+/// One slot per saved session. Its lock is held while that session connects, which makes
+/// other panes of the same session wait for it, but never panes of other sessions.
+type Slot = Arc<Mutex<Weak<SharedConnection>>>;
+
 #[derive(Default)]
 pub struct ConnectionPool {
-    entries: Mutex<HashMap<String, Weak<SharedConnection>>>,
+    slots: std::sync::Mutex<HashMap<String, Slot>>,
 }
 
 impl ConnectionPool {
@@ -48,16 +52,22 @@ impl ConnectionPool {
     where
         F: Future<Output = Result<(Connection, Vec<Connection>), AppError>>,
     {
-        let mut entries = self.entries.lock().await;
-        if let Some(shared) = entries.get(key).and_then(Weak::upgrade)
+        let slot = self
+            .slots
+            .lock()
+            .unwrap()
+            .entry(key.to_string())
+            .or_default()
+            .clone();
+        let mut current = slot.lock().await;
+        if let Some(shared) = current.upgrade()
             && !shared.handle.is_closed()
         {
             return Ok(shared);
         }
         let (handle, via) = connect.await?;
         let shared = Arc::new(SharedConnection { handle, _via: via });
-        entries.insert(key.to_string(), Arc::downgrade(&shared));
-        entries.retain(|_, weak| weak.strong_count() > 0);
+        *current = Arc::downgrade(&shared);
         Ok(shared)
     }
 }

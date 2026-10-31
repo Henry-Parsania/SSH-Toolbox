@@ -32,6 +32,16 @@ c2Z53Uovl3KhkSq7nvp0AAAACXRlc3Qtb25seQECAwQ=
 -----END OPENSSH PRIVATE KEY-----
 ";
 
+/// A third throwaway key, for tests that need three servers with different host keys.
+pub const KEY_C: &str = "-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACB5Bjh8pCbdtVNb/37nNPptFwg8tOjNVP5LgWgCjapYZQAAAJDl2Kp05diq
+dAAAAAtzc2gtZWQyNTUxOQAAACB5Bjh8pCbdtVNb/37nNPptFwg8tOjNVP5LgWgCjapYZQ
+AAAEBHBYWvXqBAQmALxUA/XfkxFpzhHoxWkD0UPRSuxX8soXkGOHykJt21U1v/fuc0+m0X
+CDy06M1U/kuBaAKNqlhlAAAACXRlc3Qtb25seQECAwQ=
+-----END OPENSSH PRIVATE KEY-----
+";
+
 /// A key protected by `ENCRYPTED_PASSPHRASE`.
 pub const KEY_ENCRYPTED: &str = "-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABCK+HBloL

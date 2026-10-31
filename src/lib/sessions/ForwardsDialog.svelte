@@ -75,7 +75,7 @@
       return;
     }
     // Listening beyond this computer lets others on the network use the connection: ask first.
-    if (kind !== "remote" && !isLoopback(bindHost) && !confirmExternal) {
+    if (!isLoopback(bindHost) && !confirmExternal) {
       warnExternal = true;
       return;
     }

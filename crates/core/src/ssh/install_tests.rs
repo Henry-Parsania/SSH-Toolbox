@@ -147,6 +147,15 @@ fn a_key_is_never_part_of_a_shell_command() {
 #[test]
 fn only_a_clean_ed25519_line_is_accepted() {
     assert_eq!(validate_key_line(KEY_LINE).unwrap(), KEY_LINE);
+    // Any comment is replaced by the app's own, so a key made elsewhere can be installed.
+    assert_eq!(
+        validate_key_line(OTHER_KEY).unwrap(),
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFD7C7zMBtOyZdIBLxajc17aZb7tI2Wqz3jw0uDu+gvo sshtoolbox"
+    );
+    assert_eq!(
+        validate_key_line("ssh-ed25519 AAAA+/= has a long comment here").unwrap(),
+        "ssh-ed25519 AAAA+/= sshtoolbox"
+    );
     // A missing or app comment is fine, and the app's comment is always the one used.
     assert_eq!(
         validate_key_line("ssh-ed25519 AAAA+/=\n").unwrap(),
@@ -158,8 +167,6 @@ fn only_a_clean_ed25519_line_is_accepted() {
         "ssh-ed25519",
         "ssh-ed25519 AAAA'; rm -rf / ; echo ' sshtoolbox",
         "ssh-ed25519 AAAA\nssh-ed25519 BBBB",
-        "ssh-ed25519 AAAA sshtoolbox extra",
-        "ssh-ed25519 AAAA someone@laptop",
         "ssh-ed25519 AA\"AA sshtoolbox",
         "ssh-ed25519 $(whoami) sshtoolbox",
         "command=\"x\" ssh-ed25519 AAAA sshtoolbox",
@@ -183,6 +190,8 @@ fn the_windows_script_holds_the_key_and_is_encoded_as_utf16() {
     ] {
         assert!(script.contains(needle), "missing {needle}");
     }
+    // A file that doesn't end with a line break gets one before the key is added.
+    assert!(script.contains("$bytes[$bytes.Length - 1] -ne 10"));
     // The format placeholders were all filled in.
     assert!(!script.contains("{{") && !script.contains("}}"));
     assert!(script.contains("\"*${sid}:F\""));

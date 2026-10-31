@@ -137,10 +137,13 @@ pub fn validate_key_line(line: &str) -> Result<String, AppError> {
         )
     };
     let line = line.trim_end_matches(['\r', '\n']);
-    let mut parts = line.split(' ');
-    let (Some(kind), Some(blob), comment, None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
+    // An existing key may carry a comment of its own, such as user@computer. It is dropped and
+    // the app's comment is used instead, but it can't hide a second line or control characters.
+    if line.chars().any(|c| c.is_control()) {
+        return Err(refuse());
+    }
+    let mut parts = line.splitn(3, ' ');
+    let (Some(kind), Some(blob)) = (parts.next(), parts.next()) else {
         return Err(refuse());
     };
     let blob_ok = !blob.is_empty()
@@ -148,7 +151,7 @@ pub fn validate_key_line(line: &str) -> Result<String, AppError> {
         && blob
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "+/=".contains(c));
-    if kind != "ssh-ed25519" || !blob_ok || comment.is_some_and(|c| c != "sshtoolbox") {
+    if kind != "ssh-ed25519" || !blob_ok {
         return Err(refuse());
     }
     Ok(format!("{kind} {blob} sshtoolbox"))
@@ -175,6 +178,10 @@ if ($isAdmin) {{
   $file = Join-Path $dir 'authorized_keys'
 }}
 if ((Test-Path $file) -and (Select-String -Path $file -SimpleMatch -Quiet -Pattern $blob)) {{ 'already-present'; exit 0 }}
+if (Test-Path $file) {{
+  $bytes = [IO.File]::ReadAllBytes($file)
+  if ($bytes.Length -gt 0 -and $bytes[$bytes.Length - 1] -ne 10) {{ Add-Content -Force -Path $file -Encoding ascii -Value '' }}
+}}
 Add-Content -Force -Path $file -Encoding ascii -Value $key
 if ($isAdmin) {{
   icacls.exe $file /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F' | Out-Null

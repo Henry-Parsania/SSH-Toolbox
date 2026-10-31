@@ -1,6 +1,8 @@
 //! Opening an SSH connection, with the host key rules applied (INTERFACES.md section 7).
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -14,7 +16,38 @@ use crate::prompt::{Prompt, Prompter};
 /// How often to check the connection is alive, and how many misses mean it is gone (S5).
 pub const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 pub const KEEPALIVE_MAX: usize = 3;
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long a connection may take, not counting the time the user spends on a question.
+const CONNECT_TIMEOUT: Duration = if cfg!(test) {
+    Duration::from_millis(600)
+} else {
+    Duration::from_secs(20)
+};
+
+struct TimedOut;
+
+/// Waits for `work`, giving up after `CONNECT_TIMEOUT`. The clock stops while a question is
+/// open, so a careful look at a fingerprint can't make the connection fail.
+async fn with_deadline<T>(
+    work: impl Future<Output = T>,
+    asking: &AtomicBool,
+) -> Result<T, TimedOut> {
+    tokio::pin!(work);
+    let tick = Duration::from_millis(100);
+    let mut waited = Duration::ZERO;
+    loop {
+        tokio::select! {
+            done = &mut work => return Ok(done),
+            _ = tokio::time::sleep(tick) => {
+                if !asking.load(Ordering::SeqCst) {
+                    waited += tick;
+                    if waited >= CONNECT_TIMEOUT {
+                        return Err(TimedOut);
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Why the host key check stopped a connection, kept for the caller because the library only
 /// reports "unknown key".
@@ -25,6 +58,7 @@ type Failure = Arc<Mutex<Option<AppError>>>;
 pub type RemoteForwards = Arc<Mutex<std::collections::HashMap<u32, (String, u16)>>>;
 
 pub struct ClientHandler {
+    asking: Arc<AtomicBool>,
     remote: RemoteForwards,
     host: String,
     port: u16,
@@ -40,6 +74,71 @@ fn refuse(failure: &Failure, error: AppError) -> Result<bool, russh::Error> {
 
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
+
+    // A server can open channels towards this computer. Only remote forwards the user asked
+    // for are accepted (below). Everything else is refused, so a hostile server can't reach
+    // an agent, a display or any other service through the connection.
+    async fn server_channel_open_session(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn server_channel_open_agent_forward(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn server_channel_open_direct_tcpip(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _host: &str,
+        _port: u32,
+        _originator: &str,
+        _originator_port: u32,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn server_channel_open_direct_streamlocal(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _path: &str,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn server_channel_open_forwarded_streamlocal(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _path: &str,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn server_channel_open_x11(
+        &mut self,
+        _channel: russh::Channel<client::Msg>,
+        _originator: &str,
+        _originator_port: u32,
+        _reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
     /// A connection arrives through a remote forward: pass it on to the place chosen for that
     /// port. A port nobody asked for is refused.
@@ -111,7 +210,10 @@ impl client::Handler for ClientHandler {
             },
         };
 
-        match self.prompter.ask(prompt).await {
+        self.asking.store(true, Ordering::SeqCst);
+        let answer = self.prompter.ask(prompt).await;
+        self.asking.store(false, Ordering::SeqCst);
+        match answer {
             Ok(answer) if answer.accepted => {
                 if let Err(error) = learn(&self.host, self.port, key, &self.known_hosts) {
                     return refuse(&self.failure, error);
@@ -164,10 +266,12 @@ fn make_handler(
     port: u16,
     known_hosts: PathBuf,
     prompter: Prompter,
-) -> (ClientHandler, Failure, RemoteForwards) {
+) -> (ClientHandler, Failure, RemoteForwards, Arc<AtomicBool>) {
     let failure: Failure = Arc::default();
     let remote = RemoteForwards::default();
+    let asking = Arc::new(AtomicBool::new(false));
     let handler = ClientHandler {
+        asking: asking.clone(),
         remote: remote.clone(),
         host: host.to_string(),
         port,
@@ -175,13 +279,13 @@ fn make_handler(
         prompter,
         failure: failure.clone(),
     };
-    (handler, failure, remote)
+    (handler, failure, remote, asking)
 }
 
 /// Turns what the library said into a plain message, with the host key check's own reason first
 /// because the library only says "unknown key".
 fn explain<T>(
-    attempt: Result<Result<T, russh::Error>, tokio::time::error::Elapsed>,
+    attempt: Result<Result<T, russh::Error>, TimedOut>,
     failure: &Failure,
     host: &str,
     port: u16,
@@ -209,10 +313,10 @@ pub async fn connect(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure, remote) = make_handler(host, port, known_hosts, prompter);
-    let attempt = tokio::time::timeout(
-        CONNECT_TIMEOUT,
+    let (handler, failure, remote, asking) = make_handler(host, port, known_hosts, prompter);
+    let attempt = with_deadline(
         client::connect(make_config(), (host, port), handler),
+        &asking,
     )
     .await;
     explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
@@ -227,13 +331,16 @@ pub async fn connect_through(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure, remote) = make_handler(host, port, known_hosts, prompter);
-    let attempt = tokio::time::timeout(CONNECT_TIMEOUT, async {
-        let channel = jump
-            .channel_open_direct_tcpip(host, port.into(), "127.0.0.1", 0)
-            .await?;
-        client::connect_stream(make_config(), channel.into_stream(), handler).await
-    })
+    let (handler, failure, remote, asking) = make_handler(host, port, known_hosts, prompter);
+    let attempt = with_deadline(
+        async {
+            let channel = jump
+                .channel_open_direct_tcpip(host, port.into(), "127.0.0.1", 0)
+                .await?;
+            client::connect_stream(make_config(), channel.into_stream(), handler).await
+        },
+        &asking,
+    )
     .await;
     explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
 }

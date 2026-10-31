@@ -51,25 +51,47 @@ pub fn decide(
     // The library treats a file it can't open as having no keys, which would show a changed key
     // as a harmless first connection. So read the file here first: a missing file is empty, and
     // any other failure stops the connection.
-    match std::fs::read(known_hosts) {
-        Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+    let text = match std::fs::read(known_hosts) {
+        Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(_) => return Err(unreadable(known_hosts)),
+    };
+
+    // Host names are not case sensitive, and the library compares them as written.
+    let host = &host.to_ascii_lowercase();
+    // Lines the library cannot read but OpenSSH honours would make a pinned host look new, so
+    // the host cannot be checked at all rather than being trusted as a first connection.
+    if has_unreadable_entry(&text, host, port) {
+        return Err(AppError::new(
+            ErrorCode::ConnectionFailed,
+            format!(
+                "{} has an entry for {host} that this app can't check (it uses tabs, wildcards or \
+                 a marker such as @cert-authority). Replace it with a plain line, \
+                 `host ssh-ed25519 key`, to connect.",
+                known_hosts.display()
+            ),
+        ));
     }
 
     let fingerprint = fingerprint_of(key);
     match check_known_hosts_path(host, port, key, known_hosts) {
         Ok(true) => Ok(HostKeyDecision::Trusted),
-        Err(KeyError::KeyChanged { line }) => Err(AppError::new(
-            ErrorCode::HostKeyChanged,
-            format!(
-                "The key of {host} has changed. It now offers {fingerprint}, but {} (line {line}) \
-                 records a different one. This could be an attack, or the server may have been \
-                 reinstalled. If you are sure it is safe, delete line {line} from that file and \
-                 connect again.",
-                known_hosts.display()
-            ),
-        )),
+        Err(KeyError::KeyChanged { line }) => {
+            // The library's count skips comment lines, so it can point at the wrong line. Find
+            // the real one, and also give the command that removes exactly this host.
+            let line = physical_line(&text, host, port).unwrap_or(line);
+            let name = host_form(host, port);
+            Err(AppError::new(
+                ErrorCode::HostKeyChanged,
+                format!(
+                    "The key of {host} has changed. It now offers {fingerprint}, but {} (line {line}) \
+                     records a different one. This could be an attack, or the server may have been \
+                     reinstalled. If you are sure it is safe, remove that entry (for example with \
+                     ssh-keygen -R \"{name}\") and connect again.",
+                    known_hosts.display()
+                ),
+            ))
+        }
         Ok(false) => {
             // The library also says "no" when the host is known only by keys of another type.
             let known = known_host_keys_path(host, port, known_hosts)
@@ -96,6 +118,76 @@ pub fn decide(
         }
         Err(_) => Err(unreadable(known_hosts)),
     }
+}
+
+/// The name a `known_hosts` line uses for this host, in the form OpenSSH writes it.
+fn host_form(host: &str, port: u16) -> String {
+    if port == 22 {
+        host.to_string()
+    } else {
+        format!("[{host}]:{port}")
+    }
+}
+
+/// A small `*` and `?` matcher, for host patterns.
+fn glob(pattern: &str, text: &str) -> bool {
+    fn go(p: &[char], t: &[char]) -> bool {
+        match p.first() {
+            None => t.is_empty(),
+            Some('*') => (0..=t.len()).any(|i| go(&p[1..], &t[i..])),
+            Some('?') => !t.is_empty() && go(&p[1..], &t[1..]),
+            Some(c) => t.first() == Some(c) && go(&p[1..], &t[1..]),
+        }
+    }
+    let (p, t): (Vec<char>, Vec<char>) = (pattern.chars().collect(), text.chars().collect());
+    go(&p, &t)
+}
+
+/// The 1-based number of the first real line that names this host. Every physical line is
+/// counted, comments and blank lines included.
+fn physical_line(text: &str, host: &str, port: u16) -> Option<usize> {
+    let wanted = host_form(host, port);
+    text.lines().enumerate().find_map(|(i, line)| {
+        let first = line.split_whitespace().next()?;
+        if first.starts_with('#') || first.starts_with('@') {
+            return None;
+        }
+        first
+            .split(',')
+            .any(|name| name.eq_ignore_ascii_case(&wanted))
+            .then_some(i + 1)
+    })
+}
+
+/// True if some line applies to this host but is written in a way the library would skip: split
+/// by a tab or several spaces, using a wildcard or negation, or starting with a marker.
+fn has_unreadable_entry(text: &str, host: &str, port: u16) -> bool {
+    let wanted = host_form(host, port);
+    text.lines().any(|line| {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            return false;
+        }
+        let odd_spacing = line.contains('\t') || line.contains("  ") || line.starts_with(' ');
+        let mut tokens = trimmed.split_whitespace();
+        let first = tokens.next().unwrap_or("");
+        let (marker, patterns) = if first.starts_with('@') {
+            (true, tokens.next().unwrap_or(""))
+        } else {
+            (false, first)
+        };
+        patterns.split(',').any(|name| {
+            let negated = name.starts_with('!');
+            let name = name.trim_start_matches('!');
+            let wild = name.contains(['*', '?']);
+            let applies = if wild {
+                glob(&name.to_ascii_lowercase(), &wanted) || glob(&name.to_ascii_lowercase(), host)
+            } else {
+                name.eq_ignore_ascii_case(&wanted)
+            };
+            applies && (marker || odd_spacing || wild || negated)
+        })
+    })
 }
 
 /// Records a key the user accepted.
@@ -250,6 +342,93 @@ mod tests {
             assert_eq!(err.code, ErrorCode::ConnectionFailed);
             assert!(err.message.contains("can't be read"), "{}", err.message);
         }
+    }
+
+    #[test]
+    fn the_line_number_counts_comments_and_blank_lines() {
+        let (_d, path) = setup();
+        std::fs::write(&path, "# first comment\n# second comment\n\n").unwrap();
+        learn("a.example", 22, &key(ED_A), &path).unwrap();
+        learn("b.example", 22, &key(ED_A), &path).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let expected = text
+            .lines()
+            .position(|l| l.starts_with("b.example"))
+            .unwrap()
+            + 1;
+        let err = decide("b.example", 22, &key(ED_B), &path).unwrap_err();
+        assert_eq!(err.code, ErrorCode::HostKeyChanged);
+        assert!(
+            err.message.contains(&format!("(line {expected})")),
+            "expected line {expected}: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("ssh-keygen -R \"b.example\""),
+            "{}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn a_host_on_another_port_is_named_the_way_ssh_keygen_expects() {
+        let (_d, path) = setup();
+        learn("h.example", 2222, &key(ED_A), &path).unwrap();
+        let err = decide("h.example", 2222, &key(ED_B), &path).unwrap_err();
+        assert!(err.message.contains("[h.example]:2222"), "{}", err.message);
+    }
+
+    #[test]
+    fn a_name_typed_in_capitals_still_matches_its_entry() {
+        let (_d, path) = setup();
+        learn("server.example", 22, &key(ED_A), &path).unwrap();
+        assert_eq!(
+            decide("Server.Example", 22, &key(ED_A), &path).unwrap(),
+            HostKeyDecision::Trusted
+        );
+        // And a different key is a change, not a first connection.
+        assert_eq!(
+            decide("SERVER.example", 22, &key(ED_B), &path)
+                .unwrap_err()
+                .code,
+            ErrorCode::HostKeyChanged
+        );
+    }
+
+    #[test]
+    fn entries_the_library_cannot_read_stop_the_check_instead_of_looking_new() {
+        for line in [
+            "server.example\tssh-ed25519 AAAA\n",
+            "server.example  ssh-ed25519 AAAA\n",
+            "*.example ssh-ed25519 AAAA\n",
+            "@cert-authority server.example ssh-ed25519 AAAA\n",
+            "@revoked server.example ssh-ed25519 AAAA\n",
+            "server.* ssh-ed25519 AAAA\n",
+        ] {
+            let (_d, path) = setup();
+            std::fs::write(&path, line).unwrap();
+            let err = decide("server.example", 22, &key(ED_A), &path).unwrap_err();
+            assert_eq!(err.code, ErrorCode::ConnectionFailed, "{line:?}");
+            assert!(
+                err.message.contains("can't check"),
+                "{line:?}: {}",
+                err.message
+            );
+        }
+    }
+
+    #[test]
+    fn unrelated_odd_entries_do_not_get_in_the_way() {
+        let (_d, path) = setup();
+        std::fs::write(
+            &path,
+            "other.example\tssh-ed25519 AAAA\n*.corp ssh-ed25519 AAAA\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            decide("server.example", 22, &key(ED_A), &path).unwrap(),
+            HostKeyDecision::Unknown { .. }
+        ));
     }
 
     #[test]

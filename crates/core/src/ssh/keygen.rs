@@ -149,6 +149,13 @@ pub fn generate_key(dir: &Path, passphrase: Option<&Secret>) -> Result<NewKey, A
             Err(_) => return Err(failed("Couldn't create the private key file.")),
         };
 
+        // Close the file to everyone else while it is still empty, so the key is never in a
+        // file that others could read, not even briefly.
+        if let Err(error) = restrict_to_owner(&private_path) {
+            drop(private_file);
+            let _ = std::fs::remove_file(&private_path);
+            return Err(error);
+        }
         let written = (|| {
             private_file.write_all(private_text.as_bytes())?;
             private_file.sync_all()
@@ -158,15 +165,26 @@ pub fn generate_key(dir: &Path, passphrase: Option<&Secret>) -> Result<NewKey, A
             let _ = std::fs::remove_file(&private_path);
             return Err(failed("Couldn't write the private key file."));
         }
-        // Never leave a private key that others could read.
-        if let Err(error) = restrict_to_owner(&private_path) {
-            let _ = std::fs::remove_file(&private_path);
-            return Err(error);
-        }
 
-        let public_written = create_new(&public_path, false)
-            .and_then(|mut f| f.write_all(format!("{public_line}\n").as_bytes()));
-        if public_written.is_err() {
+        // The public file is created new too. If someone else's file turned up in the meantime
+        // it is left alone: this key is removed and the next name is tried.
+        let mut public_file = match create_new(&public_path, false) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let _ = std::fs::remove_file(&private_path);
+                continue;
+            }
+            Err(_) => {
+                let _ = std::fs::remove_file(&private_path);
+                return Err(failed("Couldn't write the public key file."));
+            }
+        };
+        if public_file
+            .write_all(format!("{public_line}\n").as_bytes())
+            .is_err()
+        {
+            drop(public_file);
+            // This call created both files, so both may go.
             let _ = std::fs::remove_file(&private_path);
             let _ = std::fs::remove_file(&public_path);
             return Err(failed("Couldn't write the public key file."));
