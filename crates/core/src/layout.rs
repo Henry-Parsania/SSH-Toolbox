@@ -114,7 +114,8 @@ impl Layout {
 pub fn load(path: &Path) -> Option<Layout> {
     let text = std::fs::read_to_string(path).ok()?;
     match toml::from_str::<Layout>(&text) {
-        Ok(layout) if layout.validate().is_ok() && !layout.tabs.is_empty() => Some(layout),
+        // No tabs saved (every tab was closed) just means start fresh.
+        Ok(layout) if layout.validate().is_ok() => Some(layout).filter(|l| !l.tabs.is_empty()),
         _ => {
             set_aside(path);
             None
@@ -200,6 +201,22 @@ mod tests {
     fn no_file_means_start_fresh() {
         let (_dir, path) = path();
         assert_eq!(load(&path), None);
+    }
+
+    #[test]
+    fn a_layout_with_no_tabs_means_start_fresh_and_is_not_treated_as_broken() {
+        let (dir, path) = path();
+        save(
+            &path,
+            &Layout {
+                version: 1,
+                active_tab: String::new(),
+                tabs: vec![],
+            },
+        )
+        .unwrap();
+        assert_eq!(load(&path), None);
+        assert!(!dir.path().join("layout.toml.bad").exists());
     }
 
     #[test]

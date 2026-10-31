@@ -1,16 +1,27 @@
 <script lang="ts">
-  import { layoutGet, layoutSet, listShells, listWslDistros, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
+  import { layoutGet, layoutSet, type SavedSession, listShells, listWslDistros, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
   import PaneTree from "./lib/layout/PaneTree.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
+  import { Library } from "./lib/sessions/library.svelte";
+  import Sidebar from "./lib/sessions/Sidebar.svelte";
   import { loadSettings, settings } from "./lib/settings.svelte";
 
   let platform = $state<PlatformInfo | null>(null);
   let shells = $state<Shell[]>([]);
   let distros = $state<string[]>([]);
   let showSettings = $state(false);
+  let sidebarOpen = $state(true);
+  const library = new Library();
+
+  // Only SSH sessions can be opened so far. Serial and FTP arrive in phases 3 and 4.
+  function openSaved(session: SavedSession) {
+    if (session.type === "ssh") {
+      workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
+    }
+  }
   let restored = false;
   const options = $derived<NewTabOption[]>([
     ...[...shells]
@@ -35,6 +46,7 @@
         if (saved) workspace.restore(saved);
         else newTab();
         restored = true;
+        void library.load().catch(() => {});
         // The WSL entries are left out when WSL isn't there.
         if (info.wsl_available) listWslDistros().then((d) => (distros = d), () => {});
       },
@@ -98,7 +110,17 @@
   <p class="error">{failure}</p>
 {:else if platform}
   <div class="app">
-    <TabBar {workspace} {options} onnew={newTab} onsettings={() => (showSettings = true)} />
+    <TabBar
+      {workspace}
+      {options}
+      onnew={newTab}
+      onsettings={() => (showSettings = true)}
+      onsidebar={() => (sidebarOpen = !sidebarOpen)}
+    />
+    <div class="body">
+      {#if sidebarOpen}
+        <Sidebar {library} onopen={openSaved} />
+      {/if}
     <div class="tabs">
       {#each workspace.tabs as tab (tab.id)}
         <!-- Hidden tabs stay mounted, so their terminals keep running. -->
@@ -113,6 +135,7 @@
           />
         </div>
       {/each}
+    </div>
     </div>
   </div>
   {#if showSettings}
@@ -131,6 +154,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+  }
+  .body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
   }
   .tabs {
     position: relative;

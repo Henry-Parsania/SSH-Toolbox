@@ -13,9 +13,10 @@
     options: NewTabOption[];
     onnew: (option?: NewTabOption) => void;
     onsettings: () => void;
+    onsidebar: () => void;
   }
 
-  let { workspace, options, onnew, onsettings }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -66,6 +67,7 @@
 </script>
 
 <div class="bar">
+  <button class="new" aria-label="Show or hide saved sessions" title="Saved sessions" onclick={onsidebar}>☰</button>
   <div class="tabs" bind:this={strip}>
     {#each workspace.tabs as tab (tab.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->

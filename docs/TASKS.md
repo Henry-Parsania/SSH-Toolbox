@@ -69,7 +69,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.3 Connection and host keys (SEC1).** IF section 7. Add the prompt mechanism. Test every row of the host key table. Read `known_hosts` yourself first: see note 2 in LIBRARIES.md.
 - [x] **2.4 Login (S1, SEC2, SEC5).** Password, key, encrypted key and agent. Integration-test each against the container.
 - [x] **2.5 SSH in a pane (S5, P4, Q8).** `TerminalBackend` for SSH, keepalive and the Reconnect button. Integration-test killing the container mid-session: only that pane shows the failure.
-- [ ] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.
+- [x] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.
 - [ ] **2.7 Layout restore for SSH (P6).** Restored SSH panes show a Connect button, and don't connect by themselves.
 - [ ] **2.8 Key generation (K1, K2).** IF section 15, step 1. Test that an existing file is never overwritten.
 - [ ] **2.9 Key install on Linux (K3, K4, K6).** The full flow, including all the integration tests in IF section 15.
