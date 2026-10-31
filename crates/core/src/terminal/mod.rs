@@ -8,7 +8,7 @@ mod registry;
 mod shells;
 mod sink;
 #[cfg(test)]
-mod testing;
+pub(crate) mod testing;
 mod wsl;
 
 pub use backend::{BackendEvent, MAX_BACKEND_READ, QUEUE_SIZE, TermSize, TerminalBackend};

@@ -44,7 +44,43 @@ export type TerminalStatus =
   | { type: "connecting" }
   | { type: "connected" }
   | { type: "exited"; code: number | null }
-  | { type: "failed"; error: AppError };
+  | { type: "failed"; error: AppError }
+  /** A question for the user. Answer it with `promptRespond`. */
+  | { type: "prompt"; prompt_id: string; prompt: Prompt };
+
+export type Prompt =
+  | { kind: "host_key_unknown"; host: string; port: number; algorithm: string; fingerprint: string }
+  | {
+      kind: "host_key_new_type";
+      host: string;
+      port: number;
+      algorithm: string;
+      fingerprint: string;
+      known_algorithms: string[];
+    }
+  | { kind: "password"; user: string; host: string; offer_save: boolean }
+  | { kind: "passphrase"; key_path: string; offer_save: boolean }
+  | {
+      kind: "ftps_certificate";
+      host: string;
+      reason: string;
+      fingerprint: string;
+      subject: string;
+      expires: string;
+    }
+  | { kind: "plain_ftp"; host: string };
+
+export interface PromptResponse {
+  accepted: boolean;
+  /** What was typed, for password and passphrase prompts. */
+  text?: string;
+  /** Remember it in the keychain. */
+  save?: boolean;
+}
+
+export function promptRespond(promptId: string, response: PromptResponse): Promise<void> {
+  return invoke<void>("prompt_respond", { promptId, response });
+}
 
 export function listShells(): Promise<Shell[]> {
   return invoke<Shell[]>("list_shells");

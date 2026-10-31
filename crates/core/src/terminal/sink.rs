@@ -1,15 +1,25 @@
 use serde::Serialize;
 
 use crate::error::AppError;
+use crate::prompt::Prompt;
 
-/// Status messages for the interface. Prompts are added in phase 2.
+/// Status messages for the interface.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TerminalStatus {
     Connecting,
     Connected,
-    Exited { code: Option<i32> },
-    Failed { error: AppError },
+    Exited {
+        code: Option<i32>,
+    },
+    Failed {
+        error: AppError,
+    },
+    /// A question for the user. The answer goes back with `prompt_respond`.
+    Prompt {
+        prompt_id: String,
+        prompt: Prompt,
+    },
 }
 
 /// Where the pump delivers output. `src-tauri` implements this with Tauri channels.

@@ -6,9 +6,11 @@ pub mod keychain;
 pub mod layout;
 pub mod link;
 pub mod platform;
+pub mod prompt;
 pub mod secret;
 pub mod sessions;
 pub mod settings;
+pub mod ssh;
 pub mod terminal;
 
 pub use error::{AppError, ErrorCode};

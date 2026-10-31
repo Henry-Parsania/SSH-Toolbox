@@ -2,6 +2,7 @@ pub mod keychain;
 pub mod layout;
 pub mod link;
 pub mod platform;
+pub mod prompt;
 pub mod sessions;
 pub mod settings;
 pub mod startup;

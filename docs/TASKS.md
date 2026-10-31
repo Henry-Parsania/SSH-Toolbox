@@ -22,7 +22,7 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.4 One terminal in the window (T3, T4, T8).** Add `src/lib/terminal/`, including xterm, fit, Unicode 11, the renderer choice (IF section 11) and flow control (IF section 4). Temporarily fill the window with one local shell.
   *Done when:* the app builds and opens to a shell. Typing, `seq 1 1000000` and `yes` with Ctrl+C are confirmed in task 1.5.
 
-- [ ] **1.5 Owner tries the terminal.** Make a build and ask the owner to try the rendering section of the checklist, on Windows and on Ubuntu. Ubuntu matters most: see the first checkpoint in PLAN.md section 2.
+- [x] **1.5 Owner tries the terminal.** Make a build and ask the owner to try the rendering section of the checklist, on Windows and on Ubuntu. Ubuntu matters most: see the first checkpoint in PLAN.md section 2.
   *Done when:* the owner reports how it went.
 
 - [x] **1.6 Clipboard (T2).** Copy and paste, with the multi-line warning (IF section 12).
@@ -66,7 +66,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 
 - [x] **2.1 Saved sessions (S2).** `sessions.toml` per IF section 9. Test save and reload, a corrupt file (not overwritten) and that no secret appears in the file.
 - [x] **2.2 Keychain (SEC3, SEC4).** IF section 10. Test with a fake store for: normal use, failure, and a call that hangs past the timeout.
-- [ ] **2.3 Connection and host keys (SEC1).** IF section 7. Add the prompt mechanism. Test every row of the host key table. Read `known_hosts` yourself first: see note 2 in LIBRARIES.md.
+- [x] **2.3 Connection and host keys (SEC1).** IF section 7. Add the prompt mechanism. Test every row of the host key table. Read `known_hosts` yourself first: see note 2 in LIBRARIES.md.
 - [ ] **2.4 Login (S1, SEC2, SEC5).** Password, key, encrypted key and agent. Integration-test each against the container.
 - [ ] **2.5 SSH in a pane (S5, P4, Q8).** `TerminalBackend` for SSH, keepalive and the Reconnect button. Integration-test killing the container mid-session: only that pane shows the failure.
 - [ ] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.

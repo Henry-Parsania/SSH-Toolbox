@@ -26,6 +26,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(commands::startup::Startup::now())
         .manage(toolbox_core::keychain::Keychain::system())
+        .manage(toolbox_core::prompt::PromptBroker::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
@@ -35,6 +36,7 @@ pub fn run() {
             commands::layout::layout_get,
             commands::layout::layout_set,
             commands::link::open_link,
+            commands::prompt::prompt_respond,
             commands::sessions::sessions_get,
             commands::sessions::sessions_save,
             commands::sessions::sessions_set_aside_unreadable,
