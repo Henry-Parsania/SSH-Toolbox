@@ -20,7 +20,9 @@ A lightweight, personal MobaXterm-style desktop app for Windows 11 and Ubuntu 26
 - Test your work before you call it done.
 - 
 ## Current status (2026-11-01)
-- Phase 0 is finished. Phase 1 is in progress, and `TASKS.md` shows how far it's got.
+- Phase 0 is finished. Phase 1 is coded (tasks 1.1–1.4 and 1.6–1.16: terminal, clipboard, panes, tabs, shortcuts, WSL, settings, search, links, layout restore, type-into-all, measurements). What's left in phase 1 is for the owner: 1.5 (rendering checks on Windows) and 1.17 (Ubuntu rendering). Task 1.2 stays unticked until Linux CI passes its real-shell tests. Decisions the builder made are in [NOTES.md](NOTES.md).
+- Measured on the owner's Windows PC (release build, one tab): 150 MB memory, usable after 1.3 s.
+- Run the app for testing with `npx tauri dev`, or build a standalone `target\release\app.exe` with `npx tauri build --no-bundle`. In the Bash tool, add `/c/Program Files/nodejs` and `/c/Users/alire/.cargo/bin` to `PATH` first.
 - The owner hasn't run the terminal rendering checks yet, on Windows or on Ubuntu. Rendering on Ubuntu is still the project's biggest unknown. `npx tauri build` hasn't been tried on the owner's machines either: installers come from CI.
 - GitHub repository: https://github.com/Henry-Parsania/SSH-Toolbox (private). Pushing to `main` is approved. Never force-push.
 - This Windows PC has Node.js, Rust (`stable-msvc`), the Visual Studio C++ build tools, git, WSL, WebView2 and Docker Desktop. Docker Desktop wasn't running during phase 0. The Windows `ssh-agent` service is on, with one key.
