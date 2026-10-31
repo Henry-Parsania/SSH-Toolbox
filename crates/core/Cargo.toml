@@ -10,7 +10,7 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 zeroize = "1.9"
-tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
 tokio-util = "0.7"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
