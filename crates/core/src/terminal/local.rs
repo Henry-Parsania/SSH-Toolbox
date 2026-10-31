@@ -56,7 +56,10 @@ fn spawn_error(program: &str, err: Box<dyn std::error::Error + Send + Sync>) -> 
         }
         cause = current.source();
     }
-    let missing = typed_not_found || detail.contains("os error 2");
+    // On Linux, portable-pty searches the path itself and says "No viable candidates found".
+    let missing = typed_not_found
+        || detail.contains("os error 2")
+        || detail.contains("No viable candidates found");
     if missing {
         AppError::new(
             ErrorCode::NotFound,
