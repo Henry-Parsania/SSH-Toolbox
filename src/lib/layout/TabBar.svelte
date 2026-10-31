@@ -12,9 +12,10 @@
     /** What the menu offers: local shells, and WSL distributions when WSL is there. */
     options: NewTabOption[];
     onnew: (option?: NewTabOption) => void;
+    onsettings: () => void;
   }
 
-  let { workspace, options, onnew }: Props = $props();
+  let { workspace, options, onnew, onsettings }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -131,6 +132,8 @@
       </ul>
     {/if}
   </div>
+  <div class="spacer"></div>
+  <button class="new" aria-label="Settings" title="Settings" onclick={onsettings}>⚙</button>
 </div>
 
 <style>
@@ -191,6 +194,9 @@
   .new {
     color: #ccc;
     padding: 0 12px;
+  }
+  .spacer {
+    flex: 1;
   }
   .menu-wrap {
     position: relative;

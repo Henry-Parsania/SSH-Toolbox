@@ -2,12 +2,33 @@ mod commands;
 
 use tauri::{Manager, RunEvent};
 
+/// Sets the web view workaround the user chose, if any. This must run before any threads or the
+/// web view exist, so it is the first thing `run` does. Linux only.
+#[cfg(target_os = "linux")]
+fn apply_webkit_workaround() {
+    let Some(dir) = toolbox_core::config::config_dir() else {
+        return;
+    };
+    let settings = toolbox_core::settings::load(&dir.join("settings.toml"));
+    if let Some((name, value)) = settings.webkit_env() {
+        // SAFETY: nothing else is running yet, so no other thread can read the environment.
+        unsafe { std::env::set_var(name, value) };
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_webkit_workaround() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    apply_webkit_workaround();
+
     let app = tauri::Builder::default()
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::settings::settings_get,
+            commands::settings::settings_set,
             commands::terminal::list_shells,
             commands::terminal::list_wsl_distros,
             commands::terminal::terminal_open,

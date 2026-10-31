@@ -17,15 +17,13 @@
   } from "../backend";
   import { checkPaste, isCopyKey, isPasteKey, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
-  import { chooseRenderer, webglFailureNotice, type RendererSetting } from "./renderer";
+  import { settings } from "../settings.svelte";
+  import { chooseRenderer, webglFailureNotice } from "./renderer";
+  import { terminalTheme } from "./themes";
 
   interface Props {
     spec: SessionSpec;
     platform: PlatformInfo;
-    scrollback?: number;
-    fontSize?: number;
-    fontFamily?: string;
-    renderer?: RendererSetting;
     onstatus?: (status: TerminalStatus) => void;
     /** Give the keyboard to this terminal whenever this becomes true. */
     focused?: boolean;
@@ -34,21 +32,26 @@
   let {
     spec,
     platform,
-    scrollback = 10000,
-    fontSize = 14,
-    fontFamily = "Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace",
-    renderer = "auto",
     onstatus,
     focused = true,
   }: Props = $props();
 
   let focusTerminal: () => void = () => {};
+  let applyAppearance: () => void = () => {};
+  // Font, size, theme and scrollback follow the settings as they change. The renderer is
+  // chosen when the terminal opens.
+  $effect(() => {
+    void [settings.font_family, settings.font_size, settings.theme, settings.scrollback];
+    applyAppearance();
+  });
+
   $effect(() => {
     if (focused) focusTerminal();
   });
 
   let host: HTMLDivElement;
   let notice = $state("");
+  let background = $state("#1e1e1e");
   let pending = $state<{ text: string; check: PasteCheck } | null>(null);
   // Set by mount(), so the confirmation box can reach the terminal.
   let pasteConfirmed: (text: string) => void = () => {};
@@ -68,9 +71,12 @@
 
   const RESIZE_DEBOUNCE_MS = 50;
 
+  /** The chosen font first, then the usual monospace fonts on each system. */
+  function fontStack(family: string): string {
+    return `${family}, Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
+  }
+
   $effect(() => {
-    // Settings are read once when the terminal opens. Live changes come with the settings
-    // screen (task 1.12).
     return untrack(() => mount());
   });
 
@@ -79,13 +85,14 @@
     let disposed = false;
     let sessionId: string | null = null;
 
+    const renderer = settings.renderer;
     const term = new Terminal({
-      scrollback,
-      fontSize,
-      fontFamily,
+      scrollback: settings.scrollback,
+      fontSize: settings.font_size,
+      fontFamily: fontStack(settings.font_family),
+      theme: terminalTheme(settings.theme),
       allowProposedApi: true, // Needed for the Unicode 11 addon.
       cursorBlink: true,
-      theme: { background: "#1e1e1e", foreground: "#d4d4d4" },
       ...(platform.os === "windows" && platform.windows_build !== null
         ? { windowsPty: { backend: "conpty" as const, buildNumber: platform.windows_build } }
         : {}),
@@ -120,6 +127,15 @@
 
     pasteConfirmed = (text) => term.paste(text);
     refocus = () => term.focus();
+    applyAppearance = () => {
+      term.options.fontSize = settings.font_size;
+      term.options.fontFamily = fontStack(settings.font_family);
+      term.options.theme = terminalTheme(settings.theme);
+      term.options.scrollback = settings.scrollback;
+      background = terminalTheme(settings.theme).background;
+      fitIfVisible();
+    };
+    background = terminalTheme(settings.theme).background;
     focusTerminal = () => term.focus();
 
     const input = new InputSender((data) => terminalWrite(sessionId!, data));
@@ -246,7 +262,7 @@
   }
 </script>
 
-<div class="terminal-wrap">
+<div class="terminal-wrap" style:background>
   <div class="terminal" bind:this={host}></div>
   {#if notice}<p class="notice">{notice}</p>{/if}
   {#if pending}

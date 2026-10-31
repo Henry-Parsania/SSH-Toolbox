@@ -43,7 +43,7 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.11 WSL (W1–W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
-- [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).
+- [x] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).
   *Done when:* changes save and survive a restart.
 
 - [ ] **1.13 Search and links (T5, T6, SEC9).** Add search, and links per IF section 13, using `tauri-plugin-opener` from Rust.

@@ -4,19 +4,24 @@
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
+  import SettingsDialog from "./lib/SettingsDialog.svelte";
+  import { loadSettings, settings } from "./lib/settings.svelte";
 
   let platform = $state<PlatformInfo | null>(null);
   let shells = $state<Shell[]>([]);
   let distros = $state<string[]>([]);
+  let showSettings = $state(false);
   const options = $derived<NewTabOption[]>([
-    ...shells.map((s) => ({ label: s.name, spec: { type: "local" as const, shell_id: s.id } })),
+    ...[...shells]
+      .sort((a, b) => Number(b.id === settings.default_shell) - Number(a.id === settings.default_shell))
+      .map((s) => ({ label: s.name, spec: { type: "local" as const, shell_id: s.id } })),
     ...distros.map((d) => ({ label: `WSL: ${d}`, spec: { type: "wsl" as const, distro: d } })),
   ]);
   let failure = $state<string | null>(null);
   const workspace = new Workspace();
 
   $effect(() => {
-    Promise.all([platformInfo(), listShells()]).then(
+    Promise.all([platformInfo(), listShells(), loadSettings().catch(() => {})]).then(
       ([info, found]) => {
         if (found.length === 0) {
           failure = "No shell was found on this computer.";
@@ -75,7 +80,7 @@
   <p class="error">{failure}</p>
 {:else if platform}
   <div class="app">
-    <TabBar {workspace} {options} onnew={newTab} />
+    <TabBar {workspace} {options} onnew={newTab} onsettings={() => (showSettings = true)} />
     <div class="tabs">
       {#each workspace.tabs as tab (tab.id)}
         <!-- Hidden tabs stay mounted, so their terminals keep running. -->
@@ -92,6 +97,9 @@
       {/each}
     </div>
   </div>
+  {#if showSettings}
+    <SettingsDialog {platform} {shells} onclose={() => (showSettings = false)} />
+  {/if}
 {/if}
 
 <style>

@@ -89,3 +89,23 @@ export function terminalAck(sessionId: string, bytes: number): Promise<void> {
 export function terminalClose(sessionId: string): Promise<void> {
   return invoke<void>("terminal_close", { sessionId });
 }
+
+export interface Settings {
+  version: number;
+  font_family: string;
+  font_size: number;
+  theme: "dark" | "light";
+  scrollback: number;
+  renderer: "auto" | "dom" | "webgl";
+  webkit_workaround: "off" | "disable_dmabuf" | "disable_compositing";
+  default_shell: string;
+  restore_layout: boolean;
+}
+
+export function settingsGet(): Promise<Settings> {
+  return invoke<Settings>("settings_get");
+}
+
+export function settingsSet(settings: Settings): Promise<void> {
+  return invoke<void>("settings_set", { settings });
+}

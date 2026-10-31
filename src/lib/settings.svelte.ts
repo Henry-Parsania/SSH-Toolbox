@@ -1,0 +1,28 @@
+// The settings the screen is using. Terminals read these and follow changes as they happen.
+
+import { settingsGet, settingsSet, type Settings } from "./backend";
+
+export const DEFAULT_SETTINGS: Settings = {
+  version: 1,
+  font_family: "monospace",
+  font_size: 14,
+  theme: "dark",
+  scrollback: 10000,
+  renderer: "auto",
+  webkit_workaround: "off",
+  default_shell: "",
+  restore_layout: true,
+};
+
+/** Always has a value, so terminals can start before the file has been read. */
+export const settings = $state<Settings>({ ...DEFAULT_SETTINGS });
+
+export async function loadSettings(): Promise<void> {
+  Object.assign(settings, await settingsGet());
+}
+
+/** Saves, then applies. If saving fails, nothing changes and the error goes to the caller. */
+export async function saveSettings(next: Settings): Promise<void> {
+  await settingsSet(next);
+  Object.assign(settings, next);
+}
