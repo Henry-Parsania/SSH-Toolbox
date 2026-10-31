@@ -2,18 +2,22 @@
 
 mod backend;
 mod local;
+mod open;
 mod pump;
 mod registry;
+mod shells;
 mod sink;
 #[cfg(test)]
 mod testing;
 
 pub use backend::{BackendEvent, MAX_BACKEND_READ, QUEUE_SIZE, TermSize, TerminalBackend};
 pub use local::{LocalShell, ShellSpec};
+pub use open::{SessionSpec, checked_size, open_terminal};
 pub use pump::{
     ACK_DELAY, ACK_THRESHOLD, FLUSH_AFTER, HIGH, LOW, MAX_CHUNK, PumpConfig, PumpHandle, spawn_pump,
 };
 pub use registry::{Session, SessionRegistry};
+pub use shells::{Shell, list_shells, shell_spec};
 pub use sink::{OutputSink, TerminalStatus};
 
 #[cfg(test)]

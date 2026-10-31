@@ -5,6 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# A newer push replaces runs of older pushes that haven't finished, so pushes can't pile up.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: ${{ matrix.name }}

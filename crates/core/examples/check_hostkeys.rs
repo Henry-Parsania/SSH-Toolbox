@@ -81,28 +81,43 @@ fn main() {
     // Row: unreadable file. DEVIATION: russh swallows any open error and reports "no keys"
     // (Ok(false)), which would show an attacker's key as a first connection. The app must read
     // the file itself first: NotFound means empty, any other error fails the connection.
-    // A directory stands in for an unreadable file.
-    let result = check_known_hosts_path("example.test", 22, &ed_a, dir.path());
-    assert!(
-        matches!(result, Ok(false)),
-        "russh now errors by itself; simplify the app's pre-check"
-    );
+    // What matters is a file that can't be OPENED: on Windows a directory can't be opened, and on
+    // Unix a file with no permissions can't (unless the test runs as root). A directory is not a
+    // stand-in on Unix, because opening it works and only reading it fails, which russh reports.
+    let unreadable = dir.path().join("unreadable");
+    #[cfg(windows)]
+    std::fs::create_dir(&unreadable).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(&unreadable, "example.test ssh-ed25519 AAAA\n").unwrap();
+        std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000)).unwrap();
+    }
     let pre_check = |p: &std::path::Path| match std::fs::read(p) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e),
     };
     assert!(
-        pre_check(dir.path()).is_err(),
-        "pre-check must reject an unreadable path"
-    );
-    assert!(
         pre_check(&dir.path().join("missing")).is_ok(),
         "a missing file is just empty"
     );
-    println!(
-        "unreadable file:              russh says Ok(false) (unsafe); app pre-check rejects it"
-    );
+    if std::fs::File::open(&unreadable).is_err() {
+        let result = check_known_hosts_path("example.test", 22, &ed_a, &unreadable);
+        assert!(
+            matches!(result, Ok(false)),
+            "russh now errors by itself; simplify the app's pre-check ({result:?})"
+        );
+        assert!(
+            pre_check(&unreadable).is_err(),
+            "pre-check must reject an unreadable file"
+        );
+        println!(
+            "unreadable file:              russh says Ok(false) (unsafe); app pre-check rejects it"
+        );
+    } else {
+        println!("unreadable file:              skipped (this user can open it, probably root)");
+    }
 
     // Corrupt line: record how it is treated.
     let corrupt = dir.path().join("corrupt");
