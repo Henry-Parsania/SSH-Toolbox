@@ -150,3 +150,32 @@ describe("Workspace layout saving", () => {
     expect(w.activeTabId).toBe("t");
   });
 });
+
+describe("restoring SSH panes", () => {
+  it("SSH panes wait for Connect, local and WSL panes do not", () => {
+    const w = new Workspace();
+    w.restore({
+      version: 1,
+      active_tab: "t",
+      tabs: [
+        {
+          id: "t",
+          title: "t",
+          active: "a",
+          root: {
+            kind: "split",
+            direction: "row",
+            sizes: [0.5, 0.5],
+            children: [
+              { kind: "leaf", pane_id: "a", title: "ssh", spec: { type: "ssh", saved_session_id: "s1" } },
+              { kind: "leaf", pane_id: "b", title: "local", spec: { type: "local", shell_id: "x" } },
+            ],
+          },
+        },
+      ],
+    });
+    expect(w.waiting).toEqual({ a: true });
+    w.connect("a");
+    expect(w.waiting).toEqual({});
+  });
+});

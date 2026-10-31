@@ -41,7 +41,13 @@
   onfocusin={() => workspace.focusPane(tabId, node.pane_id)}
   onpointerdown={() => workspace.focusPane(tabId, node.pane_id)}
 >
-  {#if node.spec}
+  {#if node.spec && workspace.waiting[node.pane_id]}
+    <div class="waiting">
+      <p>{node.title}</p>
+      <p class="hint">This session was open when the app closed. It doesn't connect by itself.</p>
+      <button onclick={() => workspace.connect(node.pane_id)}>Connect</button>
+    </div>
+  {:else if node.spec}
     {#key attempt}
     <TerminalView spec={node.spec} {platform} focused={active && visible}
       searchSignal={workspace.searchTarget === node.pane_id ? workspace.searchCount : 0}
@@ -73,6 +79,35 @@
   }
   .pane.active {
     border-top-color: #007acc;
+  }
+  .waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font: 14px system-ui, sans-serif;
+  }
+  .waiting p {
+    margin: 0;
+  }
+  .waiting .hint {
+    color: #8a8a8a;
+    font-size: 12px;
+  }
+  .waiting button {
+    margin-top: 6px;
+    padding: 5px 18px;
+    font: inherit;
+    color: #fff;
+    background: #0e639c;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
   }
   .ended {
     position: absolute;

@@ -32,6 +32,17 @@ export class Workspace {
   /** Which pane should show its search box, and how many times it has been asked. */
   searchTarget = $state("");
   searchCount = $state(0);
+  /**
+   * Panes brought back from the saved layout that must not connect by themselves (P6): SSH
+   * panes wait for a click on Connect. Local and WSL panes just start fresh.
+   */
+  waiting = $state<Record<string, boolean>>({});
+
+  /** Marks a pane as connected by the user, so it can open. */
+  connect(paneId: string) {
+    delete this.waiting[paneId];
+  }
+
   /** When on, what is typed in one pane goes to every pane in the tab (P5). */
   broadcast = $state(false);
 
@@ -153,6 +164,12 @@ export class Workspace {
 
   /** Replaces everything with a saved layout. Panes start fresh sessions of the saved kind. */
   restore(layout: SavedLayout) {
+    this.waiting = {};
+    for (const tab of layout.tabs) {
+      for (const leaf of leavesOf(tab.root)) {
+        if (leaf.spec?.type === "ssh") this.waiting[leaf.pane_id] = true;
+      }
+    }
     this.tabs = layout.tabs.map((t) => ({
       id: t.id,
       title: t.title,
@@ -175,4 +192,8 @@ function fromSaved(node: SavedPane): PaneNode {
     return { kind: "leaf", pane_id: node.pane_id, spec: node.spec ?? null, title: node.title };
   }
   return { ...node, children: node.children.map(fromSaved) };
+}
+
+function leavesOf(node: SavedPane): Extract<SavedPane, { kind: "leaf" }>[] {
+  return node.kind === "leaf" ? [node] : node.children.flatMap(leavesOf);
 }
