@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::backend::{QUEUE_SIZE, TermSize, TerminalBackend};
@@ -15,7 +15,7 @@ use super::wsl::wsl_spec;
 use crate::error::{AppError, ErrorCode};
 
 /// What to open in a pane. More types are added in the phases that build them.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionSpec {
     Local { shell_id: String },

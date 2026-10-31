@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listShells, listWslDistros, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
+  import { layoutGet, layoutSet, listShells, listWslDistros, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
   import PaneTree from "./lib/layout/PaneTree.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
   import { shortcutFor } from "./lib/layout/shortcuts";
@@ -11,6 +11,7 @@
   let shells = $state<Shell[]>([]);
   let distros = $state<string[]>([]);
   let showSettings = $state(false);
+  let restored = false;
   const options = $derived<NewTabOption[]>([
     ...[...shells]
       .sort((a, b) => Number(b.id === settings.default_shell) - Number(a.id === settings.default_shell))
@@ -22,14 +23,18 @@
 
   $effect(() => {
     Promise.all([platformInfo(), listShells(), loadSettings().catch(() => {})]).then(
-      ([info, found]) => {
+      async ([info, found]) => {
         if (found.length === 0) {
           failure = "No shell was found on this computer.";
           return;
         }
         platform = info;
         shells = found;
-        newTab();
+        // Bring back the last layout if asked to. Its panes start fresh sessions.
+        const saved = settings.restore_layout ? await layoutGet().catch(() => null) : null;
+        if (saved) workspace.restore(saved);
+        else newTab();
+        restored = true;
         // The WSL entries are left out when WSL isn't there.
         if (info.wsl_available) listWslDistros().then((d) => (distros = d), () => {});
       },
@@ -41,6 +46,14 @@
   function newTab(option: NewTabOption | undefined = options[0]) {
     if (option) workspace.newTab(option.spec, option.label);
   }
+
+  // Save the layout shortly after it changes, but not before the old one has been read.
+  $effect(() => {
+    const layout = workspace.toLayout();
+    if (!restored) return;
+    const timer = setTimeout(() => void layoutSet(layout).catch(() => {}), 500);
+    return () => clearTimeout(timer);
+  });
 
   // Runs before the terminal sees the key, so shortcuts never reach the program in the pane.
   $effect(() => {

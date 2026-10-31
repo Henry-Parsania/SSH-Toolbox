@@ -1,7 +1,7 @@
 // Tabs and their pane trees. All the rules for the tree live in panes.ts; this holds the state
 // the screen draws.
 
-import type { SessionSpec } from "../backend";
+import type { SavedLayout, SavedPane, SessionSpec } from "../backend";
 import {
   closePane,
   findLeaf,
@@ -135,7 +135,42 @@ export class Workspace {
     if (tab) tab.root = updateLeaf(tab.root, paneId, { title });
   }
 
+  /** The tabs and panes in the form that is saved to `layout.toml`. */
+  toLayout(): SavedLayout {
+    return {
+      version: 1,
+      active_tab: this.activeTabId,
+      tabs: $state.snapshot(this.tabs).map((t) => ({
+        id: t.id,
+        title: t.title,
+        active: t.active,
+        root: t.root as SavedPane,
+      })),
+    };
+  }
+
+  /** Replaces everything with a saved layout. Panes start fresh sessions of the saved kind. */
+  restore(layout: SavedLayout) {
+    this.tabs = layout.tabs.map((t) => ({
+      id: t.id,
+      title: t.title,
+      active: t.active,
+      root: fromSaved(t.root),
+    }));
+    this.activeTabId = this.tabs.some((t) => t.id === layout.active_tab)
+      ? layout.active_tab
+      : (this.tabs[0]?.id ?? "");
+  }
+
   paneCount(tab: Tab): number {
     return leaves(tab.root).length;
   }
+}
+
+/** A saved pane leaves out `spec` when there is none. */
+function fromSaved(node: SavedPane): PaneNode {
+  if (node.kind === "leaf") {
+    return { kind: "leaf", pane_id: node.pane_id, spec: node.spec ?? null, title: node.title };
+  }
+  return { ...node, children: node.children.map(fromSaved) };
 }

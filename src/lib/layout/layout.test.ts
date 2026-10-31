@@ -117,3 +117,36 @@ describe("Workspace", () => {
     expect(tab.root.kind === "split" && tab.root.sizes[0]).toBeCloseTo(0.7, 9);
   });
 });
+
+describe("Workspace layout saving", () => {
+  const spec = { type: "local", shell_id: "x" } as const;
+
+  it("saves and restores tabs, splits, sizes and the active tab", () => {
+    const w = new Workspace();
+    w.newTab(spec, "one");
+    w.newTab({ type: "wsl", distro: "Ubuntu" }, "two");
+    w.split("row");
+    w.resizeDivider(w.activeTab!.id, [], 0, 0.2);
+    w.selectTab(w.tabs[0].id);
+
+    const saved = JSON.parse(JSON.stringify(w.toLayout()));
+    const again = new Workspace();
+    again.restore(saved);
+
+    expect(again.tabs.map((t) => t.title)).toEqual(["one", "two"]);
+    expect(again.activeTabId).toBe(w.tabs[0].id);
+    expect(again.tabs[1].root).toEqual(w.tabs[1].root);
+    expect(again.paneCount(again.tabs[1])).toBe(2);
+  });
+
+  it("a pane saved without a session comes back with none", () => {
+    const w = new Workspace();
+    w.restore({
+      version: 1,
+      active_tab: "missing",
+      tabs: [{ id: "t", title: "t", active: "p", root: { kind: "leaf", pane_id: "p", title: "p" } }],
+    });
+    expect(w.tabs[0].root).toMatchObject({ kind: "leaf", spec: null });
+    expect(w.activeTabId).toBe("t");
+  });
+});

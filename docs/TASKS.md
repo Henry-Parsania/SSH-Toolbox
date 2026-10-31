@@ -49,7 +49,7 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.13 Search and links (T5, T6, SEC9).** Add search, and links per IF section 13, using `tauri-plugin-opener` from Rust.
   *Done when:* the unsafe-scheme tests pass, and Ctrl+click opens an `https` link.
 
-- [ ] **1.14 Restore layout (P6).** `layout.toml`, restoring tabs and splits. Local and WSL panes start fresh. Reconnecting other types arrives with their phases.
+- [x] **1.14 Restore layout (P6).** `layout.toml`, restoring tabs and splits. Local and WSL panes start fresh. Reconnecting other types arrives with their phases.
   *Done when:* layout returns after restart.
 
 - [ ] **1.15 Should and Could items.** Type into all panes (P5). Save session output (T9), only if cheap. Skip moving tabs to their own window (P7), and record that on the checklist as "later".

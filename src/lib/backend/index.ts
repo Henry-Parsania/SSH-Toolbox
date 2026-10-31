@@ -114,3 +114,22 @@ export function settingsSet(settings: Settings): Promise<void> {
 export function openLink(url: string): Promise<void> {
   return invoke<void>("open_link", { url });
 }
+
+/** The layout as it is saved: tabs and their pane trees. */
+export interface SavedLayout {
+  version: number;
+  active_tab: string;
+  tabs: { id: string; title: string; active: string; root: SavedPane }[];
+}
+
+export type SavedPane =
+  | { kind: "leaf"; pane_id: string; spec?: SessionSpec | null; title: string }
+  | { kind: "split"; direction: "row" | "column"; sizes: number[]; children: SavedPane[] };
+
+export function layoutGet(): Promise<SavedLayout | null> {
+  return invoke<SavedLayout | null>("layout_get");
+}
+
+export function layoutSet(layout: SavedLayout): Promise<void> {
+  return invoke<void>("layout_set", { layout });
+}
