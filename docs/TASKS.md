@@ -67,7 +67,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.1 Saved sessions (S2).** `sessions.toml` per IF section 9. Test save and reload, a corrupt file (not overwritten) and that no secret appears in the file.
 - [x] **2.2 Keychain (SEC3, SEC4).** IF section 10. Test with a fake store for: normal use, failure, and a call that hangs past the timeout.
 - [x] **2.3 Connection and host keys (SEC1).** IF section 7. Add the prompt mechanism. Test every row of the host key table. Read `known_hosts` yourself first: see note 2 in LIBRARIES.md.
-- [ ] **2.4 Login (S1, SEC2, SEC5).** Password, key, encrypted key and agent. Integration-test each against the container.
+- [x] **2.4 Login (S1, SEC2, SEC5).** Password, key, encrypted key and agent. Integration-test each against the container.
 - [ ] **2.5 SSH in a pane (S5, P4, Q8).** `TerminalBackend` for SSH, keepalive and the Reconnect button. Integration-test killing the container mid-session: only that pane shows the failure.
 - [ ] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.
 - [ ] **2.7 Layout restore for SSH (P6).** Restored SSH panes show a Connect button, and don't connect by themselves.
