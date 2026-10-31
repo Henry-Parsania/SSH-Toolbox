@@ -5442,6 +5442,8 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-serial",
+ "tokio-util",
+ "uuid",
  "windows-native-keyring-store",
  "zbus-secret-service-keyring-store",
  "zeroize",

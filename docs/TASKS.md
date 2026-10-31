@@ -69,7 +69,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 
 ## Phase 1: Terminal, tabs and panes
 
-- [ ] **1.1 Output pump.** Build `TerminalBackend`, `BackendEvent`, `OutputSink` and the pump (IF sections 3 and 4), with a session registry holding open sessions by ID. Include all the pump's unit tests.
+- [x] **1.1 Output pump.** Build `TerminalBackend`, `BackendEvent`, `OutputSink` and the pump (IF sections 3 and 4), with a session registry holding open sessions by ID. Include all the pump's unit tests.
   *Done when:* tests pass using a fake backend and sink.
 
 - [ ] **1.2 Local shell backend (T1).** IF section 3. Test with `echo`, resize and exit code.
@@ -99,7 +99,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
-- [ ] **1.11 WSL (W1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
+- [ ] **1.11 WSL (W1ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œW3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
 - [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).

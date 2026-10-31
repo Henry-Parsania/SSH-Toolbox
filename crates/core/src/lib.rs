@@ -3,6 +3,7 @@
 pub mod error;
 pub mod platform;
 pub mod secret;
+pub mod terminal;
 
 pub use error::{AppError, ErrorCode};
 pub use platform::PlatformInfo;
