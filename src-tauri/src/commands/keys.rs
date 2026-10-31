@@ -34,13 +34,13 @@ pub async fn key_list() -> Result<Vec<ExistingKey>, AppError> {
 /// Setups that are running, so the dialog's Cancel can stop one.
 #[derive(Default)]
 pub struct KeySetups {
-    running:
+    pub(crate) running:
         std::sync::Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
 }
 
 /// Delivers only the questions (host key, password) to the interface; there is no output.
-struct QuestionSink {
-    status: tauri::ipc::Channel<toolbox_core::terminal::TerminalStatus>,
+pub(crate) struct QuestionSink {
+    pub(crate) status: tauri::ipc::Channel<toolbox_core::terminal::TerminalStatus>,
 }
 
 impl toolbox_core::terminal::OutputSink for QuestionSink {

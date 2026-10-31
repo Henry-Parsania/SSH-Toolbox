@@ -2,6 +2,7 @@
 
 import {
   keychainAvailable,
+  forwardStopSession,
   keychainDeleteSession,
   sessionsGet,
   sessionsSave,
@@ -33,6 +34,8 @@ export class Library {
   }
 
   async deleteSession(id: string): Promise<void> {
+    // A deleted session can't keep a port open.
+    await forwardStopSession(id).catch(() => {});
     await this.save(removeSession(this.file, id));
     // Deleting a session deletes its saved secrets. A keychain that isn't there is no problem.
     await keychainDeleteSession(id).catch(() => {});

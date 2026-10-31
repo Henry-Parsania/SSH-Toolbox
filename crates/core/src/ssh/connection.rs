@@ -20,7 +20,12 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 /// reports "unknown key".
 type Failure = Arc<Mutex<Option<AppError>>>;
 
+/// Where connections that come in through a remote forward should go, by the port the server
+/// listens on: the host and port on this computer.
+pub type RemoteForwards = Arc<Mutex<std::collections::HashMap<u32, (String, u16)>>>;
+
 pub struct ClientHandler {
+    remote: RemoteForwards,
     host: String,
     port: u16,
     known_hosts: PathBuf,
@@ -35,6 +40,33 @@ fn refuse(failure: &Failure, error: AppError) -> Result<bool, russh::Error> {
 
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
+
+    /// A connection arrives through a remote forward: pass it on to the place chosen for that
+    /// port. A port nobody asked for is refused.
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        _connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        reply: russh::client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let target = self.remote.lock().unwrap().get(&connected_port).cloned();
+        let Some((host, port)) = target else {
+            return Ok(()); // Dropping the handle refuses the channel.
+        };
+        let Ok(mut local) = tokio::net::TcpStream::connect((host.as_str(), port)).await else {
+            return Ok(());
+        };
+        reply.accept().await;
+        tokio::spawn(async move {
+            let mut through = channel.into_stream();
+            let _ = tokio::io::copy_bidirectional(&mut through, &mut local).await;
+        });
+        Ok(())
+    }
 
     async fn check_server_key(
         &mut self,
@@ -98,8 +130,26 @@ impl client::Handler for ClientHandler {
     }
 }
 
-/// An open connection. Terminals and file panels each open their own channel on it.
-pub type Connection = Handle<ClientHandler>;
+/// An open connection. Terminals and file panels each open their own channel on it. It can be
+/// used as the library's handle directly.
+pub struct Connection {
+    handle: Handle<ClientHandler>,
+    /// Where remote forwards on this connection lead.
+    pub remote: RemoteForwards,
+}
+
+impl std::ops::Deref for Connection {
+    type Target = Handle<ClientHandler>;
+    fn deref(&self) -> &Self::Target {
+        &self.handle
+    }
+}
+
+impl std::ops::DerefMut for Connection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.handle
+    }
+}
 
 fn make_config() -> Arc<client::Config> {
     Arc::new(client::Config {
@@ -114,16 +164,18 @@ fn make_handler(
     port: u16,
     known_hosts: PathBuf,
     prompter: Prompter,
-) -> (ClientHandler, Failure) {
+) -> (ClientHandler, Failure, RemoteForwards) {
     let failure: Failure = Arc::default();
+    let remote = RemoteForwards::default();
     let handler = ClientHandler {
+        remote: remote.clone(),
         host: host.to_string(),
         port,
         known_hosts,
         prompter,
         failure: failure.clone(),
     };
-    (handler, failure)
+    (handler, failure, remote)
 }
 
 /// Turns what the library said into a plain message, with the host key check's own reason first
@@ -157,13 +209,13 @@ pub async fn connect(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure) = make_handler(host, port, known_hosts, prompter);
+    let (handler, failure, remote) = make_handler(host, port, known_hosts, prompter);
     let attempt = tokio::time::timeout(
         CONNECT_TIMEOUT,
         client::connect(make_config(), (host, port), handler),
     )
     .await;
-    explain(attempt, &failure, host, port)
+    explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
 }
 
 /// Connects to `host` by way of an already open connection (a jump host). The server's key is
@@ -175,7 +227,7 @@ pub async fn connect_through(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure) = make_handler(host, port, known_hosts, prompter);
+    let (handler, failure, remote) = make_handler(host, port, known_hosts, prompter);
     let attempt = tokio::time::timeout(CONNECT_TIMEOUT, async {
         let channel = jump
             .channel_open_direct_tcpip(host, port.into(), "127.0.0.1", 0)
@@ -183,5 +235,5 @@ pub async fn connect_through(
         client::connect_stream(make_config(), channel.into_stream(), handler).await
     })
     .await;
-    explain(attempt, &failure, host, port)
+    explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
 }

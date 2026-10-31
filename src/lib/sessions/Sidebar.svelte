@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SavedSession } from "../backend";
   import type { Library } from "./library.svelte";
+  import ForwardsDialog from "./ForwardsDialog.svelte";
   import ImportDialog from "./ImportDialog.svelte";
   import KeySetupDialog from "./KeySetupDialog.svelte";
   import SessionEditor from "./SessionEditor.svelte";
@@ -19,6 +20,7 @@
   let editor = $state<{ editing?: SshSession; folder?: string } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
   let importing = $state(false);
+  let forwardsFor = $state<SshSession | null>(null);
   let keySetupFor = $state<SshSession | null>(null);
   let renaming = $state<{ id: string; name: string } | null>(null);
   let message = $state("");
@@ -105,6 +107,7 @@
       <span class="tools">
         <button title="Connect in a new tab" onclick={() => onopen(item.session)}>▶</button>
         {#if item.session.type === "ssh"}
+          <button title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>⇄</button>
           <button title="Set up key login" onclick={() => (keySetupFor = item.session as SshSession)}>🔑</button>
           <button title="Edit" onclick={() => (editor = { editing: item.session as SshSession })}>✎</button>
         {/if}
@@ -168,6 +171,10 @@
 
 {#if editor}
   <SessionEditor {library} editing={editor.editing} folder={editor.folder} onclose={() => (editor = null)} />
+{/if}
+
+{#if forwardsFor}
+  <ForwardsDialog session={forwardsFor} onclose={() => (forwardsFor = null)} />
 {/if}
 
 {#if importing}

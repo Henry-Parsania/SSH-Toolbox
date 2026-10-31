@@ -17,6 +17,16 @@ pub struct SharedConnection {
     _via: Vec<Connection>,
 }
 
+impl SharedConnection {
+    /// For code that makes a connection itself instead of going through the pool.
+    pub fn new(handle: Connection) -> Arc<Self> {
+        Arc::new(Self {
+            handle,
+            _via: Vec::new(),
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct ConnectionPool {
     entries: Mutex<HashMap<String, Weak<SharedConnection>>>,

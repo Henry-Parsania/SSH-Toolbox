@@ -5,6 +5,7 @@ pub mod backend;
 pub mod chain;
 pub mod config_import;
 pub mod connection;
+pub mod forward;
 pub mod hostkeys;
 pub mod install;
 pub mod keygen;
@@ -19,6 +20,9 @@ mod connection_tests;
 
 #[cfg(test)]
 mod backend_tests;
+
+#[cfg(test)]
+mod forward_tests;
 
 #[cfg(test)]
 mod install_tests;

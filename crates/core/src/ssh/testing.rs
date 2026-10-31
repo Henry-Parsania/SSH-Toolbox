@@ -80,6 +80,9 @@ pub struct Stats {
     pub shells: AtomicUsize,
     /// `direct-tcpip` channels that were opened (connections made through this server).
     pub forwarded: AtomicUsize,
+    /// Channels that carry a forwarded connection, in either direction: their data belongs to the
+    /// stream, not to a shell.
+    pub forwarding_channels: Mutex<std::collections::HashSet<ChannelId>>,
 }
 
 #[derive(Clone)]
@@ -88,12 +91,7 @@ struct TestServer(Arc<Accepts>, Arc<Stats>);
 impl server::Server for TestServer {
     type Handler = TestHandler;
     fn new_client(&mut self, _peer: Option<std::net::SocketAddr>) -> TestHandler {
-        TestHandler(
-            self.0.clone(),
-            self.1.clone(),
-            HashMap::new(),
-            Default::default(),
-        )
+        TestHandler(self.0.clone(), self.1.clone(), HashMap::new())
     }
 }
 
@@ -101,8 +99,6 @@ pub struct TestHandler(
     Arc<Accepts>,
     Arc<Stats>,
     HashMap<ChannelId, (String, Vec<u8>)>,
-    /// Channels that carry a forwarded connection: their data belongs to the stream, not a shell.
-    std::collections::HashSet<ChannelId>,
 );
 
 impl server::Handler for TestHandler {
@@ -136,13 +132,63 @@ impl server::Handler for TestHandler {
             return Ok(());
         };
         self.1.forwarded.fetch_add(1, Ordering::SeqCst);
-        self.3.insert(channel.id());
+        self.1
+            .forwarding_channels
+            .lock()
+            .unwrap()
+            .insert(channel.id());
         reply.accept().await;
         tokio::spawn(async move {
             let mut through = channel.into_stream();
             let _ = tokio::io::copy_bidirectional(&mut through, &mut target).await;
         });
         Ok(())
+    }
+
+    /// A remote forward: listens here, and hands each connection to the client.
+    async fn tcpip_forward(
+        &mut self,
+        address: &str,
+        port: &mut u32,
+        session: &mut Session,
+    ) -> Result<bool, Self::Error> {
+        if !self.0.allow_forwarding {
+            return Ok(false);
+        }
+        let Ok(listener) = tokio::net::TcpListener::bind(("127.0.0.1", *port as u16)).await else {
+            return Ok(false);
+        };
+        *port = listener.local_addr().map(|a| a.port() as u32).unwrap_or(0);
+        let (handle, address, connected_port, stats) =
+            (session.handle(), address.to_string(), *port, self.1.clone());
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut socket, peer)) = listener.accept().await else {
+                    return;
+                };
+                let (handle, address, stats) = (handle.clone(), address.clone(), stats.clone());
+                tokio::spawn(async move {
+                    let opened = handle
+                        .channel_open_forwarded_tcpip(
+                            address,
+                            connected_port,
+                            peer.ip().to_string(),
+                            peer.port() as u32,
+                        )
+                        .await;
+                    if let Ok(channel) = opened {
+                        stats
+                            .forwarding_channels
+                            .lock()
+                            .unwrap()
+                            .insert(channel.id());
+                        let mut through = channel.into_stream();
+                        let _ = tokio::io::copy_bidirectional(&mut through, &mut socket).await;
+                    }
+                });
+            }
+        });
+        Ok(true)
     }
 
     async fn pty_request(
@@ -258,7 +304,13 @@ impl server::Handler for TestHandler {
         data: &[u8],
         session: &mut Session,
     ) -> Result<(), Self::Error> {
-        if self.3.contains(&channel) {
+        if self
+            .1
+            .forwarding_channels
+            .lock()
+            .unwrap()
+            .contains(&channel)
+        {
             return Ok(());
         }
         if let Some((_, stdin)) = self.2.get_mut(&channel) {

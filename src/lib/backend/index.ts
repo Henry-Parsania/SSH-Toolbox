@@ -355,3 +355,56 @@ export function sshConfigPreview(): Promise<ImportPreviewItem[]> {
 export function sshConfigImport(aliases: string[]): Promise<ImportResult> {
   return invoke<ImportResult>("ssh_config_import", { aliases });
 }
+
+export type ForwardSpec = (
+  | { type: "local"; dest_host: string; dest_port: number }
+  | { type: "remote"; dest_host: string; dest_port: number }
+  | { type: "socks" }
+) & {
+  /** Where to listen: this computer for local and SOCKS, the server for remote. */
+  bind_host: string;
+  /** 0 lets the system choose a free port. */
+  bind_port: number;
+};
+
+export interface ForwardInfo {
+  id: string;
+  session_id: string;
+  spec: ForwardSpec;
+  /** The port really listening. */
+  port: number;
+}
+
+/**
+ * Starts a port forward on a saved session, connecting first if needed (questions arrive through
+ * `onStatus`). `confirmExternal` is only for a listener open to the network, after warning.
+ */
+export function forwardStart(
+  operationId: string,
+  savedSessionId: string,
+  spec: ForwardSpec,
+  confirmExternal: boolean,
+  onStatus: (status: TerminalStatus) => void,
+): Promise<ForwardInfo> {
+  const channel = new Channel<TerminalStatus>();
+  channel.onmessage = onStatus;
+  return invoke<ForwardInfo>("forward_start", {
+    operationId,
+    savedSessionId,
+    spec,
+    confirmExternal,
+    onStatus: channel,
+  });
+}
+
+export function forwardStop(id: string): Promise<void> {
+  return invoke<void>("forward_stop", { id });
+}
+
+export function forwardStopSession(savedSessionId: string): Promise<void> {
+  return invoke<void>("forward_stop_session", { savedSessionId });
+}
+
+export function forwardList(): Promise<ForwardInfo[]> {
+  return invoke<ForwardInfo[]>("forward_list");
+}

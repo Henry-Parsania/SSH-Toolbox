@@ -48,9 +48,14 @@ pub fn run() {
         .manage(broker)
         .manage(services)
         .manage(commands::keys::KeySetups::default())
+        .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::forward::forward_list,
+            commands::forward::forward_start,
+            commands::forward::forward_stop,
+            commands::forward::forward_stop_session,
             commands::keychain::keychain_available,
             commands::keychain::keychain_delete_session,
             commands::keychain::keychain_set,
