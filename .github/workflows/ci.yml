@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # Installers are slow, so they're built only for these tags and manual runs.
+    tags: ['build-*']
   workflow_dispatch:
 
 # A newer push replaces runs of older pushes that haven't finished, so pushes can't pile up.
@@ -96,10 +98,15 @@ jobs:
       - name: Interface tests
         run: npm test
 
+      - name: Interface build
+        run: npm run build
+
       - name: Build the app
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: npx tauri build --bundles ${{ matrix.bundles }}
 
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         with:
           name: ssh-toolbox-${{ runner.os }}
           path: ${{ matrix.artifact_paths }}

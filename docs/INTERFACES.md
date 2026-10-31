@@ -1,8 +1,8 @@
 # SSH Toolbox: Interfaces and Exact Details
 
-This is the contract for the code. It settles details so the builder doesn't have to guess. The Rust and TypeScript here show the intended shape: small syntax changes are fine, but changes in meaning aren't. See the stop rules in [PLAN.md](PLAN.md) section 6.
+This is the design so far, and it's here to save working things out twice. Improve it when you find something better, and update this file when you do. Sections 7, 10 and 15 handle logins and passwords, so take a little more care when changing those.
 
-Facts about libraries were checked against their source on 2026-10-31, but they haven't been run yet. Task 0.7 proves the important ones.
+What real testing found is in [LIBRARIES.md](LIBRARIES.md). Where that differs from this file, trust it.
 
 ## 1. App identity
 
@@ -96,7 +96,7 @@ Output moves like this:
 Backend -> queue of 32 -> pump task -> Tauri channel -> xterm.write(chunk, callback) -> terminal_ack
 ```
 
-Use these numbers:
+Start with these numbers, and tune them if measurements suggest better ones:
 
 | Name | Value | Meaning |
 |---|---|---|
@@ -106,7 +106,7 @@ Use these numbers:
 | `LOW` | 100,000 bytes unacknowledged | Pump starts again |
 | Ack threshold | 32 KiB, or 50 ms after the last unsent ack | When the interface reports processed bytes |
 
-`LOW` must stay above the ack threshold, or the pump could wait forever for an ack the interface is holding back. Change these numbers only after measuring, and record why. xterm's own guide says `HIGH` should stay at 500K or below to keep keystrokes responsive.
+`LOW` must stay above the ack threshold, or the pump could wait forever for an ack the interface is holding back. xterm's own guide says `HIGH` should stay at 500K or below to keep keystrokes responsive.
 
 **Pump rules:**
 - Send `Data` chunks as `InvokeResponseBody::Raw` through `tauri::ipc::Channel<InvokeResponseBody>`. Never use Tauri events for terminal output, as Tauri's docs say they aren't built for high throughput. Don't convert bytes to strings, because a multi-byte character can be split across chunks. xterm's `write` accepts `Uint8Array` and handles that.
@@ -210,7 +210,7 @@ pub trait FileBackend: Send + Sync {
 - **FTP:** a control connection handles one thing at a time. Keep one for browsing, and open a new login for each transfer. Use passive mode.
 - **WSL (W4):** use the local backend with paths under `\\wsl.localhost\<distro>\`.
 
-**Remote file names (SEC11).** Before writing a downloaded folder to disk, reject any entry name that is empty, is `.` or `..`, or contains `/`, `\` or a NUL character. Also reject Windows drive prefixes such as `C:`. Report rejected names and carry on with the rest. Don't follow remote symlinks when downloading folders. Unit-test all of these.
+**Remote file names (SEC11).** Before writing a downloaded folder to disk, reject any entry name that is empty, is `.` or `..`, or contains `/`, `\` or a NUL character. Also reject Windows drive prefixes such as `C:`. Report rejected names and carry on with the rest. Skip remote symlinks when downloading folders. A small unit test of the name check is enough.
 
 ## 7. SSH details
 
@@ -234,7 +234,7 @@ type Prompt =
 | `Err(Error::KeyChanged { line })` | **Block, with no way to continue.** Return `HostKeyChanged`, with a message giving the host, the new fingerprint, the file and the line, and explaining this could be an attack or a reinstalled server, and that the user removes that line to accept it |
 | `Ok(false)`, and `known_host_keys_path` finds **no** keys for this host | `host_key_unknown` prompt. On yes, save with `learn_known_hosts_path` |
 | `Ok(false)`, but the host **has** keys of other types | `host_key_new_type` prompt, in warning colors, with Cancel as the default button. Say a different type of key was offered and that this can happen after a server upgrade, but can also be an attack |
-| Any other error, such as an unreadable file | Fail the connection with a clear message. Never treat this as "accepted" |
+| Any other error, such as an unreadable file | Fail the connection with a clear message. Never treat this as "accepted". `russh` reports an unopenable file as "no keys", so read the file first (LIBRARIES.md note 2) |
 
 **The last two rows matter:** `russh` returns `Ok(false)` rather than `KeyChanged` when the new key's type differs from the recorded one. A plain `Ok(false)` check would show an attacker's key as a harmless first connection. Unit-test every row, including this one. Jump hosts go through the same check at each hop.
 

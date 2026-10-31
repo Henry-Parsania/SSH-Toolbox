@@ -45,8 +45,8 @@ These are checked on Windows first and on the Ubuntu machine later, using the me
 | SEC4 | If the keychain fails or is missing, keep running and ask for the password each time. This has been seen in practice: `gnome-keyring-daemon` crashed on the Ubuntu test machine | Must |
 | SEC5 | Refer to private keys by file path, and never copy them into app data | Must |
 | SEC6 | Warn before connecting with plain, unencrypted FTP | Must |
-| SEC7 | Run a security review of the code, by a stronger model than the builder, before first use on real servers. Until then, test only against throwaway servers | Must |
-| SEC8 | Verify FTPS certificates. If verification fails, show the reason and fingerprint and connect only if the user accepts. Save the accepted fingerprint with the session, and block with a clear warning if it later changes | Must |
+| SEC7 | Run one security review of the login code, in a separate session from the one that wrote it, before relying on it for daily use | Must |
+| SEC8 | Verify FTPS certificates. If verification fails, show the reason and fingerprint and connect only if the user accepts. Save the accepted fingerprint with the session, and ask again if it later changes | Must |
 | SEC9 | Open terminal links only on Ctrl+click, and only `http` and `https` links. The backend enforces this | Must |
 | SEC10 | Use a strict content security policy and minimal Tauri permissions, as set out in INTERFACES.md section 14 | Must |
 | SEC11 | Treat remote names as untrusted. A folder download can't write outside its chosen destination, and remote text is never rendered as HTML | Must |

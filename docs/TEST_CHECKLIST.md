@@ -1,8 +1,8 @@
 # SSH Toolbox: Owner Test Checklist
 
-These are the tests on real machines. Windows comes first, and Ubuntu follows later. Claude tells you when a list is ready and how to get the build. Report problems with a screenshot and what you did.
+This is a reminder of what's worth trying on real machines, not a sign-off form. Try what you care about, when there's a build worth trying, and skip what you don't use. The one thing that really needs doing is marked **Important** below. A screenshot and what you did is plenty when something's wrong.
 
-For Ubuntu tests, download the `.deb` from the latest GitHub Actions run of the repository and install it with `sudo apt install ./<file>.deb`.
+To get a build, ask Claude to make one. Then download it from the repository's Actions tab on GitHub. On Ubuntu, install the `.deb` with `sudo apt install ./<file>.deb`.
 
 ## How targets are measured
 
@@ -43,7 +43,7 @@ For Ubuntu tests, download the `.deb` from the latest GitHub Actions run of the 
 - [ ] Your WSL distro opens. `docker-desktop` isn't offered.
 - [ ] Q2 and Q3 numbers recorded: ______
 
-**Ubuntu rendering decision, before phase 2 (also send your GPU model from `lspci | grep -i vga`)**
+**Important: Ubuntu rendering, before phase 2 (also send your GPU model from `lspci | grep -i vga`)**
 - [ ] Q4, Q5, Q6 and Q7 pass with renderer `auto` (DOM).
 - [ ] If they don't: try renderer `webgl`, then each `webkit_workaround` setting. Report which helped.
 - [ ] Scrolling is smooth enough for daily use. This is your call.
@@ -54,7 +54,7 @@ For Ubuntu tests, download the `.deb` from the latest GitHub Actions run of the 
 - [ ] Splits, tabs and shortcuts work, including that GNOME doesn't take any of them.
 
 ## Phase 2
-Run these only after Claude confirms the security review is done.
+Claude will say when the login code has had its review. Try key setup first on a server you can still reach another way.
 
 **Windows**
 - [ ] Connect to a real server with a password, a key, a passphrase-protected key and an agent.
@@ -111,7 +111,7 @@ Run these only after Claude confirms the security review is done.
 ## Phase 6
 - [ ] Installers work on a clean install on Windows and Ubuntu.
 - [ ] Q1â€“Q8 measured on both, and recorded here: ______
-- [ ] All "Ubuntu (later)" items above are done.
+- [ ] The "Ubuntu (later)" items you care about are done.
 
 ## Deferred on purpose
 - T9, P7 and F8 are Could items. Tasks 1.15 and 3.10 record what was decided.
