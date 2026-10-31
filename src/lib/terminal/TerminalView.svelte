@@ -15,6 +15,7 @@
     type SessionSpec,
     type TerminalStatus,
   } from "../backend";
+  import { checkPaste, isCopyKey, isPasteKey, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
   import { chooseRenderer, webglFailureNotice, type RendererSetting } from "./renderer";
 
@@ -40,6 +41,22 @@
 
   let host: HTMLDivElement;
   let notice = $state("");
+  let pending = $state<{ text: string; check: PasteCheck } | null>(null);
+  // Set by mount(), so the confirmation box can reach the terminal.
+  let pasteConfirmed: (text: string) => void = () => {};
+  let refocus: () => void = () => {};
+
+  function confirmPaste() {
+    if (!pending) return;
+    pasteConfirmed(pending.text);
+    pending = null;
+    refocus();
+  }
+
+  function cancelPaste() {
+    pending = null;
+    refocus();
+  }
 
   const RESIZE_DEBOUNCE_MS = 50;
 
@@ -93,11 +110,45 @@
     // Acknowledgements for output that arrives before the session ID is known.
     let earlyAcks = 0;
 
+    pasteConfirmed = (text) => term.paste(text);
+    refocus = () => term.focus();
+
     const input = new InputSender((data) => terminalWrite(sessionId!, data));
     const dataSub = term.onData((text) => input.push(encoder.encode(text)));
     const binarySub = term.onBinary((text) =>
       input.push(Uint8Array.from(text, (c) => c.charCodeAt(0))),
     );
+
+    // Copy and paste (T2). Every paste goes through here, whatever started it, so the
+    // multi-line warning can't be skipped.
+    function requestPaste(text: string) {
+      if (!text) return;
+      const check = checkPaste(text);
+      if (check.needsConfirm) pending = { text, check };
+      else term.paste(text);
+    }
+    const onPasteEvent = (e: ClipboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      requestPaste(e.clipboardData?.getData("text/plain") ?? "");
+    };
+    // Capture phase, so it runs before xterm's own paste handler.
+    host.addEventListener("paste", onPasteEvent, true);
+
+    term.attachCustomKeyEventHandler((e) => {
+      if (isCopyKey(e)) {
+        e.preventDefault();
+        const selection = term.getSelection();
+        if (selection) void navigator.clipboard.writeText(selection).catch(() => {});
+        return false;
+      }
+      if (isPasteKey(e)) {
+        e.preventDefault();
+        void navigator.clipboard.readText().then(requestPaste, () => {});
+        return false;
+      }
+      return true;
+    });
 
     function handleStatus(status: TerminalStatus) {
       if (status.type === "exited") {
@@ -173,6 +224,7 @@
     return () => {
       disposed = true;
       observer.disconnect();
+      host.removeEventListener("paste", onPasteEvent, true);
       if (resizeTimer !== null) clearTimeout(resizeTimer);
       acks.dispose();
       input.stop();
@@ -188,6 +240,26 @@
 <div class="terminal-wrap">
   <div class="terminal" bind:this={host}></div>
   {#if notice}<p class="notice">{notice}</p>{/if}
+  {#if pending}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      class="confirm"
+      role="dialog"
+      aria-label="Paste multiple lines?"
+      tabindex="-1"
+      onkeydown={(e) => {
+        if (e.key === "Escape") cancelPaste();
+      }}
+    >
+      <p class="title">Paste {pending.check.lineCount} lines?</p>
+      <pre>{pending.check.preview.join("\n")}{pending.check.truncated ? "\n…" : ""}</pre>
+      <div class="buttons">
+        <button onclick={cancelPaste}>Cancel</button>
+        <!-- svelte-ignore a11y_autofocus -->
+        <button autofocus onclick={confirmPaste}>Paste</button>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -202,6 +274,37 @@
     height: 100%;
     padding: 4px;
     box-sizing: border-box;
+  }
+  .confirm {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 80%;
+    padding: 12px 16px;
+    background: #252526;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 6px;
+    font: 13px system-ui, sans-serif;
+    box-shadow: 0 4px 16px #0008;
+  }
+  .confirm .title {
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  .confirm pre {
+    margin: 0 0 12px;
+    padding: 6px 8px;
+    background: #1e1e1e;
+    overflow: auto;
+    max-height: 10em;
+    font: 12px Consolas, monospace;
+  }
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
   .notice {
     position: absolute;

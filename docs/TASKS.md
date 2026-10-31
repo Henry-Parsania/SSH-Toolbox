@@ -84,7 +84,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.5 Early owner check.** Ask the owner to run the rendering section of the checklist on Windows. Fix what's found. Mention that Ubuntu can be tried from this point with the CI build.
   *Done when:* the owner reports it works on Windows.
 
-- [ ] **1.6 Clipboard (T2).** Copy and paste, with the multi-line warning (IF section 12).
+- [x] **1.6 Clipboard (T2).** Copy and paste, with the multi-line warning (IF section 12).
   *Done when:* tests cover the "should we warn" logic, and manual checks work.
 
 - [ ] **1.7 Pane tree (P2).** Build the `PaneNode` tree as plain TypeScript with no UI: split, close, resize, and finding the next pane in a direction. Unit-test thoroughly, including closing the last child of a split.
