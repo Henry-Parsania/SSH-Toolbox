@@ -28,6 +28,12 @@ pub fn write_atomic(path: &Path, text: &str) -> Result<(), AppError> {
         let mut file = std::fs::File::create(&temp)?;
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
+        // Keep the version being replaced as `<name>.bak`.
+        if path.exists() {
+            let mut backup = path.as_os_str().to_owned();
+            backup.push(".bak");
+            std::fs::copy(path, PathBuf::from(backup))?;
+        }
         std::fs::rename(&temp, path)
     })();
     if result.is_err() {

@@ -138,3 +138,74 @@ export function layoutSet(layout: SavedLayout): Promise<void> {
 export function startupReady(): Promise<void> {
   return invoke<void>("startup_ready");
 }
+
+export interface SavedFolder {
+  id: string;
+  name: string;
+  /** Empty means top level. */
+  parent: string;
+}
+
+export type SavedSession =
+  | {
+      type: "ssh";
+      id: string;
+      name: string;
+      folder: string;
+      host: string;
+      port: number;
+      user: string;
+      auth: "password" | "key" | "agent";
+      key_path: string;
+      jump: string;
+    }
+  | {
+      type: "serial";
+      id: string;
+      name: string;
+      folder: string;
+      port: string;
+      baud: number;
+      data_bits: number;
+      parity: "none" | "odd" | "even";
+      stop_bits: number;
+      flow_control: "none" | "hardware" | "software";
+      local_echo: boolean;
+      line_ending: "cr" | "lf" | "crlf";
+    }
+  | {
+      type: "ftp";
+      id: string;
+      name: string;
+      folder: string;
+      host: string;
+      port: number;
+      user: string;
+      security: "plain" | "explicit" | "implicit";
+      trusted_cert_sha256: string;
+    };
+
+/** The saved-sessions file. It never holds a password or passphrase. */
+export interface SessionsFile {
+  version: number;
+  folder: SavedFolder[];
+  session: SavedSession[];
+}
+
+export interface LoadedSessions {
+  file: SessionsFile;
+  /** Set when the file exists but can't be used. Nothing is overwritten until the user decides. */
+  problem: string | null;
+}
+
+export function sessionsGet(): Promise<LoadedSessions> {
+  return invoke<LoadedSessions>("sessions_get");
+}
+
+export function sessionsSave(file: SessionsFile): Promise<void> {
+  return invoke<void>("sessions_save", { file });
+}
+
+export function sessionsSetAsideUnreadable(): Promise<void> {
+  return invoke<void>("sessions_set_aside_unreadable");
+}
