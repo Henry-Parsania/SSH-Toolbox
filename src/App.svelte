@@ -68,7 +68,10 @@
         case "move-focus":
           workspace.moveFocus(action.move);
           break;
-        // Search and typing into all panes arrive in tasks 1.13 and 1.15.
+        case "search":
+          workspace.requestSearch();
+          break;
+        // Typing into all panes arrives in task 1.15.
       }
     };
     window.addEventListener("keydown", onKey, true);

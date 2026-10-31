@@ -46,7 +46,7 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).
   *Done when:* changes save and survive a restart.
 
-- [ ] **1.13 Search and links (T5, T6, SEC9).** Add search, and links per IF section 13, using `tauri-plugin-opener` from Rust.
+- [x] **1.13 Search and links (T5, T6, SEC9).** Add search, and links per IF section 13, using `tauri-plugin-opener` from Rust.
   *Done when:* the unsafe-scheme tests pass, and Ctrl+click opens an `https` link.
 
 - [ ] **1.14 Restore layout (P6).** `layout.toml`, restoring tabs and splits. Local and WSL panes start fresh. Reconnecting other types arrives with their phases.

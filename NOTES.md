@@ -9,3 +9,4 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - Until the shell menu (1.11), "new tab" opens the first shell in the list.
 - 1.12: Settings changes (font, size, theme, scrollback) apply to open terminals at once. The renderer applies to terminals opened afterwards. The light theme changes the terminal only; the tab bar and dialogs stay dark.
 - 1.12: A `settings.toml` that can't be read is moved to `settings.toml.bad` and defaults are used, so the user's text is kept. Out-of-range numbers in a hand-edited file are pulled into range.
+- 1.13: Links go through the backend command open_link, which checks http/https with the url crate before calling tauri-plugin-opener from Rust. The plugin itself is not registered with the window, so the interface has no permission to it.

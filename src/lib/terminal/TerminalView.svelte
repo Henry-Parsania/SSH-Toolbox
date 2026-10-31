@@ -3,9 +3,12 @@
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import { Unicode11Addon } from "@xterm/addon-unicode11";
+  import { SearchAddon } from "@xterm/addon-search";
+  import { WebLinksAddon } from "@xterm/addon-web-links";
   import { WebglAddon } from "@xterm/addon-webgl";
   import "@xterm/xterm/css/xterm.css";
   import {
+    openLink,
     terminalAck,
     terminalClose,
     terminalOpen,
@@ -27,6 +30,8 @@
     onstatus?: (status: TerminalStatus) => void;
     /** Give the keyboard to this terminal whenever this becomes true. */
     focused?: boolean;
+    /** Opens the search box each time this number goes up. */
+    searchSignal?: number;
   }
 
   let {
@@ -34,7 +39,29 @@
     platform,
     onstatus,
     focused = true,
+    searchSignal = 0,
   }: Props = $props();
+
+  let searching = $state(false);
+  let query = $state("");
+  let noMatch = $state(false);
+  let searchInput: HTMLInputElement | undefined = $state();
+  let findNext: (backwards: boolean) => void = () => {};
+  let clearSearch: () => void = () => {};
+
+  $effect(() => {
+    if (searchSignal > 0) {
+      searching = true;
+      queueMicrotask(() => searchInput?.select());
+    }
+  });
+
+  function closeSearch() {
+    searching = false;
+    noMatch = false;
+    clearSearch();
+    refocus();
+  }
 
   let focusTerminal: () => void = () => {};
   let applyAppearance: () => void = () => {};
@@ -101,6 +128,21 @@
     term.loadAddon(fit);
     term.loadAddon(new Unicode11Addon());
     term.unicode.activeVersion = "11";
+    const search = new SearchAddon();
+    term.loadAddon(search);
+    // Links open only on Ctrl+click (or Cmd+click), and only through the backend, which allows
+    // nothing but http and https (SEC9).
+    term.loadAddon(
+      new WebLinksAddon((event, uri) => {
+        if (event.ctrlKey || event.metaKey) void openLink(uri).catch(() => {});
+      }),
+    );
+    findNext = (backwards) => {
+      if (!query) return;
+      const found = backwards ? search.findPrevious(query) : search.findNext(query);
+      noMatch = !found;
+    };
+    clearSearch = () => search.clearDecorations();
     term.open(host);
 
     if (chooseRenderer(renderer, platform.os) === "webgl") {
@@ -265,6 +307,25 @@
 <div class="terminal-wrap" style:background>
   <div class="terminal" bind:this={host}></div>
   {#if notice}<p class="notice">{notice}</p>{/if}
+  {#if searching}
+    <div class="search">
+      <input
+        bind:this={searchInput}
+        bind:value={query}
+        placeholder="Search"
+        oninput={() => findNext(false)}
+        onkeydown={(e) => {
+          if (e.key === "Enter") findNext(e.shiftKey);
+          else if (e.key === "Escape") closeSearch();
+          e.stopPropagation();
+        }}
+        class:nomatch={noMatch}
+      />
+      <button aria-label="Previous match" onclick={() => findNext(true)}>↑</button>
+      <button aria-label="Next match" onclick={() => findNext(false)}>↓</button>
+      <button aria-label="Close search" onclick={closeSearch}>×</button>
+    </div>
+  {/if}
   {#if pending}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
@@ -299,6 +360,35 @@
     height: 100%;
     padding: 4px;
     box-sizing: border-box;
+  }
+  .search {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #252526;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font: 13px system-ui, sans-serif;
+  }
+  .search input {
+    width: 14em;
+    padding: 2px 6px;
+    font: inherit;
+    color: #d4d4d4;
+    background: #3c3c3c;
+    border: 1px solid #555;
+  }
+  .search input.nomatch {
+    border-color: #f48771;
+  }
+  .search button {
+    color: #d4d4d4;
+    background: none;
+    border: none;
+    cursor: pointer;
   }
   .confirm {
     position: absolute;

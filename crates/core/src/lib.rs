@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod error;
+pub mod link;
 pub mod platform;
 pub mod secret;
 pub mod settings;

@@ -27,6 +27,7 @@ pub fn run() {
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::link::open_link,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::terminal::list_shells,

@@ -35,7 +35,10 @@
   onpointerdown={() => workspace.focusPane(tabId, node.pane_id)}
 >
   {#if node.spec}
-    <TerminalView spec={node.spec} {platform} focused={active && visible} {onstatus} />
+    <TerminalView spec={node.spec} {platform} focused={active && visible}
+      searchSignal={workspace.searchTarget === node.pane_id ? workspace.searchCount : 0}
+      {onstatus}
+    />
   {/if}
   {#if ended}
     <div class="ended">

@@ -109,3 +109,8 @@ export function settingsGet(): Promise<Settings> {
 export function settingsSet(settings: Settings): Promise<void> {
   return invoke<void>("settings_set", { settings });
 }
+
+/** Opens a web link in the browser. The backend refuses anything but http and https. */
+export function openLink(url: string): Promise<void> {
+  return invoke<void>("open_link", { url });
+}

@@ -29,6 +29,16 @@ export interface Tab {
 export class Workspace {
   tabs = $state<Tab[]>([]);
   activeTabId = $state("");
+  /** Which pane should show its search box, and how many times it has been asked. */
+  searchTarget = $state("");
+  searchCount = $state(0);
+
+  requestSearch() {
+    const tab = this.activeTab;
+    if (!tab) return;
+    this.searchTarget = tab.active;
+    this.searchCount++;
+  }
 
   get activeTab(): Tab | undefined {
     return this.tabs.find((t) => t.id === this.activeTabId);
