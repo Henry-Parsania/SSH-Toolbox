@@ -12,7 +12,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 
 ## Phase 0: Setup
 
-- [ ] **0.1 Install tools.** Run these one at a time, because Windows installers can block each other:
+- [x] **0.1 Install tools.** Run these one at a time, because Windows installers can block each other:
   ```
   winget install --id OpenJS.NodeJS.LTS --exact --source winget --silent --accept-package-agreements --accept-source-agreements
   winget install --id Rustlang.Rustup --exact --source winget --silent --accept-package-agreements --accept-source-agreements
@@ -22,10 +22,10 @@ The builder may not be able to see or operate the app window. If a "done when" n
   The owner has approved these. The build tools take a while and show a Windows administrator prompt, so tell the owner to expect it. Open a new shell afterward, so the new `PATH` applies.
   *Done when:* `node -v`, `npm -v`, `rustc -V` and `cargo -V` print versions, and `rustup show` lists `stable-x86_64-pc-windows-msvc` as default.
 
-- [ ] **0.2 Create the git repository.** In the project folder run `git init -b main`. Add a `.gitignore` for `node_modules/`, `dist/`, `target/`, `*.log` and `.env`. Add the remote `https://github.com/Henry-Parsania/SSH-Toolbox.git`, commit the docs and `CLAUDE.md`, and push. Don't commit `.claude/` local settings.
+- [x] **0.2 Create the git repository.** In the project folder run `git init -b main`. Add a `.gitignore` for `node_modules/`, `dist/`, `target/`, `*.log` and `.env`. Add the remote `https://github.com/Henry-Parsania/SSH-Toolbox.git`, commit the docs and `CLAUDE.md`, and push. Don't commit `.claude/` local settings.
   *Done when:* the docs are visible on GitHub.
 
-- [ ] **0.3 Create the skeleton.**
+- [x] **0.3 Create the skeleton.**
   1. Create the Svelte project in a temporary folder with `npm create vite@latest <temp> -- --template svelte-ts`, then copy it into the project root. Don't use `create-tauri-app`, whose Svelte template may bring SvelteKit.
   2. `npm install`, then `npm install -D @tauri-apps/cli` and `npm install @tauri-apps/api`.
   3. `npx tauri init` with app name `SSH Toolbox`, window title `SSH Toolbox`, frontend dist `../dist`, dev URL `http://localhost:5173`, before-dev command `npm run dev` and before-build command `npm run build`.
@@ -99,7 +99,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
-- [ ] **1.11 WSL (W1–W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
+- [ ] **1.11 WSL (W1â€“W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
 - [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).
