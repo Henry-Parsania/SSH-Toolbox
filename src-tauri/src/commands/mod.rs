@@ -1,3 +1,4 @@
+pub mod keychain;
 pub mod layout;
 pub mod link;
 pub mod platform;

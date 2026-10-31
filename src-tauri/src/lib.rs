@@ -25,9 +25,13 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .manage(commands::startup::Startup::now())
+        .manage(toolbox_core::keychain::Keychain::system())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::keychain::keychain_available,
+            commands::keychain::keychain_delete_session,
+            commands::keychain::keychain_set,
             commands::layout::layout_get,
             commands::layout::layout_set,
             commands::link::open_link,

@@ -209,3 +209,22 @@ export function sessionsSave(file: SessionsFile): Promise<void> {
 export function sessionsSetAsideUnreadable(): Promise<void> {
   return invoke<void>("sessions_set_aside_unreadable");
 }
+
+/** Whether saved passwords can be used. When false, hide "save password". */
+export function keychainAvailable(): Promise<boolean> {
+  return invoke<boolean>("keychain_available");
+}
+
+/** Saves a secret the user typed. The interface can never read one back. */
+export function keychainSet(
+  sessionId: string,
+  kind: "password" | "passphrase" | "ftp_password",
+  secret: string,
+): Promise<void> {
+  return invoke<void>("keychain_set", { sessionId, kind, secret });
+}
+
+/** Removes every saved secret of a session. Call this when a session is deleted. */
+export function keychainDeleteSession(sessionId: string): Promise<void> {
+  return invoke<void>("keychain_delete_session", { sessionId });
+}
