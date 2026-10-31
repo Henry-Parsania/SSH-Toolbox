@@ -33,10 +33,10 @@ The builder may not be able to see or operate the app window. If a "done when" n
   5. Use the folder layout in PLAN.md section 1. Commit `Cargo.lock` and `package-lock.json`.
   *Done when:* `npx tauri dev` opens a window on this PC.
 
-- [ ] **0.4 Security settings (SEC10).** Apply IF section 14. Don't add any plugin yet.
+- [x] **0.4 Security settings (SEC10).** Apply IF section 14. Don't add any plugin yet.
   *Done when:* the window still opens, with no CSP errors in the dev console.
 
-- [ ] **0.5 Connect the layers.** Add `AppError` and `Secret` (IF section 2) with tests, the `platform_info` command, and `src/lib/backend/index.ts`. Show the OS name in the window, proving the path from interface to `crates/core`. Add `scripts/check-boundaries.mjs`, which fails if a file outside `src/lib/backend/` imports `@tauri-apps/*`, and add it to `npm run check`.
+- [x] **0.5 Connect the layers.** Add `AppError` and `Secret` (IF section 2) with tests, the `platform_info` command, and `src/lib/backend/index.ts`. Show the OS name in the window, proving the path from interface to `crates/core`. Add `scripts/check-boundaries.mjs`, which fails if a file outside `src/lib/backend/` imports `@tauri-apps/*`, and add it to `npm run check`.
   *Done when:* the window shows the OS. Adding such an import temporarily makes the check fail.
 
 - [ ] **0.6 CI.** Add `.github/workflows/ci.yml`, running on pushes to `main`, with `windows-latest` and `ubuntu-26.04`. Run every check from PLAN.md section 3, then `npx tauri build`, and upload the Windows installer and Linux `.deb` and AppImage as artifacts. On Linux, first install:
@@ -99,7 +99,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
-- [ ] **1.11 WSL (W1â€“W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
+- [ ] **1.11 WSL (W1Ã¢â‚¬â€œW3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
 - [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).

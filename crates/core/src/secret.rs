@@ -48,7 +48,12 @@ mod tests {
             #[allow(dead_code)]
             password: Secret,
         }
-        let text = format!("{:#?}", Login { password: Secret::new("hunter2-very-secret") });
+        let text = format!(
+            "{:#?}",
+            Login {
+                password: Secret::new("hunter2-very-secret")
+            }
+        );
         assert!(!text.contains("hunter2"));
     }
 
