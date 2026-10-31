@@ -87,7 +87,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [x] **1.6 Clipboard (T2).** Copy and paste, with the multi-line warning (IF section 12).
   *Done when:* tests cover the "should we warn" logic, and manual checks work.
 
-- [ ] **1.7 Pane tree (P2).** Build the `PaneNode` tree as plain TypeScript with no UI: split, close, resize, and finding the next pane in a direction. Unit-test thoroughly, including closing the last child of a split.
+- [x] **1.7 Pane tree (P2).** Build the `PaneNode` tree as plain TypeScript with no UI: split, close, resize, and finding the next pane in a direction. Unit-test thoroughly, including closing the last child of a split.
   *Done when:* tests pass.
 
 - [ ] **1.8 Panes on screen (P2, P4).** Draw the tree with draggable dividers. Each pane takes a `SessionSpec`, so later session types need no pane changes. Closing a pane closes its session. A pane whose session ended shows a message and a close button, and only that pane is affected.
