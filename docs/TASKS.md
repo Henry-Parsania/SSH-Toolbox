@@ -52,10 +52,10 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.14 Restore layout (P6).** `layout.toml`, restoring tabs and splits. Local and WSL panes start fresh. Reconnecting other types arrives with their phases.
   *Done when:* layout returns after restart.
 
-- [ ] **1.15 Should and Could items.** Type into all panes (P5). Save session output (T9), only if cheap. Skip moving tabs to their own window (P7), and record that on the checklist as "later".
+- [x] **1.15 Should and Could items.** Type into all panes (P5). Save session output (T9), only if cheap. Skip moving tabs to their own window (P7), and record that on the checklist as "later".
   *Done when:* P5 works, and the T9 and P7 decisions are recorded.
 
-- [ ] **1.16 Measurements.** Add `scripts/measure-memory.sh` and `scripts/measure-memory.ps1` for Q2 (see the checklist), and log startup time for Q3.
+- [x] **1.16 Measurements.** Add `scripts/measure-memory.sh` and `scripts/measure-memory.ps1` for Q2 (see the checklist), and log startup time for Q3.
   *Done when:* numbers are recorded in the checklist.
 
 - [ ] **1.17 Finish.** Make sure the Ubuntu rendering check has happened (PLAN.md section 2) before phase 2 starts.

@@ -9,6 +9,7 @@
   import "@xterm/xterm/css/xterm.css";
   import {
     openLink,
+    startupReady,
     terminalAck,
     terminalClose,
     terminalOpen,
@@ -21,6 +22,7 @@
   import { checkPaste, isCopyKey, isPasteKey, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
   import { settings } from "../settings.svelte";
+  import { broadcastInput, registerReceiver } from "./broadcast";
   import { chooseRenderer, webglFailureNotice } from "./renderer";
   import { terminalTheme } from "./themes";
 
@@ -32,6 +34,10 @@
     focused?: boolean;
     /** Opens the search box each time this number goes up. */
     searchSignal?: number;
+    /** Identify this pane, so typing can be copied to the others in the tab. */
+    tabId?: string;
+    paneId?: string;
+    broadcasting?: boolean;
   }
 
   let {
@@ -40,6 +46,9 @@
     onstatus,
     focused = true,
     searchSignal = 0,
+    tabId = "",
+    paneId = "",
+    broadcasting = false,
   }: Props = $props();
 
   let searching = $state(false);
@@ -97,6 +106,14 @@
   }
 
   const RESIZE_DEBOUNCE_MS = 50;
+
+  // The first output of the first terminal marks "usable" for the startup time (Q3).
+  let startupReported = false;
+  function reportStartup() {
+    if (startupReported) return;
+    startupReported = true;
+    void startupReady().catch(() => {});
+  }
 
   /** The chosen font first, then the usual monospace fonts on each system. */
   function fontStack(family: string): string {
@@ -181,10 +198,17 @@
     focusTerminal = () => term.focus();
 
     const input = new InputSender((data) => terminalWrite(sessionId!, data));
-    const dataSub = term.onData((text) => input.push(encoder.encode(text)));
-    const binarySub = term.onBinary((text) =>
-      input.push(Uint8Array.from(text, (c) => c.charCodeAt(0))),
-    );
+    const unregister = registerReceiver(tabId, paneId, (data) => input.push(data));
+    const dataSub = term.onData((text) => {
+      const bytes = encoder.encode(text);
+      input.push(bytes);
+      if (broadcasting) broadcastInput(tabId, paneId, bytes);
+    });
+    const binarySub = term.onBinary((text) => {
+      const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
+      input.push(bytes);
+      if (broadcasting) broadcastInput(tabId, paneId, bytes);
+    });
 
     // Copy and paste (T2). Every paste goes through here, whatever started it, so the
     // multi-line warning can't be skipped.
@@ -256,6 +280,7 @@
       openedCols,
       openedRows,
       (chunk) => {
+        reportStartup();
         term.write(chunk, () => {
           if (sessionId) acks.processed(chunk.length);
           else earlyAcks += chunk.length;
@@ -295,6 +320,7 @@
       if (resizeTimer !== null) clearTimeout(resizeTimer);
       acks.dispose();
       input.stop();
+      unregister();
       dataSub.dispose();
       binarySub.dispose();
       resizeSub.dispose();

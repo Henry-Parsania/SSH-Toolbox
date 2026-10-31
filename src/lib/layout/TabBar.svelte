@@ -132,7 +132,11 @@
       </ul>
     {/if}
   </div>
-  <div class="spacer"></div>
+  <div class="spacer">
+    {#if workspace.broadcast}
+      <span class="broadcast">Typing into all panes (Ctrl+Shift+B to stop)</span>
+    {/if}
+  </div>
   <button class="new" aria-label="Settings" title="Settings" onclick={onsettings}>⚙</button>
 </div>
 
@@ -197,6 +201,17 @@
   }
   .spacer {
     flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+  }
+  .broadcast {
+    padding: 2px 8px;
+    color: #fff;
+    background: #a1260d;
+    border-radius: 3px;
+    font-size: 12px;
   }
   .menu-wrap {
     position: relative;

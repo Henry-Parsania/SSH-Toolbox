@@ -37,6 +37,9 @@
   {#if node.spec}
     <TerminalView spec={node.spec} {platform} focused={active && visible}
       searchSignal={workspace.searchTarget === node.pane_id ? workspace.searchCount : 0}
+      {tabId}
+      paneId={node.pane_id}
+      broadcasting={workspace.broadcast}
       {onstatus}
     />
   {/if}

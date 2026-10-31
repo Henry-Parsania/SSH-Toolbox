@@ -24,6 +24,7 @@ pub fn run() {
     apply_webkit_workaround();
 
     let app = tauri::Builder::default()
+        .manage(commands::startup::Startup::now())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
@@ -31,6 +32,7 @@ pub fn run() {
             commands::layout::layout_set,
             commands::link::open_link,
             commands::settings::settings_get,
+            commands::startup::startup_ready,
             commands::settings::settings_set,
             commands::terminal::list_shells,
             commands::terminal::list_wsl_distros,

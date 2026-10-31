@@ -133,3 +133,8 @@ export function layoutGet(): Promise<SavedLayout | null> {
 export function layoutSet(layout: SavedLayout): Promise<void> {
   return invoke<void>("layout_set", { layout });
 }
+
+/** Marks the first terminal output, so the backend can log how long startup took (Q3). */
+export function startupReady(): Promise<void> {
+  return invoke<void>("startup_ready");
+}

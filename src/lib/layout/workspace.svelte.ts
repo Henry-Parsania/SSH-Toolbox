@@ -32,6 +32,8 @@ export class Workspace {
   /** Which pane should show its search box, and how many times it has been asked. */
   searchTarget = $state("");
   searchCount = $state(0);
+  /** When on, what is typed in one pane goes to every pane in the tab (P5). */
+  broadcast = $state(false);
 
   requestSearch() {
     const tab = this.activeTab;

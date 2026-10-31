@@ -114,5 +114,5 @@ Claude will say when the login code has had its review. Try key setup first on a
 - [ ] The "Ubuntu (later)" items you care about are done.
 
 ## Deferred on purpose
-- T9, P7 and F8 are Could items. Tasks 1.15 and 3.10 record what was decided.
+- T9, P7 and F8 are Could items. Tasks 1.15 and 3.10 record what was decided: T9 (save output) and P7 (tab in its own window) are "later".
 </content>

@@ -84,7 +84,9 @@
         case "search":
           workspace.requestSearch();
           break;
-        // Typing into all panes arrives in task 1.15.
+        case "broadcast":
+          workspace.broadcast = !workspace.broadcast;
+          break;
       }
     };
     window.addEventListener("keydown", onKey, true);
