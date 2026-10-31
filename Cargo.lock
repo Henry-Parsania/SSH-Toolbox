@@ -5533,6 +5533,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bollard",
+ "bytes",
  "directories",
  "keyring-core",
  "portable-pty",

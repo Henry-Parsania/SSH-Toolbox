@@ -17,6 +17,13 @@
 
   // Only this pane is affected when its session ends.
   let ended = $state<string | null>(null);
+  // Bumped by Reconnect, which opens a fresh session in the same pane.
+  let attempt = $state(0);
+
+  function reconnect() {
+    ended = null;
+    attempt++;
+  }
 
   function onstatus(status: TerminalStatus) {
     if (status.type === "exited") {
@@ -35,6 +42,7 @@
   onpointerdown={() => workspace.focusPane(tabId, node.pane_id)}
 >
   {#if node.spec}
+    {#key attempt}
     <TerminalView spec={node.spec} {platform} focused={active && visible}
       searchSignal={workspace.searchTarget === node.pane_id ? workspace.searchCount : 0}
       {tabId}
@@ -42,11 +50,15 @@
       broadcasting={workspace.broadcast}
       {onstatus}
     />
+    {/key}
   {/if}
   {#if ended}
     <div class="ended">
       <span>{ended}</span>
-      <button onclick={() => workspace.closePane(tabId, node.pane_id)}>Close pane</button>
+      <span class="actions">
+        {#if node.spec?.type === "ssh"}<button onclick={reconnect}>Reconnect</button>{/if}
+        <button onclick={() => workspace.closePane(tabId, node.pane_id)}>Close pane</button>
+      </span>
     </div>
   {/if}
 </div>

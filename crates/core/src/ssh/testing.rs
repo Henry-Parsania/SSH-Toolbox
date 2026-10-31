@@ -3,10 +3,12 @@
 //! The keys below are throwaway keys made only for these tests. They open nothing anywhere.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use russh::keys::{PrivateKey, PublicKey};
-use russh::server::{self, Auth, Server as _, VerifiedPublicKey};
+use russh::server::{self, Auth, Msg, Server as _, Session, VerifiedPublicKey};
+use russh::{Channel, ChannelId};
 use tokio::net::TcpListener;
 
 use crate::keychain::SecretStore;
@@ -59,20 +61,99 @@ pub struct Accepts {
     pub keys: Vec<PublicKey>,
 }
 
+/// What happened on the server, for tests to look at.
+#[derive(Default)]
+pub struct Stats {
+    /// Connections that were opened.
+    pub opened: AtomicUsize,
+    /// Connections that have ended.
+    pub ended: AtomicUsize,
+    /// Terminal sizes asked for: first the one in the pty request, then each window change.
+    pub sizes: Mutex<Vec<(u32, u32)>>,
+    pub shells: AtomicUsize,
+}
+
 #[derive(Clone)]
-struct TestServer(Arc<Accepts>);
+struct TestServer(Arc<Accepts>, Arc<Stats>);
 
 impl server::Server for TestServer {
     type Handler = TestHandler;
     fn new_client(&mut self, _peer: Option<std::net::SocketAddr>) -> TestHandler {
-        TestHandler(self.0.clone())
+        TestHandler(self.0.clone(), self.1.clone())
     }
 }
 
-pub struct TestHandler(Arc<Accepts>);
+pub struct TestHandler(Arc<Accepts>, Arc<Stats>);
 
 impl server::Handler for TestHandler {
     type Error = russh::Error;
+
+    async fn channel_open_session(
+        &mut self,
+        _channel: Channel<Msg>,
+        reply: russh::server::ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        reply.accept().await;
+        Ok(())
+    }
+
+    async fn pty_request(
+        &mut self,
+        channel: ChannelId,
+        _term: &str,
+        cols: u32,
+        rows: u32,
+        _px: u32,
+        _py: u32,
+        _modes: &[(russh::Pty, u32)],
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        self.1.sizes.lock().unwrap().push((cols, rows));
+        session.channel_success(channel)?;
+        Ok(())
+    }
+
+    async fn window_change_request(
+        &mut self,
+        _channel: ChannelId,
+        cols: u32,
+        rows: u32,
+        _px: u32,
+        _py: u32,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        self.1.sizes.lock().unwrap().push((cols, rows));
+        Ok(())
+    }
+
+    async fn shell_request(
+        &mut self,
+        channel: ChannelId,
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        self.1.shells.fetch_add(1, Ordering::SeqCst);
+        session.channel_success(channel)?;
+        session.data(channel, b"welcome-banner".to_vec())?;
+        Ok(())
+    }
+
+    /// Echoes what it is sent. "exit-now" ends the shell with exit code 7 when it gets "exit-now".
+    async fn data(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        if data == b"exit-now" {
+            session.exit_status_request(channel, 7)?;
+            session.eof(channel)?;
+            session.close(channel)?;
+        } else {
+            session.data(channel, data.to_vec())?;
+        }
+        Ok(())
+    }
 
     async fn auth_password(&mut self, user: &str, password: &str) -> Result<Auth, Self::Error> {
         let ok = user == self.0.user && self.0.password.as_deref() == Some(password);
@@ -89,9 +170,38 @@ impl server::Handler for TestHandler {
     }
 }
 
+/// A running test server. Dropping it, or calling `kill`, cuts every connection at once, the way
+/// a crashed server would.
+pub struct ServerHandle {
+    pub port: u16,
+    pub stats: Arc<Stats>,
+    cut: tokio_util::sync::CancellationToken,
+}
+
+impl ServerHandle {
+    /// Cuts every connection and stops listening.
+    pub fn kill(&self) {
+        self.cut.cancel();
+    }
+}
+
+impl Drop for ServerHandle {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+
 /// Starts a server that offers `host_key` and lets in only what `accepts` says. Returns the
 /// port it listens on.
 pub async fn start_server_with(host_key: PrivateKey, accepts: Accepts) -> u16 {
+    let handle = spawn_server(host_key, accepts).await;
+    let port = handle.port;
+    // Tests that only need the port leave the server running until the test ends.
+    std::mem::forget(handle);
+    port
+}
+
+pub async fn spawn_server(host_key: PrivateKey, accepts: Accepts) -> ServerHandle {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let config = Arc::new(server::Config {
@@ -100,22 +210,46 @@ pub async fn start_server_with(host_key: PrivateKey, accepts: Accepts) -> u16 {
         auth_rejection_time_initial: Some(std::time::Duration::from_millis(1)),
         ..Default::default()
     });
-    let mut server = TestServer(Arc::new(accepts));
-    tokio::spawn(async move {
-        loop {
-            let Ok((stream, peer)) = listener.accept().await else {
-                return;
-            };
-            let handler = server.new_client(Some(peer));
-            let config = config.clone();
-            tokio::spawn(async move {
-                if let Ok(session) = server::run_stream(config, stream, handler).await {
-                    let _ = session.await;
-                }
-            });
-        }
-    });
-    port
+    let stats = Arc::new(Stats::default());
+    let cut = tokio_util::sync::CancellationToken::new();
+    let mut server = TestServer(Arc::new(accepts), stats.clone());
+    {
+        let cut = cut.clone();
+        let stats = stats.clone();
+        tokio::spawn(async move {
+            loop {
+                let accepted = tokio::select! {
+                    accepted = listener.accept() => accepted,
+                    _ = cut.cancelled() => return,
+                };
+                let Ok((mut stream, peer)) = accepted else {
+                    return;
+                };
+                stats.opened.fetch_add(1, Ordering::SeqCst);
+                let handler = server.new_client(Some(peer));
+                let config = config.clone();
+                let stats = stats.clone();
+                // The SSH server talks over an in-memory pipe, and this task joins the pipe to
+                // the real socket. Cutting the server closes the socket at once, the way a
+                // crashed machine would, which stopping the SSH tasks alone would not.
+                let (ssh_side, mut pipe_side) = tokio::io::duplex(64 * 1024);
+                let cut = cut.clone();
+                tokio::spawn(async move {
+                    tokio::select! {
+                        _ = tokio::io::copy_bidirectional(&mut stream, &mut pipe_side) => {}
+                        _ = cut.cancelled() => {}
+                    }
+                });
+                tokio::spawn(async move {
+                    if let Ok(session) = server::run_stream(config, ssh_side, handler).await {
+                        let _ = session.await;
+                    }
+                    stats.ended.fetch_add(1, Ordering::SeqCst);
+                });
+            }
+        });
+    }
+    ServerHandle { port, stats, cut }
 }
 
 /// A server for tests that only look at the host key.

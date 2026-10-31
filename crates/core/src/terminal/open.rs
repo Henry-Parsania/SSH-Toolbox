@@ -18,8 +18,17 @@ use crate::error::{AppError, ErrorCode};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionSpec {
-    Local { shell_id: String },
-    Wsl { distro: String },
+    Local {
+        shell_id: String,
+    },
+    Wsl {
+        distro: String,
+    },
+    /// A saved SSH session. Opened with `ssh::backend::open_ssh_terminal`, which needs the
+    /// SSH services that `open_terminal` doesn't have.
+    Ssh {
+        saved_session_id: String,
+    },
 }
 
 const MAX_DIMENSION: u16 = 1000;
@@ -58,6 +67,12 @@ pub async fn open_terminal(
             .await
             .map_err(|_| blocking_failed())??;
             Arc::new(shell)
+        }
+        SessionSpec::Ssh { .. } => {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "SSH sessions are opened through the SSH services.",
+            ));
         }
         SessionSpec::Wsl { distro } => {
             let shell = tokio::task::spawn_blocking(move || {

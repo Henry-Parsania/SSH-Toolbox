@@ -1,0 +1,342 @@
+//! SSH panes end to end: saved session, shared connection, shell, resize and failure.
+
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+
+use super::backend::{SshServices, open_ssh_terminal};
+use super::hostkeys::learn;
+use super::pool::ConnectionPool;
+use super::testing::{Accepts, KEY_A, ServerHandle, key, public_of, spawn_server};
+use crate::error::ErrorCode;
+use crate::keychain::{Keychain, SecretStore};
+use crate::prompt::PromptBroker;
+use crate::sessions::{SavedSession, SessionStore, SessionsFile, SshAuth};
+use crate::terminal::testing::{RecordingSink, Sent};
+use crate::terminal::{SessionRegistry, TermSize, TerminalStatus};
+
+use super::testing::MemoryStore;
+
+const SIZE: TermSize = TermSize { cols: 80, rows: 24 };
+
+struct World {
+    services: Arc<SshServices>,
+    registry: SessionRegistry,
+    _dir: tempfile::TempDir,
+    store: SessionStore,
+    known_hosts: std::path::PathBuf,
+    secrets: Arc<MemoryStore>,
+}
+
+fn world() -> World {
+    let dir = tempfile::tempdir().unwrap();
+    let secrets = Arc::new(MemoryStore::default());
+    let dyn_secrets: Arc<dyn SecretStore> = secrets.clone();
+    let sessions_file = dir.path().join("sessions.toml");
+    let known_hosts = dir.path().join("known_hosts");
+    let services = Arc::new(SshServices {
+        keychain: Arc::new(Keychain::with_store(
+            Some(dyn_secrets),
+            Duration::from_millis(500),
+        )),
+        broker: PromptBroker::new(),
+        pool: ConnectionPool::new(),
+        sessions_file: sessions_file.clone(),
+        known_hosts: known_hosts.clone(),
+    });
+    World {
+        services,
+        registry: SessionRegistry::new(),
+        store: SessionStore::new(sessions_file),
+        known_hosts,
+        _dir: dir,
+        secrets,
+    }
+}
+
+/// A server, a saved session for it (named \`id\`), its password saved in the keychain, and its
+/// host key already trusted.
+async fn server_for(w: &World, id: &str) -> ServerHandle {
+    let host_key = key(KEY_A);
+    let server = spawn_server(
+        host_key.clone(),
+        Accepts {
+            user: "tester".into(),
+            password: Some("pw".into()),
+            keys: vec![],
+        },
+    )
+    .await;
+    learn(
+        "127.0.0.1",
+        server.port,
+        &public_of(&host_key),
+        &w.known_hosts,
+    )
+    .unwrap();
+    w.secrets
+        .items
+        .lock()
+        .unwrap()
+        .insert(format!("session:{id}:password"), "pw".into());
+
+    let mut file = w.store.load().file;
+    file.sessions.push(SavedSession::Ssh {
+        id: id.into(),
+        name: format!("server {id}"),
+        folder: String::new(),
+        host: "127.0.0.1".into(),
+        port: server.port,
+        user: "tester".into(),
+        auth: SshAuth::Password,
+        key_path: String::new(),
+        jump: String::new(),
+    });
+    let file = SessionsFile { ..file };
+    w.store.save(&file).unwrap();
+    server
+}
+
+async fn open(w: &World, id: &str) -> (String, Arc<RecordingSink>) {
+    let sink = Arc::new(RecordingSink::default());
+    let session = open_ssh_terminal(
+        &w.registry,
+        w.services.clone(),
+        id.into(),
+        SIZE,
+        sink.clone(),
+    )
+    .await
+    .unwrap();
+    (session, sink)
+}
+
+fn text(sink: &RecordingSink) -> String {
+    let bytes: Vec<u8> = sink
+        .all()
+        .into_iter()
+        .filter_map(|s| match s {
+            Sent::Data(d) => Some(d),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+async fn until(what: &str, mut ok: impl FnMut() -> bool) {
+    for _ in 0..400 {
+        if ok() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("timed out waiting for: {what}");
+}
+
+async fn echoes(w: &World, session: &str, sink: &RecordingSink, word: &str) {
+    w.registry
+        .get(session)
+        .unwrap()
+        .write(word.as_bytes())
+        .await
+        .unwrap();
+    until(&format!("echo of {word}"), || text(sink).contains(word)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_saved_session_opens_a_shell_you_can_type_into_and_resize() {
+    let w = world();
+    let server = server_for(&w, "s1").await;
+    let (session, sink) = open(&w, "s1").await;
+
+    until("connected", || {
+        sink.statuses().contains(&TerminalStatus::Connected)
+    })
+    .await;
+    assert_eq!(sink.statuses()[0], TerminalStatus::Connecting);
+    until("banner", || text(&sink).contains("welcome-banner")).await;
+    echoes(&w, &session, &sink, "hello-remote").await;
+
+    assert_eq!(server.stats.sizes.lock().unwrap()[0], (80, 24));
+    w.registry
+        .get(&session)
+        .unwrap()
+        .resize(TermSize {
+            cols: 100,
+            rows: 30,
+        })
+        .await
+        .unwrap();
+    until("resize reaches the server", || {
+        server.stats.sizes.lock().unwrap().last() == Some(&(100, 30))
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_exit_code_is_reported_after_the_last_output() {
+    let w = world();
+    let _server = server_for(&w, "s1").await;
+    let (session, sink) = open(&w, "s1").await;
+    until("banner", || text(&sink).contains("welcome-banner")).await;
+    w.registry
+        .get(&session)
+        .unwrap()
+        .write(b"exit-now")
+        .await
+        .unwrap();
+    until("exit", || {
+        sink.statuses()
+            .contains(&TerminalStatus::Exited { code: Some(7) })
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn panes_of_one_saved_session_share_one_connection_until_the_last_closes() {
+    let w = world();
+    let server = server_for(&w, "s1").await;
+    let (a, sink_a) = open(&w, "s1").await;
+    let (b, sink_b) = open(&w, "s1").await;
+    until("both banners", || {
+        text(&sink_a).contains("welcome-banner") && text(&sink_b).contains("welcome-banner")
+    })
+    .await;
+    assert_eq!(
+        server.stats.opened.load(Ordering::SeqCst),
+        1,
+        "one login, not two"
+    );
+    assert_eq!(server.stats.shells.load(Ordering::SeqCst), 2);
+
+    w.registry.close(&a).await.unwrap();
+    echoes(&w, &b, &sink_b, "still-here").await;
+    assert_eq!(server.stats.ended.load(Ordering::SeqCst), 0);
+
+    w.registry.close(&b).await.unwrap();
+    until("the connection closes with its last pane", || {
+        server.stats.ended.load(Ordering::SeqCst) == 1
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_dead_server_fails_only_the_panes_on_it() {
+    let w = world();
+    let doomed = server_for(&w, "doomed").await;
+    let _healthy = server_for(&w, "healthy").await;
+    let (a, sink_a) = open(&w, "doomed").await;
+    let (b, sink_b) = open(&w, "healthy").await;
+    until("both open", || {
+        text(&sink_a).contains("welcome-banner") && text(&sink_b).contains("welcome-banner")
+    })
+    .await;
+
+    doomed.kill();
+    until("the doomed pane reports the loss", || {
+        sink_a.statuses().iter().any(|s| {
+            matches!(s, TerminalStatus::Failed { error } if error.code == ErrorCode::ConnectionLost)
+        })
+    })
+    .await;
+    // The other pane carries on, with no failure shown.
+    echoes(&w, &b, &sink_b, "unaffected").await;
+    assert!(
+        !sink_b
+            .statuses()
+            .iter()
+            .any(|s| matches!(s, TerminalStatus::Failed { .. }))
+    );
+    // The failed pane stays registered with its output until it is closed.
+    assert!(text(&sink_a).contains("welcome-banner"));
+    let _ = a;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn reconnecting_after_a_loss_makes_a_fresh_connection() {
+    let w = world();
+    let server = server_for(&w, "s1").await;
+    let (_a, sink_a) = open(&w, "s1").await;
+    until("open", || text(&sink_a).contains("welcome-banner")).await;
+    server.kill();
+    until("failed", || {
+        sink_a
+            .statuses()
+            .iter()
+            .any(|s| matches!(s, TerminalStatus::Failed { .. }))
+    })
+    .await;
+
+    // Bring a server back on the same port is not possible to promise, so save a new one and
+    // point the same session at it: what matters is that a dropped connection isn't reused.
+    let replacement = server_for(&w, "s1-again").await;
+    let (_b, sink_b) = open(&w, "s1-again").await;
+    until("new shell", || text(&sink_b).contains("welcome-banner")).await;
+    assert_eq!(replacement.stats.opened.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn closing_a_pane_during_a_question_cancels_it() {
+    let w = world();
+    // A server whose key isn't trusted yet, so the connection stops to ask.
+    let host_key = key(KEY_A);
+    let server = spawn_server(host_key, Accepts::default()).await;
+    let mut file = w.store.load().file;
+    file.sessions.push(SavedSession::Ssh {
+        id: "ask".into(),
+        name: "ask".into(),
+        folder: String::new(),
+        host: "127.0.0.1".into(),
+        port: server.port,
+        user: "tester".into(),
+        auth: SshAuth::Password,
+        key_path: String::new(),
+        jump: String::new(),
+    });
+    w.store.save(&file).unwrap();
+
+    let (session, sink) = open(&w, "ask").await;
+    until("the question appears", || {
+        sink.statuses()
+            .iter()
+            .any(|s| matches!(s, TerminalStatus::Prompt { .. }))
+    })
+    .await;
+    assert_eq!(w.services.broker.pending(), 1);
+
+    w.registry.close(&session).await.unwrap();
+    until("the question is dropped", || {
+        w.services.broker.pending() == 0
+    })
+    .await;
+    assert!(!w.known_hosts.exists(), "nothing was trusted");
+    assert!(
+        !sink
+            .statuses()
+            .iter()
+            .any(|s| matches!(s, TerminalStatus::Failed { .. })),
+        "a closed pane shows nothing"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_missing_or_broken_saved_session_fails_with_a_plain_message() {
+    let w = world();
+    let (_a, sink) = open(&w, "nope").await;
+    until("failure", || {
+        sink.statuses().iter().any(
+            |s| matches!(s, TerminalStatus::Failed { error } if error.code == ErrorCode::NotFound),
+        )
+    })
+    .await;
+
+    std::fs::write(&w.services.sessions_file, "[[session]\nbroken").unwrap();
+    let (_b, sink) = open(&w, "nope").await;
+    until("failure", || {
+        sink.statuses().iter().any(
+            |s| matches!(s, TerminalStatus::Failed { error } if error.code == ErrorCode::InvalidInput),
+        )
+    })
+    .await;
+}

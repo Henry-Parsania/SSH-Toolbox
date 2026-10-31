@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tauri::State;
 use tauri::ipc::{Channel, InvokeResponseBody};
+use toolbox_core::ssh::{self, backend::SshServices};
 use toolbox_core::terminal::{
     self, OutputSink, SessionRegistry, SessionSpec, Shell, TerminalStatus, checked_size,
 };
@@ -56,6 +57,7 @@ pub async fn list_wsl_distros() -> Result<Vec<String>, AppError> {
 #[tauri::command]
 pub async fn terminal_open(
     terminals: State<'_, Terminals>,
+    services: State<'_, Arc<SshServices>>,
     spec: SessionSpec,
     cols: u16,
     rows: u16,
@@ -67,7 +69,19 @@ pub async fn terminal_open(
         output: on_output,
         status: on_status,
     });
-    terminal::open_terminal(&terminals.sessions, spec, size, sink).await
+    match spec {
+        SessionSpec::Ssh { saved_session_id } => {
+            ssh::backend::open_ssh_terminal(
+                &terminals.sessions,
+                services.inner().clone(),
+                saved_session_id,
+                size,
+                sink,
+            )
+            .await
+        }
+        other => terminal::open_terminal(&terminals.sessions, other, size, sink).await,
+    }
 }
 
 #[tauri::command]

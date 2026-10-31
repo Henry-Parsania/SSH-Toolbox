@@ -9,6 +9,7 @@
   import "@xterm/xterm/css/xterm.css";
   import {
     openLink,
+    promptRespond,
     startupReady,
     terminalAck,
     terminalClose,
@@ -16,9 +17,12 @@
     terminalResize,
     terminalWrite,
     type PlatformInfo,
+    type Prompt,
+    type PromptResponse,
     type SessionSpec,
     type TerminalStatus,
   } from "../backend";
+  import PromptDialog from "./PromptDialog.svelte";
   import { checkPaste, isCopyKey, isPasteKey, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
   import { settings } from "../settings.svelte";
@@ -87,6 +91,15 @@
 
   let host: HTMLDivElement;
   let notice = $state("");
+  // A question from the backend (host key, password). Shown over the terminal until answered.
+  let question = $state<{ id: string; prompt: Prompt } | null>(null);
+
+  function answerQuestion(response: PromptResponse) {
+    if (!question) return;
+    void promptRespond(question.id, response).catch(() => {});
+    question = null;
+    refocus();
+  }
   let background = $state("#1e1e1e");
   let pending = $state<{ text: string; check: PasteCheck } | null>(null);
   // Set by mount(), so the confirmation box can reach the terminal.
@@ -242,6 +255,11 @@
     });
 
     function handleStatus(status: TerminalStatus) {
+      if (status.type === "prompt") {
+        question = { id: status.prompt_id, prompt: status.prompt };
+      } else if (status.type === "connected" || status.type === "failed" || status.type === "exited") {
+        question = null;
+      }
       if (status.type === "exited") {
         input.stop();
         const how = status.code === null ? "" : ` with code ${status.code}`;
@@ -333,6 +351,9 @@
 <div class="terminal-wrap" style:background>
   <div class="terminal" bind:this={host}></div>
   {#if notice}<p class="notice">{notice}</p>{/if}
+  {#if question}
+    <PromptDialog prompt={question.prompt} onanswer={answerQuestion} />
+  {/if}
   {#if searching}
     <div class="search">
       <input

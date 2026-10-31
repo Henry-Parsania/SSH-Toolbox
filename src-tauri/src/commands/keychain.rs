@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use tauri::State;
 use toolbox_core::keychain::{Keychain, SecretKind};
 use toolbox_core::{AppError, ErrorCode, Secret};
 
 /// Whether saved passwords can be used. False hides "save password" in the session editor.
 #[tauri::command]
-pub async fn keychain_available(keychain: State<'_, Keychain>) -> Result<bool, AppError> {
+pub async fn keychain_available(keychain: State<'_, Arc<Keychain>>) -> Result<bool, AppError> {
     Ok(keychain.is_available())
 }
 
@@ -24,7 +26,7 @@ fn kind_of(kind: &str) -> Result<SecretKind, AppError> {
 /// interface: only the backend reads secrets, when it connects.
 #[tauri::command]
 pub async fn keychain_set(
-    keychain: State<'_, Keychain>,
+    keychain: State<'_, Arc<Keychain>>,
     session_id: String,
     kind: String,
     secret: Secret,
@@ -34,7 +36,7 @@ pub async fn keychain_set(
 
 #[tauri::command]
 pub async fn keychain_delete_session(
-    keychain: State<'_, Keychain>,
+    keychain: State<'_, Arc<Keychain>>,
     session_id: String,
 ) -> Result<(), AppError> {
     keychain.delete_all(&session_id).await

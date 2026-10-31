@@ -1,6 +1,14 @@
 mod commands;
 
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use tauri::{Manager, RunEvent};
+use toolbox_core::keychain::Keychain;
+use toolbox_core::prompt::PromptBroker;
+use toolbox_core::ssh::backend::SshServices;
+use toolbox_core::ssh::hostkeys::default_known_hosts;
+use toolbox_core::ssh::pool::ConnectionPool;
 
 /// Sets the web view workaround the user chose, if any. This must run before any threads or the
 /// web view exist, so it is the first thing `run` does. Linux only.
@@ -23,10 +31,22 @@ fn apply_webkit_workaround() {}
 pub fn run() {
     apply_webkit_workaround();
 
+    let keychain = Arc::new(Keychain::system());
+    let broker = PromptBroker::new();
+    let config = toolbox_core::config::config_dir().unwrap_or_else(|| PathBuf::from("."));
+    let services = Arc::new(SshServices {
+        keychain: keychain.clone(),
+        broker: broker.clone(),
+        pool: ConnectionPool::new(),
+        sessions_file: config.join("sessions.toml"),
+        known_hosts: default_known_hosts().unwrap_or_else(|| config.join("known_hosts")),
+    });
+
     let app = tauri::Builder::default()
         .manage(commands::startup::Startup::now())
-        .manage(toolbox_core::keychain::Keychain::system())
-        .manage(toolbox_core::prompt::PromptBroker::new())
+        .manage(keychain)
+        .manage(broker)
+        .manage(services)
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,

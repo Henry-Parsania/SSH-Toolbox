@@ -38,7 +38,10 @@ export interface Shell {
 }
 
 /** What to open in a pane. More types are added in the phases that build them. */
-export type SessionSpec = { type: "local"; shell_id: string } | { type: "wsl"; distro: string };
+export type SessionSpec =
+  | { type: "local"; shell_id: string }
+  | { type: "wsl"; distro: string }
+  | { type: "ssh"; saved_session_id: string };
 
 export type TerminalStatus =
   | { type: "connecting" }
