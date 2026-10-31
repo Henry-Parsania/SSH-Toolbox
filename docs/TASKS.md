@@ -78,7 +78,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [x] **1.3 Terminal commands.** Add the phase 1 terminal commands (IF section 5), `list_shells`, and their `src/lib/backend/` wrappers.
   *Done when:* it compiles and a temporary button can list shells.
 
-- [ ] **1.4 One terminal in the window (T3, T4, T8).** Add `src/lib/terminal/`, including xterm, fit, Unicode 11, the renderer choice (IF section 11) and flow control (IF section 4). Temporarily fill the window with one local shell.
+- [x] **1.4 One terminal in the window (T3, T4, T8).** Add `src/lib/terminal/`, including xterm, fit, Unicode 11, the renderer choice (IF section 11) and flow control (IF section 4). Temporarily fill the window with one local shell.
   *Done when:* the app builds and opens to a shell. Typing, `seq 1 1000000` and `yes` with Ctrl+C are confirmed in task 1.5.
 
 - [ ] **1.5 Early owner check.** Ask the owner to run the rendering section of the checklist on Windows. Fix what's found. Mention that Ubuntu can be tried from this point with the CI build.
@@ -99,7 +99,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
-- [ ] **1.11 WSL (W1ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
+- [ ] **1.11 WSL (W1ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œW3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
 - [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).
