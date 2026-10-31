@@ -27,6 +27,8 @@
     fontFamily?: string;
     renderer?: RendererSetting;
     onstatus?: (status: TerminalStatus) => void;
+    /** Give the keyboard to this terminal whenever this becomes true. */
+    focused?: boolean;
   }
 
   let {
@@ -37,7 +39,13 @@
     fontFamily = "Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace",
     renderer = "auto",
     onstatus,
+    focused = true,
   }: Props = $props();
+
+  let focusTerminal: () => void = () => {};
+  $effect(() => {
+    if (focused) focusTerminal();
+  });
 
   let host: HTMLDivElement;
   let notice = $state("");
@@ -112,6 +120,7 @@
 
     pasteConfirmed = (text) => term.paste(text);
     refocus = () => term.focus();
+    focusTerminal = () => term.focus();
 
     const input = new InputSender((data) => terminalWrite(sessionId!, data));
     const dataSub = term.onData((text) => input.push(encoder.encode(text)));
@@ -218,7 +227,7 @@
       },
     );
 
-    term.focus();
+    if (focused) term.focus();
     if (import.meta.env.DEV) (window as unknown as { __term?: Terminal }).__term = term;
 
     return () => {

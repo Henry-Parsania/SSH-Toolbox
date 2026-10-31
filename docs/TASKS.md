@@ -31,13 +31,13 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.7 Pane tree (P2).** Build the `PaneNode` tree as plain TypeScript with no UI: split, close, resize, and finding the next pane in a direction. Unit-test thoroughly, including closing the last child of a split.
   *Done when:* tests pass.
 
-- [ ] **1.8 Panes on screen (P2, P4).** Draw the tree with draggable dividers. Each pane takes a `SessionSpec`, so later session types need no pane changes. Closing a pane closes its session. A pane whose session ended shows a message and a close button, and only that pane is affected.
+- [x] **1.8 Panes on screen (P2, P4).** Draw the tree with draggable dividers. Each pane takes a `SessionSpec`, so later session types need no pane changes. Closing a pane closes its session. A pane whose session ended shows a message and a close button, and only that pane is affected.
   *Done when:* panes split in both directions, resize by dragging, and each runs its own shell.
 
-- [ ] **1.9 Tabs (P1).** New, close, rename and drag to reorder. Hidden tabs keep their terminals alive (IF section 4).
+- [x] **1.9 Tabs (P1).** New, close, rename and drag to reorder. Hidden tabs keep their terminals alive (IF section 4).
   *Done when:* switching tabs keeps scrollback and running programs.
 
-- [ ] **1.10 Shortcuts (P3).** IF section 12.
+- [x] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
 - [ ] **1.11 WSL (W1–W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.

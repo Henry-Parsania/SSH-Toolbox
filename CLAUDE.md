@@ -12,6 +12,13 @@ A lightweight, personal MobaXterm-style desktop app for Windows 11 and Ubuntu 26
 - Linux support is essential. This PC can't judge rendering on the owner's Ubuntu desktop, so those results come from the owner.
 - Testing is on Windows for now, and on Ubuntu later, apart from the rendering check in PLAN.md section 2.
 
+## Working autonomously
+- Do not stop to ask whether to continue. The answer is always yes.
+- When a decision is unclear, choose the most reasonable option, note it in NOTES.md, and keep going.
+- Only stop when everything is finished, or when you are blocked by something only I can provide, such as a password.
+- If one item is blocked, record it and move on to the next.
+- Test your work before you call it done.
+- 
 ## Current status (2026-11-01)
 - Phase 0 is finished. Phase 1 is in progress, and `TASKS.md` shows how far it's got.
 - The owner hasn't run the terminal rendering checks yet, on Windows or on Ubuntu. Rendering on Ubuntu is still the project's biggest unknown. `npx tauri build` hasn't been tried on the owner's machines either: installers come from CI.
