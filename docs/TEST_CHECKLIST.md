@@ -19,7 +19,7 @@ For Ubuntu tests, download the `.deb` from the latest GitHub Actions run of the 
 
 ## Phase 0
 **Windows**
-- [ ] The app opens a window, showing the OS name.
+- [x] The app opens a window, showing the OS name. (Owner screenshot, 2026-10-31, from a dev build. The CI installer hasn't been tried yet.)
 
 **Ubuntu (later)**
 - [ ] The app from CI opens a window on Ubuntu 26.04.
@@ -110,7 +110,7 @@ Run these only after Claude confirms the security review is done.
 
 ## Phase 6
 - [ ] Installers work on a clean install on Windows and Ubuntu.
-- [ ] Q1–Q8 measured on both, and recorded here: ______
+- [ ] Q1â€“Q8 measured on both, and recorded here: ______
 - [ ] All "Ubuntu (later)" items above are done.
 
 ## Deferred on purpose

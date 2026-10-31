@@ -39,7 +39,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [x] **0.5 Connect the layers.** Add `AppError` and `Secret` (IF section 2) with tests, the `platform_info` command, and `src/lib/backend/index.ts`. Show the OS name in the window, proving the path from interface to `crates/core`. Add `scripts/check-boundaries.mjs`, which fails if a file outside `src/lib/backend/` imports `@tauri-apps/*`, and add it to `npm run check`.
   *Done when:* the window shows the OS. Adding such an import temporarily makes the check fail.
 
-- [ ] **0.6 CI.** Add `.github/workflows/ci.yml`, running on pushes to `main`, with `windows-latest` and `ubuntu-26.04`. Run every check from PLAN.md section 3, then `npx tauri build`, and upload the Windows installer and Linux `.deb` and AppImage as artifacts. On Linux, first install:
+- [x] **0.6 CI.** Add `.github/workflows/ci.yml`, running on pushes to `main`, with `windows-latest` and `ubuntu-26.04`. Run every check from PLAN.md section 3, then `npx tauri build`, and upload the Windows installer and Linux `.deb` and AppImage as artifacts. On Linux, first install:
   ```
   sudo apt-get update
   sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
@@ -47,7 +47,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
   Build on 26.04 so the build matches the owner's Ubuntu. If that build machine is unavailable, run the Linux job on `ubuntu-latest` with `container: ubuntu:26.04`, and tell the owner.
   *Done when:* both jobs are green and the artifacts can be downloaded.
 
-- [ ] **0.7 Check the libraries.** Add small programs under `crates/core/examples/`, then record results in a new `docs/LIBRARIES.md`, with one row per library: version, what was tried, on which OS, and the result. Add a Dockerfile in `tests/containers/sshd/` based on `debian:stable-slim` with `openssh-server`. In CI on Linux, start that container, and start `ssh-agent` with a throwaway key.
+- [x] **0.7 Check the libraries.** Add small programs under `crates/core/examples/`, then record results in a new `docs/LIBRARIES.md`, with one row per library: version, what was tried, on which OS, and the result. Add a Dockerfile in `tests/containers/sshd/` based on `debian:stable-slim` with `openssh-server`. In CI on Linux, start that container, and start `ssh-agent` with a throwaway key.
 
   | Library | Check | Where |
   |---|---|---|
@@ -64,7 +64,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 
   *Done when:* every row has a result. If a check fails, follow the stop rules.
 
-- [ ] **0.8 Finish.** Ask the owner to run the phase 0 Windows item in [TEST_CHECKLIST.md](TEST_CHECKLIST.md). Update `CLAUDE.md`'s status.
+- [x] **0.8 Finish.** Ask the owner to run the phase 0 Windows item in [TEST_CHECKLIST.md](TEST_CHECKLIST.md). Update `CLAUDE.md`'s status.
   *Done when:* the owner confirms the window opens on Windows.
 
 ## Phase 1: Terminal, tabs and panes
@@ -99,7 +99,7 @@ The builder may not be able to see or operate the app window. If a "done when" n
 - [ ] **1.10 Shortcuts (P3).** IF section 12.
   *Done when:* each works, and `vim` still gets ordinary keys such as Ctrl+W.
 
-- [ ] **1.11 WSL (W1Ã¢â‚¬â€œW3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
+- [ ] **1.11 WSL (W1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“W3).** IF section 3. Add `list_wsl_distros` and a menu, hidden when `wsl_available` is false.
   *Done when:* a test decodes a captured UTF-16LE sample and removes Docker's distros. On this PC, `Ubuntu` is listed and opens, and `docker-desktop` isn't listed.
 
 - [ ] **1.12 Settings (T7, T8).** `settings.toml` and a simple screen for font, size, theme, scrollback and renderer. Add `webkit_workaround` too (IF section 11).

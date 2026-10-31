@@ -18,10 +18,13 @@ A lightweight, personal MobaXterm-style desktop app for Windows 11 and Ubuntu 26
 - The builder may be a less capable model. Stronger-model security reviews at the points in PLAN.md section 6 aren't optional.
 
 ## Current status (2026-10-31)
-- Only the documents exist. There is no code, and this folder isn't a git repository yet.
-- Next step: task 0.1 in [docs/TASKS.md](docs/TASKS.md).
-- GitHub repository: https://github.com/Henry-Parsania/SSH-Toolbox. It's empty, and it's reachable from this PC.
-- This Windows PC has git, WSL, WebView2 and Docker Desktop. Rust, Node.js and the Visual Studio C++ build tools are missing. The owner has approved installing those three, and the first attempt was stopped before anything installed.
+- Phase 0 (setup) is finished. The app opens a window on Windows showing the OS name, and CI is green on Windows and Linux.
+- Next step: task 1.1 in [docs/TASKS.md](docs/TASKS.md).
+- GitHub repository: https://github.com/Henry-Parsania/SSH-Toolbox (private). The builder pushes straight to `main`, as PLAN.md section 6 allows.
+- This Windows PC has Node.js, Rust (`stable-msvc`), the Visual Studio C++ build tools, git, WSL, WebView2 and Docker Desktop. Docker Desktop wasn't running during phase 0. The Windows `ssh-agent` service is on, with one key.
+- Library results are in [docs/LIBRARIES.md](docs/LIBRARIES.md). Two matter later: task 2.3 must read `known_hosts` itself, because `russh` treats an unreadable file as "no keys", and Windows terminal tests must answer ConPTY's cursor-position request.
+- Not yet tried: the CI-built Windows installer, and the app on Ubuntu (both on the checklist).
+- Windows tools can't see a window's contents, but a window opened with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` can be read over the DevTools protocol, which is how the builder checked the page text and console errors.
 - WSL has `Ubuntu` (26.04.1) and `docker-desktop`, both stopped. Installing packages in it needs the owner's `sudo` password. It isn't needed for now, so leave it alone.
 - Early test: Termex, a Tauri SSH client, opened and drew its window correctly on the Ubuntu machine. The terminal rendering tests weren't reported, so rendering is still unproven (see PLAN.md section 5).
 - `gnome-keyring-daemon` crashed around Termex's first launch on that machine. The cause is unknown. Requirement SEC4 covers this.
