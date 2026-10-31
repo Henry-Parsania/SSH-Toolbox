@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SavedSession } from "../backend";
   import type { Library } from "./library.svelte";
+  import KeySetupDialog from "./KeySetupDialog.svelte";
   import SessionEditor from "./SessionEditor.svelte";
   import { buildTree, newId, type SshSession, type TreeItem } from "./tree";
 
@@ -16,6 +17,7 @@
   let collapsed = $state<Record<string, boolean>>({});
   let editor = $state<{ editing?: SshSession; folder?: string } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
+  let keySetupFor = $state<SshSession | null>(null);
   let renaming = $state<{ id: string; name: string } | null>(null);
   let message = $state("");
 
@@ -101,6 +103,7 @@
       <span class="tools">
         <button title="Connect in a new tab" onclick={() => onopen(item.session)}>▶</button>
         {#if item.session.type === "ssh"}
+          <button title="Set up key login" onclick={() => (keySetupFor = item.session as SshSession)}>🔑</button>
           <button title="Edit" onclick={() => (editor = { editing: item.session as SshSession })}>✎</button>
         {/if}
         <button
@@ -162,6 +165,10 @@
 
 {#if editor}
   <SessionEditor {library} editing={editor.editing} folder={editor.folder} onclose={() => (editor = null)} />
+{/if}
+
+{#if keySetupFor}
+  <KeySetupDialog {library} session={keySetupFor} onclose={() => (keySetupFor = null)} />
 {/if}
 
 {#if confirm}

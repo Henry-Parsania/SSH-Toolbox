@@ -47,6 +47,7 @@ pub fn run() {
         .manage(keychain)
         .manage(broker)
         .manage(services)
+        .manage(commands::keys::KeySetups::default())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
@@ -55,6 +56,9 @@ pub fn run() {
             commands::keychain::keychain_set,
             commands::keys::key_generate,
             commands::keys::key_list,
+            commands::keys::key_setup,
+            commands::keys::key_setup_cancel,
+            commands::keychain::keychain_delete_secret,
             commands::layout::layout_get,
             commands::layout::layout_set,
             commands::link::open_link,

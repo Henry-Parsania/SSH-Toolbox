@@ -289,3 +289,43 @@ export function keyGenerate(passphrase?: string): Promise<NewKey> {
 export function keyList(): Promise<ExistingKey[]> {
   return invoke<ExistingKey[]>("key_list");
 }
+
+export interface KeySetupResult {
+  outcome: "installed" | "already_present";
+  /** The key login was tried on a fresh connection and worked. */
+  verified: boolean;
+}
+
+/**
+ * Installs a public key on the server of a saved session and checks the key login. Questions
+ * (host key, password) arrive through `onStatus` as prompts, to be answered with `promptRespond`.
+ */
+export function keySetup(
+  operationId: string,
+  savedSessionId: string,
+  privateKeyPath: string,
+  publicLine: string,
+  onStatus: (status: TerminalStatus) => void,
+): Promise<KeySetupResult> {
+  const channel = new Channel<TerminalStatus>();
+  channel.onmessage = onStatus;
+  return invoke<KeySetupResult>("key_setup", {
+    operationId,
+    savedSessionId,
+    privateKeyPath,
+    publicLine,
+    onStatus: channel,
+  });
+}
+
+export function keySetupCancel(operationId: string): Promise<void> {
+  return invoke<void>("key_setup_cancel", { operationId });
+}
+
+/** Removes one saved secret. Only after the user agrees. */
+export function keychainDeleteSecret(
+  sessionId: string,
+  kind: "password" | "passphrase" | "ftp_password",
+): Promise<void> {
+  return invoke<void>("keychain_delete_secret", { sessionId, kind });
+}

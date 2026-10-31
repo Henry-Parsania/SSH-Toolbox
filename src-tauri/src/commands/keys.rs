@@ -30,3 +30,68 @@ pub async fn key_list() -> Result<Vec<ExistingKey>, AppError> {
         .await
         .map_err(|_| task_failed())
 }
+
+/// Setups that are running, so the dialog's Cancel can stop one.
+#[derive(Default)]
+pub struct KeySetups {
+    running:
+        std::sync::Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
+}
+
+/// Delivers only the questions (host key, password) to the interface; there is no output.
+struct QuestionSink {
+    status: tauri::ipc::Channel<toolbox_core::terminal::TerminalStatus>,
+}
+
+impl toolbox_core::terminal::OutputSink for QuestionSink {
+    fn send_data(&self, _chunk: Vec<u8>) -> Result<(), AppError> {
+        Ok(())
+    }
+    fn send_status(&self, status: toolbox_core::terminal::TerminalStatus) -> Result<(), AppError> {
+        self.status
+            .send(status)
+            .map_err(|_| AppError::new(ErrorCode::Internal, "The window stopped listening."))
+    }
+}
+
+/// Installs a public key on the server of a saved session and checks that the key login works.
+/// Questions arrive on `on_status`; `operation_id` lets `key_setup_cancel` stop it.
+#[tauri::command]
+pub async fn key_setup(
+    setups: tauri::State<'_, KeySetups>,
+    services: tauri::State<'_, std::sync::Arc<toolbox_core::ssh::backend::SshServices>>,
+    operation_id: String,
+    saved_session_id: String,
+    private_key_path: String,
+    public_line: String,
+    on_status: tauri::ipc::Channel<toolbox_core::terminal::TerminalStatus>,
+) -> Result<toolbox_core::ssh::install::KeySetupResult, AppError> {
+    let cancel = tokio_util::sync::CancellationToken::new();
+    setups
+        .running
+        .lock()
+        .unwrap()
+        .insert(operation_id.clone(), cancel.clone());
+    let result = toolbox_core::ssh::install::setup_key_login(
+        &services,
+        &saved_session_id,
+        std::path::PathBuf::from(private_key_path),
+        &public_line,
+        std::sync::Arc::new(QuestionSink { status: on_status }),
+        cancel,
+    )
+    .await;
+    setups.running.lock().unwrap().remove(&operation_id);
+    result
+}
+
+#[tauri::command]
+pub async fn key_setup_cancel(
+    setups: tauri::State<'_, KeySetups>,
+    operation_id: String,
+) -> Result<(), AppError> {
+    if let Some(token) = setups.running.lock().unwrap().get(&operation_id) {
+        token.cancel();
+    }
+    Ok(())
+}

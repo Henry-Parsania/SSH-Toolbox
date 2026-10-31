@@ -72,8 +72,8 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.
 - [x] **2.7 Layout restore for SSH (P6).** Restored SSH panes show a Connect button, and don't connect by themselves.
 - [x] **2.8 Key generation (K1, K2).** IF section 15, step 1. Test that an existing file is never overwritten.
-- [ ] **2.9 Key install on Linux (K3, K4, K6).** The full flow, including all the integration tests in IF section 15.
-- [ ] **2.10 Key install on Windows servers (K5, K7).** The script in IF section 15. Unit-test the generated script and its encoding. Real testing is on the owner's list.
+- [x] **2.9 Key install on Linux (K3, K4, K6).** The full flow, including all the integration tests in IF section 15.
+- [x] **2.10 Key install on Windows servers (K5, K7).** The script in IF section 15. Unit-test the generated script and its encoding. Real testing is on the owner's list.
 - [ ] **2.11 Import and jump hosts (S4, S6).** IF section 7. Test parsing with sample config files. Integration-test a jump host with two containers.
 - [ ] **2.12 Port forwarding (S7).** IF section 7. Integration-test local, remote and SOCKS.
 - [ ] **2.13 Security review (SEC7).** Run the review in PLAN.md section 5 and fix what's serious.

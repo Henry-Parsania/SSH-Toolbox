@@ -64,6 +64,7 @@ async fn server_for(w: &World, id: &str) -> ServerHandle {
             user: "tester".into(),
             password: Some("pw".into()),
             keys: vec![],
+            ..Default::default()
         },
     )
     .await;

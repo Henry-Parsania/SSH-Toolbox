@@ -41,3 +41,14 @@ pub async fn keychain_delete_session(
 ) -> Result<(), AppError> {
     keychain.delete_all(&session_id).await
 }
+
+/// Removes one saved secret, for when the user chooses to delete a password that a key now
+/// replaces. Never done without asking.
+#[tauri::command]
+pub async fn keychain_delete_secret(
+    keychain: State<'_, Arc<Keychain>>,
+    session_id: String,
+    kind: String,
+) -> Result<(), AppError> {
+    keychain.delete(&session_id, kind_of(&kind)?).await
+}

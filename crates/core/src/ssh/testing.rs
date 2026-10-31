@@ -59,6 +59,11 @@ pub struct Accepts {
     pub user: String,
     pub password: Option<String>,
     pub keys: Vec<PublicKey>,
+    /// Lets the server run commands with this as the user's home folder, and accept any key that
+    /// is listed in `<home>/.ssh/authorized_keys`, as a real server does.
+    pub home: Option<std::path::PathBuf>,
+    /// The `sh` that runs those commands.
+    pub sh: Option<String>,
 }
 
 /// What happened on the server, for tests to look at.
@@ -79,11 +84,15 @@ struct TestServer(Arc<Accepts>, Arc<Stats>);
 impl server::Server for TestServer {
     type Handler = TestHandler;
     fn new_client(&mut self, _peer: Option<std::net::SocketAddr>) -> TestHandler {
-        TestHandler(self.0.clone(), self.1.clone())
+        TestHandler(self.0.clone(), self.1.clone(), HashMap::new())
     }
 }
 
-pub struct TestHandler(Arc<Accepts>, Arc<Stats>);
+pub struct TestHandler(
+    Arc<Accepts>,
+    Arc<Stats>,
+    HashMap<ChannelId, (String, Vec<u8>)>,
+);
 
 impl server::Handler for TestHandler {
     type Error = russh::Error;
@@ -138,6 +147,72 @@ impl server::Handler for TestHandler {
         Ok(())
     }
 
+    /// Commands run on a real `sh`, with a temporary home folder. They get what the client sends
+    /// as standard input once it says it is finished.
+    async fn exec_request(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        if self.0.home.is_some() {
+            self.2.insert(
+                channel,
+                (String::from_utf8_lossy(data).into_owned(), Vec::new()),
+            );
+            session.channel_success(channel)?;
+        } else {
+            session.channel_failure(channel)?;
+        }
+        Ok(())
+    }
+
+    async fn channel_eof(
+        &mut self,
+        channel: ChannelId,
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        let Some((command, stdin)) = self.2.remove(&channel) else {
+            return Ok(());
+        };
+        let (Some(home), Some(sh)) = (self.0.home.clone(), self.0.sh.clone()) else {
+            return Ok(());
+        };
+        // Only `sh` commands run. Anything else, such as the PowerShell probe, isn't understood.
+        let code = if command.starts_with("powershell") {
+            session.extended_data(channel, 1, b"powershell: not found".to_vec())?;
+            127
+        } else {
+            use tokio::io::AsyncWriteExt;
+            let mut child = tokio::process::Command::new(&sh)
+                .args(["-c", &command])
+                .env("HOME", &home)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|_| russh::Error::Disconnect)?;
+            let mut input = child.stdin.take().unwrap();
+            let _ = input.write_all(&stdin).await;
+            drop(input);
+            let out = child
+                .wait_with_output()
+                .await
+                .map_err(|_| russh::Error::Disconnect)?;
+            if !out.stdout.is_empty() {
+                session.data(channel, out.stdout)?;
+            }
+            if !out.stderr.is_empty() {
+                session.extended_data(channel, 1, out.stderr)?;
+            }
+            out.status.code().unwrap_or(1) as u32
+        };
+        session.exit_status_request(channel, code)?;
+        session.eof(channel)?;
+        session.close(channel)?;
+        Ok(())
+    }
+
     /// Echoes what it is sent. "exit-now" ends the shell with exit code 7 when it gets "exit-now".
     async fn data(
         &mut self,
@@ -145,6 +220,10 @@ impl server::Handler for TestHandler {
         data: &[u8],
         session: &mut Session,
     ) -> Result<(), Self::Error> {
+        if let Some((_, stdin)) = self.2.get_mut(&channel) {
+            stdin.extend_from_slice(data);
+            return Ok(());
+        }
         if data == b"exit-now" {
             session.exit_status_request(channel, 7)?;
             session.eof(channel)?;
@@ -165,7 +244,18 @@ impl server::Handler for TestHandler {
         user: &str,
         key: VerifiedPublicKey<'_>,
     ) -> Result<Auth, Self::Error> {
-        let ok = user == self.0.user && self.0.keys.iter().any(|k| k == key.public_key);
+        let in_file = self.0.home.as_ref().is_some_and(|home| {
+            let blob = key.public_key.to_openssh().unwrap_or_default();
+            let blob = blob.split(' ').nth(1).unwrap_or("").to_string();
+            std::fs::read_to_string(home.join(".ssh").join("authorized_keys"))
+                .map(|text| {
+                    text.lines()
+                        .any(|l| !blob.is_empty() && l.split(' ').nth(1) == Some(blob.as_str()))
+                })
+                .unwrap_or(false)
+        });
+        let ok =
+            user == self.0.user && (in_file || self.0.keys.iter().any(|k| k == key.public_key));
         Ok(if ok { Auth::Accept } else { Auth::reject() })
     }
 }

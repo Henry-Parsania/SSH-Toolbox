@@ -106,6 +106,7 @@ fn password_server() -> Accepts {
         user: USER.into(),
         password: Some(PASSWORD.into()),
         keys: vec![],
+        ..Default::default()
     }
 }
 
@@ -114,6 +115,7 @@ fn key_server(pem: &str) -> Accepts {
         user: USER.into(),
         password: None,
         keys: vec![public_of(&key(pem))],
+        ..Default::default()
     }
 }
 
@@ -469,6 +471,7 @@ async fn the_windows_agent_logs_in_when_it_has_a_key() {
             user: USER.into(),
             password: None,
             keys,
+            ..Default::default()
         },
     )
     .await;
