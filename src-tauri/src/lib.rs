@@ -64,6 +64,8 @@ pub fn run() {
             commands::link::open_link,
             commands::prompt::prompt_respond,
             commands::sessions::sessions_get,
+            commands::sessions::ssh_config_import,
+            commands::sessions::ssh_config_preview,
             commands::sessions::sessions_save,
             commands::sessions::sessions_set_aside_unreadable,
             commands::settings::settings_get,

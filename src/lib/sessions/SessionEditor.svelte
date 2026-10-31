@@ -24,6 +24,7 @@
     auth: editing?.auth ?? ("password" as const),
     keyPath: editing?.key_path ?? "",
     folder: editing?.folder ?? folder,
+    jump: editing?.jump ?? "",
   }));
   let name = $state(start.name);
   let host = $state(start.host);
@@ -32,6 +33,7 @@
   let auth = $state<"password" | "key" | "agent">(start.auth);
   let keyPath = $state(start.keyPath);
   let inFolder = $state(start.folder);
+  let jump = $state(start.jump);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -40,6 +42,22 @@
   let saving = $state(false);
 
   const choices = $derived(folderChoices(library.file.folder));
+  // Any other SSH session can be a jump host, unless it would go round in a circle.
+  const jumpChoices = $derived(
+    library.file.session.filter(
+      (s): s is SshSession => s.type === "ssh" && s.id !== editing?.id && !goesThrough(s, editing?.id),
+    ),
+  );
+
+  /** True if `s` already reaches the session being edited through its own jump hosts. */
+  function goesThrough(s: SshSession, id: string | undefined): boolean {
+    let at: SshSession | undefined = s;
+    for (let i = 0; at && id && i < 10; i++) {
+      if (at.jump === id) return true;
+      at = library.file.session.find((x): x is SshSession => x.type === "ssh" && x.id === at!.jump);
+    }
+    return false;
+  }
 
   async function save() {
     const problem = checkSshForm({ name, host, port, user, auth, key_path: keyPath });
@@ -60,7 +78,7 @@
       user: user.trim(),
       auth,
       key_path: auth === "key" ? keyPath.trim() : "",
-      jump: editing?.jump ?? "",
+      jump,
     };
     const sessions = editing
       ? library.file.session.map((s) => (s.id === id ? session : s))
@@ -127,6 +145,16 @@
         <small>The app reads this file when connecting and never copies it.</small>
       </label>
     {/if}
+    <label>
+      Go through a jump host
+      <select bind:value={jump}>
+        <option value="">(connect directly)</option>
+        {#each jumpChoices as j (j.id)}
+          <option value={j.id}>{j.name} ({j.user}@{j.host})</option>
+        {/each}
+      </select>
+      <small>Connects to that session first, then on to this one. Up to 3 hops.</small>
+    </label>
     {#if library.keychain && auth === "password"}
       <label>
         Save password in the keychain (optional)

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SavedSession } from "../backend";
   import type { Library } from "./library.svelte";
+  import ImportDialog from "./ImportDialog.svelte";
   import KeySetupDialog from "./KeySetupDialog.svelte";
   import SessionEditor from "./SessionEditor.svelte";
   import { buildTree, newId, type SshSession, type TreeItem } from "./tree";
@@ -17,6 +18,7 @@
   let collapsed = $state<Record<string, boolean>>({});
   let editor = $state<{ editing?: SshSession; folder?: string } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
+  let importing = $state(false);
   let keySetupFor = $state<SshSession | null>(null);
   let renaming = $state<{ id: string; name: string } | null>(null);
   let message = $state("");
@@ -138,6 +140,7 @@
     <input class="search" type="search" placeholder="Search sessions" bind:value={search} />
     <button title="New SSH session" onclick={() => (editor = {})}>+</button>
     <button title="New folder" onclick={() => addFolder("")}>▤</button>
+    <button title="Import from ~/.ssh/config" onclick={() => (importing = true)}>⇩</button>
   </div>
 
   {#if library.problem}
@@ -165,6 +168,10 @@
 
 {#if editor}
   <SessionEditor {library} editing={editor.editing} folder={editor.folder} onclose={() => (editor = null)} />
+{/if}
+
+{#if importing}
+  <ImportDialog {library} onclose={() => (importing = false)} />
 {/if}
 
 {#if keySetupFor}

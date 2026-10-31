@@ -2,6 +2,8 @@
 
 pub mod auth;
 pub mod backend;
+pub mod chain;
+pub mod config_import;
 pub mod connection;
 pub mod hostkeys;
 pub mod install;

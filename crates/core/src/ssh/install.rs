@@ -9,12 +9,13 @@ use russh::ChannelMsg;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 
-use super::auth::{Login, LoginMethod, login};
+use super::auth::LoginMethod;
 use super::backend::SshServices;
-use super::connection::{Connection, connect};
+use super::chain::{connect_chain, resolve_chain};
+use super::connection::Connection;
 use crate::error::{AppError, ErrorCode};
 use crate::prompt::Prompter;
-use crate::sessions::{SavedSession, SessionStore};
+use crate::sessions::SessionStore;
 use crate::terminal::OutputSink;
 
 const EXEC_TIMEOUT: Duration = Duration::from_secs(30);
@@ -269,56 +270,26 @@ pub async fn setup_key_login(
     if let Some(problem) = loaded.problem {
         return Err(AppError::new(ErrorCode::InvalidInput, problem));
     }
-    let Some(SavedSession::Ssh {
-        host, port, user, ..
-    }) = loaded
-        .file
-        .sessions
-        .into_iter()
-        .find(|s| s.id() == saved_session_id)
-    else {
-        return Err(AppError::new(
-            ErrorCode::NotFound,
-            "That saved session doesn't exist any more.",
-        ));
-    };
+    let chain = resolve_chain(&loaded.file, saved_session_id)?;
 
     let prompter = Prompter::new(services.broker.clone(), sink, cancel.clone());
     let work = async {
-        // Step 2: a normal connection and password login, with every host key check.
-        let mut first =
-            connect(&host, port, services.known_hosts.clone(), prompter.clone()).await?;
-        login(
-            &mut first,
-            &Login {
-                session_id: saved_session_id.to_string(),
-                host: host.clone(),
-                user: user.clone(),
-                method: LoginMethod::Password,
-            },
-            &services.keychain,
-            &prompter,
-        )
-        .await?;
+        // Step 2: a normal connection and password login, with every host key check. Jump
+        // hosts, if the session has any, log in with their own saved methods.
+        let (first, _first_via) =
+            connect_chain(services, &chain, Some(LoginMethod::Password), &prompter).await?;
 
         // Steps 3 and 4.
         let os = detect_os(&first).await?;
         let outcome = install_key(&first, os, public_line).await?;
 
         // Step 5: a separate connection that can only succeed with the key.
-        let mut second =
-            connect(&host, port, services.known_hosts.clone(), prompter.clone()).await?;
-        let verified = login(
-            &mut second,
-            &Login {
-                session_id: saved_session_id.to_string(),
-                host: host.clone(),
-                user: user.clone(),
-                method: LoginMethod::Key {
-                    path: private_key_path.display().to_string(),
-                },
-            },
-            &services.keychain,
+        let verified = connect_chain(
+            services,
+            &chain,
+            Some(LoginMethod::Key {
+                path: private_key_path.display().to_string(),
+            }),
             &prompter,
         )
         .await

@@ -13,6 +13,8 @@ use crate::error::AppError;
 /// A logged-in connection that panes open their channels on.
 pub struct SharedConnection {
     pub handle: Connection,
+    /// Jump host connections this one runs through. They close when this one does.
+    _via: Vec<Connection>,
 }
 
 #[derive(Default)]
@@ -34,7 +36,7 @@ impl ConnectionPool {
         connect: F,
     ) -> Result<Arc<SharedConnection>, AppError>
     where
-        F: Future<Output = Result<Connection, AppError>>,
+        F: Future<Output = Result<(Connection, Vec<Connection>), AppError>>,
     {
         let mut entries = self.entries.lock().await;
         if let Some(shared) = entries.get(key).and_then(Weak::upgrade)
@@ -42,9 +44,8 @@ impl ConnectionPool {
         {
             return Ok(shared);
         }
-        let shared = Arc::new(SharedConnection {
-            handle: connect.await?,
-        });
+        let (handle, via) = connect.await?;
+        let shared = Arc::new(SharedConnection { handle, _via: via });
         entries.insert(key.to_string(), Arc::downgrade(&shared));
         entries.retain(|_, weak| weak.strong_count() > 0);
         Ok(shared)

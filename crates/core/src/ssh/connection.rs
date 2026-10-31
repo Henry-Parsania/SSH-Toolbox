@@ -101,13 +101,20 @@ impl client::Handler for ClientHandler {
 /// An open connection. Terminals and file panels each open their own channel on it.
 pub type Connection = Handle<ClientHandler>;
 
-/// Connects and checks the server's key, asking the user when the rules say so.
-pub async fn connect(
+fn make_config() -> Arc<client::Config> {
+    Arc::new(client::Config {
+        keepalive_interval: Some(KEEPALIVE_INTERVAL),
+        keepalive_max: KEEPALIVE_MAX,
+        ..Default::default()
+    })
+}
+
+fn make_handler(
     host: &str,
     port: u16,
     known_hosts: PathBuf,
     prompter: Prompter,
-) -> Result<Connection, AppError> {
+) -> (ClientHandler, Failure) {
     let failure: Failure = Arc::default();
     let handler = ClientHandler {
         host: host.to_string(),
@@ -116,19 +123,17 @@ pub async fn connect(
         prompter,
         failure: failure.clone(),
     };
-    let config = Arc::new(client::Config {
-        keepalive_interval: Some(KEEPALIVE_INTERVAL),
-        keepalive_max: KEEPALIVE_MAX,
-        ..Default::default()
-    });
+    (handler, failure)
+}
 
-    let attempt = tokio::time::timeout(
-        CONNECT_TIMEOUT,
-        client::connect(config, (host, port), handler),
-    )
-    .await;
-
-    // The host key check's own reason comes first: the library only says "unknown key".
+/// Turns what the library said into a plain message, with the host key check's own reason first
+/// because the library only says "unknown key".
+fn explain<T>(
+    attempt: Result<Result<T, russh::Error>, tokio::time::error::Elapsed>,
+    failure: &Failure,
+    host: &str,
+    port: u16,
+) -> Result<T, AppError> {
     if let Some(error) = failure.lock().unwrap().take() {
         return Err(error);
     }
@@ -143,4 +148,40 @@ pub async fn connect(
             format!("{host} didn't answer in time."),
         )),
     }
+}
+
+/// Connects and checks the server's key, asking the user when the rules say so.
+pub async fn connect(
+    host: &str,
+    port: u16,
+    known_hosts: PathBuf,
+    prompter: Prompter,
+) -> Result<Connection, AppError> {
+    let (handler, failure) = make_handler(host, port, known_hosts, prompter);
+    let attempt = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        client::connect(make_config(), (host, port), handler),
+    )
+    .await;
+    explain(attempt, &failure, host, port)
+}
+
+/// Connects to `host` by way of an already open connection (a jump host). The server's key is
+/// checked exactly as for a direct connection.
+pub async fn connect_through(
+    jump: &Connection,
+    host: &str,
+    port: u16,
+    known_hosts: PathBuf,
+    prompter: Prompter,
+) -> Result<Connection, AppError> {
+    let (handler, failure) = make_handler(host, port, known_hosts, prompter);
+    let attempt = tokio::time::timeout(CONNECT_TIMEOUT, async {
+        let channel = jump
+            .channel_open_direct_tcpip(host, port.into(), "127.0.0.1", 0)
+            .await?;
+        client::connect_stream(make_config(), channel.into_stream(), handler).await
+    })
+    .await;
+    explain(attempt, &failure, host, port)
 }

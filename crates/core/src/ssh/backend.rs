@@ -9,13 +9,12 @@ use russh::client::Msg;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::auth::{Login, LoginMethod, login};
-use super::connection::connect;
+use super::chain::{connect_chain, resolve_chain};
 use super::pool::{ConnectionPool, SharedConnection};
 use crate::error::{AppError, ErrorCode};
 use crate::keychain::Keychain;
 use crate::prompt::{PromptBroker, Prompter};
-use crate::sessions::{SavedSession, SessionStore, SshAuth};
+use crate::sessions::SessionStore;
 use crate::terminal::{
     BackendEvent, MAX_BACKEND_READ, OutputSink, PumpConfig, QUEUE_SIZE, Session, SessionRegistry,
     TermSize, TerminalBackend, TerminalStatus, spawn_pump,
@@ -47,16 +46,6 @@ fn lost() -> AppError {
     )
 }
 
-fn to_ssh_auth(auth: SshAuth, key_path: &str) -> LoginMethod {
-    match auth {
-        SshAuth::Password => LoginMethod::Password,
-        SshAuth::Key => LoginMethod::Key {
-            path: key_path.to_string(),
-        },
-        SshAuth::Agent => LoginMethod::Agent,
-    }
-}
-
 impl SshBackend {
     /// Opens the shell. Everything that can take a while (connecting, questions to the user,
     /// logging in) happens here, after the session is already registered, so closing the pane
@@ -74,41 +63,14 @@ impl SshBackend {
         if let Some(problem) = loaded.problem {
             return Err(AppError::new(ErrorCode::InvalidInput, problem));
         }
-        let saved = loaded
-            .file
-            .sessions
-            .into_iter()
-            .find(|s| s.id() == saved_session_id);
-        let Some(SavedSession::Ssh {
-            host,
-            port,
-            user,
-            auth,
-            key_path,
-            ..
-        }) = saved
-        else {
-            return Err(AppError::new(
-                ErrorCode::NotFound,
-                "That saved session doesn't exist any more.",
-            ));
-        };
-
+        let chain = resolve_chain(&loaded.file, saved_session_id)?;
         let prompter = Prompter::new(services.broker.clone(), sink.clone(), self.cancel.clone());
-        let who = Login {
-            session_id: saved_session_id.to_string(),
-            host: host.clone(),
-            user,
-            method: to_ssh_auth(auth, &key_path),
-        };
         let shared = services
             .pool
-            .get_or_connect(saved_session_id, async {
-                let mut connection =
-                    connect(&host, port, services.known_hosts.clone(), prompter.clone()).await?;
-                login(&mut connection, &who, &services.keychain, &prompter).await?;
-                Ok(connection)
-            })
+            .get_or_connect(
+                saved_session_id,
+                connect_chain(services, &chain, None, &prompter),
+            )
             .await?;
 
         let size = *self.size.lock().unwrap();

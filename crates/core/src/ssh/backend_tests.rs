@@ -341,3 +341,146 @@ async fn a_missing_or_broken_saved_session_fails_with_a_plain_message() {
     })
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_session_with_a_jump_host_goes_through_it() {
+    let w = world();
+    let jump_key = key(KEY_A);
+    let target_key = key(super::testing::KEY_B);
+
+    // The jump host allows forwarding. The target is a separate server.
+    let jump = spawn_server(
+        jump_key.clone(),
+        Accepts {
+            user: "tester".into(),
+            password: Some("pw".into()),
+            allow_forwarding: true,
+            ..Default::default()
+        },
+    )
+    .await;
+    let target = spawn_server(
+        target_key.clone(),
+        Accepts {
+            user: "tester".into(),
+            password: Some("pw".into()),
+            ..Default::default()
+        },
+    )
+    .await;
+    learn(
+        "127.0.0.1",
+        jump.port,
+        &public_of(&jump_key),
+        &w.known_hosts,
+    )
+    .unwrap();
+    learn(
+        "127.0.0.1",
+        target.port,
+        &public_of(&target_key),
+        &w.known_hosts,
+    )
+    .unwrap();
+    for id in ["jump", "target"] {
+        w.secrets
+            .items
+            .lock()
+            .unwrap()
+            .insert(format!("session:{id}:password"), "pw".into());
+    }
+    let ssh = |id: &str, port: u16, via: &str| SavedSession::Ssh {
+        id: id.into(),
+        name: id.into(),
+        folder: String::new(),
+        host: "127.0.0.1".into(),
+        port,
+        user: "tester".into(),
+        auth: SshAuth::Password,
+        key_path: String::new(),
+        jump: via.into(),
+    };
+    let mut file = w.store.load().file;
+    file.sessions.push(ssh("jump", jump.port, ""));
+    file.sessions.push(ssh("target", target.port, "jump"));
+    w.store.save(&file).unwrap();
+
+    let (session, sink) = open(&w, "target").await;
+    until("the shell on the target", || {
+        text(&sink).contains("welcome-banner")
+    })
+    .await;
+    echoes(&w, &session, &sink, "through-the-jump").await;
+    assert_eq!(
+        jump.stats.forwarded.load(Ordering::SeqCst),
+        1,
+        "went through the jump host"
+    );
+    assert_eq!(target.stats.shells.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        jump.stats.shells.load(Ordering::SeqCst),
+        0,
+        "no shell on the jump host"
+    );
+
+    // Closing the pane lets go of the whole chain.
+    w.registry.close(&session).await.unwrap();
+    until("both connections close", || {
+        target.stats.ended.load(Ordering::SeqCst) == 1
+            && jump.stats.ended.load(Ordering::SeqCst) == 1
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_jump_host_that_refuses_forwarding_gives_a_clear_failure_naming_the_step() {
+    let w = world();
+    let jump_key = key(KEY_A);
+    let target_key = key(super::testing::KEY_B);
+    let jump = spawn_server(
+        jump_key.clone(),
+        Accepts {
+            user: "tester".into(),
+            password: Some("pw".into()),
+            allow_forwarding: false,
+            ..Default::default()
+        },
+    )
+    .await;
+    let target = spawn_server(target_key.clone(), Accepts::default()).await;
+    learn(
+        "127.0.0.1",
+        jump.port,
+        &public_of(&jump_key),
+        &w.known_hosts,
+    )
+    .unwrap();
+    w.secrets
+        .items
+        .lock()
+        .unwrap()
+        .insert("session:jump:password".into(), "pw".into());
+    let ssh = |id: &str, port: u16, via: &str| SavedSession::Ssh {
+        id: id.into(),
+        name: id.into(),
+        folder: String::new(),
+        host: "127.0.0.1".into(),
+        port,
+        user: "tester".into(),
+        auth: SshAuth::Password,
+        key_path: String::new(),
+        jump: via.into(),
+    };
+    let mut file = w.store.load().file;
+    file.sessions.push(ssh("jump", jump.port, ""));
+    file.sessions.push(ssh("target", target.port, "jump"));
+    w.store.save(&file).unwrap();
+
+    let (_session, sink) = open(&w, "target").await;
+    until("failure", || {
+        sink.statuses().iter().any(|s| {
+            matches!(s, TerminalStatus::Failed { error } if error.message.contains("step 2 of 2"))
+        })
+    })
+    .await;
+}

@@ -329,3 +329,29 @@ export function keychainDeleteSecret(
 ): Promise<void> {
   return invoke<void>("keychain_delete_secret", { sessionId, kind });
 }
+
+export interface ImportPreviewItem {
+  alias: string;
+  hostname: string;
+  port: number;
+  user: string;
+  /** Already saved (same host, port and user), so it would be skipped. */
+  duplicate: boolean;
+  /** What it goes through, as written in the file, or empty. */
+  jump: string;
+}
+
+export interface ImportResult {
+  added: string[];
+  /** Hosts left out, each with the reason. */
+  skipped: string[];
+}
+
+/** The hosts in ~/.ssh/config. The file is only read. */
+export function sshConfigPreview(): Promise<ImportPreviewItem[]> {
+  return invoke<ImportPreviewItem[]>("ssh_config_preview");
+}
+
+export function sshConfigImport(aliases: string[]): Promise<ImportResult> {
+  return invoke<ImportResult>("ssh_config_import", { aliases });
+}

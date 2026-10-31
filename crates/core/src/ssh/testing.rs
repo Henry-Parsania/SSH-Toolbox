@@ -64,6 +64,8 @@ pub struct Accepts {
     pub home: Option<std::path::PathBuf>,
     /// The `sh` that runs those commands.
     pub sh: Option<String>,
+    /// Lets clients open `direct-tcpip` channels, which is what a jump host does.
+    pub allow_forwarding: bool,
 }
 
 /// What happened on the server, for tests to look at.
@@ -76,6 +78,8 @@ pub struct Stats {
     /// Terminal sizes asked for: first the one in the pty request, then each window change.
     pub sizes: Mutex<Vec<(u32, u32)>>,
     pub shells: AtomicUsize,
+    /// `direct-tcpip` channels that were opened (connections made through this server).
+    pub forwarded: AtomicUsize,
 }
 
 #[derive(Clone)]
@@ -84,7 +88,12 @@ struct TestServer(Arc<Accepts>, Arc<Stats>);
 impl server::Server for TestServer {
     type Handler = TestHandler;
     fn new_client(&mut self, _peer: Option<std::net::SocketAddr>) -> TestHandler {
-        TestHandler(self.0.clone(), self.1.clone(), HashMap::new())
+        TestHandler(
+            self.0.clone(),
+            self.1.clone(),
+            HashMap::new(),
+            Default::default(),
+        )
     }
 }
 
@@ -92,6 +101,8 @@ pub struct TestHandler(
     Arc<Accepts>,
     Arc<Stats>,
     HashMap<ChannelId, (String, Vec<u8>)>,
+    /// Channels that carry a forwarded connection: their data belongs to the stream, not a shell.
+    std::collections::HashSet<ChannelId>,
 );
 
 impl server::Handler for TestHandler {
@@ -104,6 +115,33 @@ impl server::Handler for TestHandler {
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
         reply.accept().await;
+        Ok(())
+    }
+
+    async fn channel_open_direct_tcpip(
+        &mut self,
+        channel: Channel<Msg>,
+        host: &str,
+        port: u32,
+        _originator: &str,
+        _originator_port: u32,
+        reply: russh::server::ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        // Dropping the handle refuses the channel.
+        if !self.0.allow_forwarding {
+            return Ok(());
+        }
+        let Ok(mut target) = tokio::net::TcpStream::connect((host, port as u16)).await else {
+            return Ok(());
+        };
+        self.1.forwarded.fetch_add(1, Ordering::SeqCst);
+        self.3.insert(channel.id());
+        reply.accept().await;
+        tokio::spawn(async move {
+            let mut through = channel.into_stream();
+            let _ = tokio::io::copy_bidirectional(&mut through, &mut target).await;
+        });
         Ok(())
     }
 
@@ -220,6 +258,9 @@ impl server::Handler for TestHandler {
         data: &[u8],
         session: &mut Session,
     ) -> Result<(), Self::Error> {
+        if self.3.contains(&channel) {
+            return Ok(());
+        }
         if let Some((_, stdin)) = self.2.get_mut(&channel) {
             stdin.extend_from_slice(data);
             return Ok(());
