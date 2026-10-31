@@ -47,6 +47,13 @@ pub async fn list_shells() -> Result<Vec<Shell>, AppError> {
 }
 
 #[tauri::command]
+pub async fn list_wsl_distros() -> Result<Vec<String>, AppError> {
+    tokio::task::spawn_blocking(terminal::list_wsl_distros)
+        .await
+        .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't look for WSL."))
+}
+
+#[tauri::command]
 pub async fn terminal_open(
     terminals: State<'_, Terminals>,
     spec: SessionSpec,

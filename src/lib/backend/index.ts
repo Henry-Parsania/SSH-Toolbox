@@ -38,7 +38,7 @@ export interface Shell {
 }
 
 /** What to open in a pane. More types are added in the phases that build them. */
-export type SessionSpec = { type: "local"; shell_id: string };
+export type SessionSpec = { type: "local"; shell_id: string } | { type: "wsl"; distro: string };
 
 export type TerminalStatus =
   | { type: "connecting" }
@@ -48,6 +48,11 @@ export type TerminalStatus =
 
 export function listShells(): Promise<Shell[]> {
   return invoke<Shell[]>("list_shells");
+}
+
+/** Installed WSL distributions, or none when WSL isn't there. */
+export function listWslDistros(): Promise<string[]> {
+  return invoke<string[]>("list_wsl_distros");
 }
 
 /**

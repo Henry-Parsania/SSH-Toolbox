@@ -11,6 +11,7 @@ use super::pump::{PumpConfig, spawn_pump};
 use super::registry::{Session, SessionRegistry};
 use super::shells::shell_spec;
 use super::sink::{OutputSink, TerminalStatus};
+use super::wsl::wsl_spec;
 use crate::error::{AppError, ErrorCode};
 
 /// What to open in a pane. More types are added in the phases that build them.
@@ -18,6 +19,7 @@ use crate::error::{AppError, ErrorCode};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionSpec {
     Local { shell_id: String },
+    Wsl { distro: String },
 }
 
 const MAX_DIMENSION: u16 = 1000;
@@ -51,6 +53,15 @@ pub async fn open_terminal(
         SessionSpec::Local { shell_id } => {
             let shell = tokio::task::spawn_blocking(move || {
                 let spec = shell_spec(&shell_id)?;
+                LocalShell::spawn(&spec, size, events)
+            })
+            .await
+            .map_err(|_| blocking_failed())??;
+            Arc::new(shell)
+        }
+        SessionSpec::Wsl { distro } => {
+            let shell = tokio::task::spawn_blocking(move || {
+                let spec = wsl_spec(&distro)?;
                 LocalShell::spawn(&spec, size, events)
             })
             .await

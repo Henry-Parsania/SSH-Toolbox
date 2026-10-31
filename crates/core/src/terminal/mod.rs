@@ -9,6 +9,7 @@ mod shells;
 mod sink;
 #[cfg(test)]
 mod testing;
+mod wsl;
 
 pub use backend::{BackendEvent, MAX_BACKEND_READ, QUEUE_SIZE, TermSize, TerminalBackend};
 pub use local::{LocalShell, ShellSpec};
@@ -19,6 +20,7 @@ pub use pump::{
 pub use registry::{Session, SessionRegistry};
 pub use shells::{Shell, list_shells, shell_spec};
 pub use sink::{OutputSink, TerminalStatus};
+pub use wsl::{list_wsl_distros, wsl_spec};
 
 #[cfg(test)]
 mod local_tests;

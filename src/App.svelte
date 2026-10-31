@@ -1,12 +1,17 @@
 <script lang="ts">
-  import { listShells, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
+  import { listShells, listWslDistros, platformInfo, type PlatformInfo, type Shell } from "./lib/backend";
   import PaneTree from "./lib/layout/PaneTree.svelte";
-  import TabBar from "./lib/layout/TabBar.svelte";
+  import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
 
   let platform = $state<PlatformInfo | null>(null);
   let shells = $state<Shell[]>([]);
+  let distros = $state<string[]>([]);
+  const options = $derived<NewTabOption[]>([
+    ...shells.map((s) => ({ label: s.name, spec: { type: "local" as const, shell_id: s.id } })),
+    ...distros.map((d) => ({ label: `WSL: ${d}`, spec: { type: "wsl" as const, distro: d } })),
+  ]);
   let failure = $state<string | null>(null);
   const workspace = new Workspace();
 
@@ -20,15 +25,16 @@
         platform = info;
         shells = found;
         newTab();
+        // The WSL entries are left out when WSL isn't there.
+        if (info.wsl_available) listWslDistros().then((d) => (distros = d), () => {});
       },
       (err: { message?: string }) => (failure = err.message ?? "Couldn't start."),
     );
   });
 
-  // Until the shell menu arrives (task 1.11), new tabs use the first shell.
-  function newTab() {
-    const shell = shells[0];
-    if (shell) workspace.newTab({ type: "local", shell_id: shell.id }, shell.name);
+  // Without a choice, a new tab uses the first shell.
+  function newTab(option: NewTabOption | undefined = options[0]) {
+    if (option) workspace.newTab(option.spec, option.label);
   }
 
   // Runs before the terminal sees the key, so shortcuts never reach the program in the pane.
@@ -69,7 +75,7 @@
   <p class="error">{failure}</p>
 {:else if platform}
   <div class="app">
-    <TabBar {workspace} onnew={newTab} />
+    <TabBar {workspace} {options} onnew={newTab} />
     <div class="tabs">
       {#each workspace.tabs as tab (tab.id)}
         <!-- Hidden tabs stay mounted, so their terminals keep running. -->

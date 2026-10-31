@@ -1,12 +1,21 @@
 <script lang="ts">
+  import type { SessionSpec } from "../backend";
   import type { Workspace } from "./workspace.svelte";
+
+  export interface NewTabOption {
+    label: string;
+    spec: SessionSpec;
+  }
 
   interface Props {
     workspace: Workspace;
-    onnew: () => void;
+    /** What the menu offers: local shells, and WSL distributions when WSL is there. */
+    options: NewTabOption[];
+    onnew: (option?: NewTabOption) => void;
   }
 
-  let { workspace, onnew }: Props = $props();
+  let { workspace, options, onnew }: Props = $props();
+  let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
   let draft = $state("");
@@ -102,7 +111,26 @@
       </div>
     {/each}
   </div>
-  <button class="new" aria-label="New tab" title="New tab (Ctrl+Shift+T)" onclick={onnew}>+</button>
+  <button class="new" aria-label="New tab" title="New tab (Ctrl+Shift+T)" onclick={() => onnew()}>+</button>
+  <div class="menu-wrap">
+    <button class="new" aria-label="Choose a shell" onclick={() => (menuOpen = !menuOpen)}>▾</button>
+    {#if menuOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="backdrop" onpointerdown={() => (menuOpen = false)}></div>
+      <ul class="menu">
+        {#each options as option (option.label)}
+          <li>
+            <button
+              onclick={() => {
+                menuOpen = false;
+                onnew(option);
+              }}>{option.label}</button
+            >
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -163,5 +191,35 @@
   .new {
     color: #ccc;
     padding: 0 12px;
+  }
+  .menu-wrap {
+    position: relative;
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+  }
+  .menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 11;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    min-width: 12em;
+    background: #252526;
+    border: 1px solid #555;
+    box-shadow: 0 4px 12px #0008;
+  }
+  .menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 0;
+    color: #d4d4d4;
   }
 </style>
