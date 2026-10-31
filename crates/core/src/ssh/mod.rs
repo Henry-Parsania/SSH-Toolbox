@@ -4,6 +4,7 @@ pub mod auth;
 pub mod backend;
 pub mod connection;
 pub mod hostkeys;
+pub mod keygen;
 pub mod pool;
 #[cfg(test)]
 pub(crate) mod testing;

@@ -53,6 +53,8 @@ pub fn run() {
             commands::keychain::keychain_available,
             commands::keychain::keychain_delete_session,
             commands::keychain::keychain_set,
+            commands::keys::key_generate,
+            commands::keys::key_list,
             commands::layout::layout_get,
             commands::layout::layout_set,
             commands::link::open_link,

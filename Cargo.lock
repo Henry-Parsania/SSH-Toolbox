@@ -5537,6 +5537,7 @@ dependencies = [
  "directories",
  "keyring-core",
  "portable-pty",
+ "rand",
  "russh",
  "russh-sftp",
  "serde",

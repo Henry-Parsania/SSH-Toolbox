@@ -267,3 +267,25 @@ export function keychainSet(
 export function keychainDeleteSession(sessionId: string): Promise<void> {
   return invoke<void>("keychain_delete_session", { sessionId });
 }
+
+export interface NewKey {
+  private_path: string;
+  public_path: string;
+  /** The line for `authorized_keys`. */
+  public_line: string;
+  fingerprint: string;
+}
+
+export interface ExistingKey {
+  private_path: string;
+  public_line: string;
+}
+
+/** Makes a new ed25519 key in ~/.ssh, optionally protected by a passphrase. */
+export function keyGenerate(passphrase?: string): Promise<NewKey> {
+  return invoke<NewKey>("key_generate", { passphrase: passphrase || null });
+}
+
+export function keyList(): Promise<ExistingKey[]> {
+  return invoke<ExistingKey[]>("key_list");
+}

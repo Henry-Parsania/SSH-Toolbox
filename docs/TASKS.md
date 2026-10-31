@@ -71,7 +71,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.5 SSH in a pane (S5, P4, Q8).** `TerminalBackend` for SSH, keepalive and the Reconnect button. Integration-test killing the container mid-session: only that pane shows the failure.
 - [x] **2.6 Sidebar (S3).** Folders, search, and a session editor. Add the "save password" option, hidden when the keychain is unavailable.
 - [x] **2.7 Layout restore for SSH (P6).** Restored SSH panes show a Connect button, and don't connect by themselves.
-- [ ] **2.8 Key generation (K1, K2).** IF section 15, step 1. Test that an existing file is never overwritten.
+- [x] **2.8 Key generation (K1, K2).** IF section 15, step 1. Test that an existing file is never overwritten.
 - [ ] **2.9 Key install on Linux (K3, K4, K6).** The full flow, including all the integration tests in IF section 15.
 - [ ] **2.10 Key install on Windows servers (K5, K7).** The script in IF section 15. Unit-test the generated script and its encoding. Real testing is on the owner's list.
 - [ ] **2.11 Import and jump hosts (S4, S6).** IF section 7. Test parsing with sample config files. Integration-test a jump host with two containers.
