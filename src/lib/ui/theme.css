@@ -326,13 +326,13 @@ input[type="radio"] {
   width: min(560px, 94vw);
 }
 .modal h2 {
-  margin: 0 0 4px;
+  margin: 0 0 16px;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 .modal .lead {
-  margin: 0 0 16px;
+  margin: -8px 0 16px;
   color: var(--text-muted);
 }
 .modal h3 {

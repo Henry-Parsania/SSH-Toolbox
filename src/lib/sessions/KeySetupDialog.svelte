@@ -122,7 +122,7 @@
     <h2>Key login for {session.name}</h2>
 
     {#if stage === "choose"}
-      <p>
+      <p class="lead">
         This logs in to {session.user}@{session.host} once with your password, adds a key to the
         server, and checks that the key works before saying it's done.
       </p>

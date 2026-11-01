@@ -131,6 +131,11 @@
 
   /** The chosen font first, then the usual monospace fonts on each system. */
   function fontStack(family: string): string {
+    // The plain word "monospace" is the default setting. It gives a small, dated font, so the
+    // good fonts of each system are used instead.
+    if (family.trim().toLowerCase() === "monospace") {
+      return `Cascadia Mono, 'SF Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
+    }
     return `${family}, Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
   }
 
