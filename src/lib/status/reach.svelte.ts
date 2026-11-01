@@ -1,16 +1,11 @@
 // Which saved servers answer, kept up to date in the background.
 
 import type { SavedSession } from "../backend";
-import { reachCheck, type Reach, type ReachTarget } from "../backend/status";
+import { reachCheck, type Reach } from "../backend/status";
 
-/** The sessions worth checking: those with a host and port that are reached directly. */
-export function targetsOf(sessions: SavedSession[]): ReachTarget[] {
-  const out: ReachTarget[] = [];
-  for (const s of sessions) {
-    if (s.type === "ssh" && !s.jump) out.push({ id: s.id, host: s.host, port: s.port });
-    else if (s.type === "ftp") out.push({ id: s.id, host: s.host, port: s.port });
-  }
-  return out;
+/** Whether any saved session is one that gets checked (the backend picks them itself). */
+export function hasTargets(sessions: SavedSession[]): boolean {
+  return sessions.some((s) => (s.type === "ssh" && !s.jump) || s.type === "ftp");
 }
 
 export class Reachability {
@@ -21,12 +16,11 @@ export class Reachability {
 
   /** Checks the given sessions now. A check already under way is not doubled up. */
   async run(sessions: SavedSession[]): Promise<void> {
-    const targets = targetsOf(sessions);
-    if (this.running || targets.length === 0) return;
+    if (this.running || !hasTargets(sessions)) return;
     this.running = true;
     this.checking = true;
     try {
-      const found = await reachCheck(targets);
+      const found = await reachCheck();
       const next: Record<string, Reach> = {};
       for (const r of found) next[r.id] = r;
       this.results = next;

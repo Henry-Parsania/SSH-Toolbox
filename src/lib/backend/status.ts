@@ -2,12 +2,6 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-export interface ReachTarget {
-  id: string;
-  host: string;
-  port: number;
-}
-
 export interface Reach {
   id: string;
   reachable: boolean;
@@ -26,9 +20,9 @@ export interface Stats {
   uptime_secs: number | null;
 }
 
-/** Tries a quick connection to each server's port. */
-export function reachCheck(targets: ReachTarget[]): Promise<Reach[]> {
-  return invoke<Reach[]>("reach_check", { targets });
+/** Tries a quick connection to the port of each saved server. */
+export function reachCheck(): Promise<Reach[]> {
+  return invoke<Reach[]>("reach_check");
 }
 
 export function statsLocal(): Promise<Stats> {

@@ -45,6 +45,8 @@ enum Tls {
 struct Options {
     tls: Tls,
     mlsd: bool,
+    /// Answers PASV with an address that isn't this server's, as a hostile server might.
+    bounce: bool,
 }
 
 struct Server {
@@ -229,10 +231,15 @@ async fn session(mut io: BoxIo, ctx: Arc<Ctx>) {
                 let port = listener.local_addr().unwrap().port();
                 passive = Some(listener);
                 if command == "PASV" {
+                    let address = if ctx.options.bounce {
+                        "10,255,255,1"
+                    } else {
+                        "127,0,0,1"
+                    };
                     send(
                         &mut io,
                         &format!(
-                            "227 Entering Passive Mode (127,0,0,1,{},{})",
+                            "227 Entering Passive Mode ({address},{},{})",
                             port / 256,
                             port % 256
                         ),
@@ -661,6 +668,7 @@ async fn plain_ftp_warns_first_and_then_does_everything() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes], Some("secret"));
@@ -687,6 +695,7 @@ async fn declining_the_plain_ftp_warning_sends_nothing() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::No], Some("secret"));
@@ -711,6 +720,7 @@ async fn the_warning_comes_every_time() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes, Answer::Yes], Some("secret"));
@@ -735,6 +745,7 @@ async fn a_wrong_saved_password_leads_to_a_question() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(
@@ -756,6 +767,7 @@ async fn a_refused_password_is_an_auth_failure() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes, Answer::Text("nope")], None);
@@ -776,6 +788,7 @@ async fn servers_without_mlsd_are_read_through_list() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: false,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes], Some("secret"));
@@ -804,6 +817,7 @@ async fn explicit_ftps_with_an_unknown_certificate_asks_and_then_connects() {
     let server = spawn(Options {
         tls: Tls::Explicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes], Some("secret"));
@@ -845,6 +859,7 @@ async fn refusing_the_certificate_stops_before_any_login() {
     let server = spawn(Options {
         tls: Tls::Explicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::No], Some("secret"));
@@ -869,6 +884,7 @@ async fn a_trusted_authority_needs_no_question() {
     let server = spawn(Options {
         tls: Tls::Explicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![], Some("secret"));
@@ -890,6 +906,7 @@ async fn an_accepted_fingerprint_is_trusted_next_time() {
     let server = spawn(Options {
         tls: Tls::Explicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![], Some("secret"));
@@ -909,6 +926,7 @@ async fn a_changed_certificate_is_asked_about_again() {
     let server = spawn(Options {
         tls: Tls::Explicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::No], Some("secret"));
@@ -945,6 +963,7 @@ async fn implicit_ftps_works_the_same_way() {
     let server = spawn(Options {
         tls: Tls::Implicit,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes], Some("secret"));
@@ -968,6 +987,7 @@ async fn a_server_that_isnt_there_gives_a_plain_error() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let mut gone = target(&server, FtpSecurity::Plain, "");
@@ -986,6 +1006,7 @@ async fn a_plain_server_refused_for_tls_gives_a_connection_error() {
     let server = spawn(Options {
         tls: Tls::None,
         mlsd: true,
+        bounce: false,
     })
     .await;
     let s = setup(vec![Answer::Yes], Some("secret"));
@@ -1001,4 +1022,26 @@ async fn a_plain_server_refused_for_tls_gives_a_connection_error() {
     assert!(asked(&s.script).is_empty());
     assert!(!sent_user(&server));
     assert_ne!(err.code, ErrorCode::Cancelled);
+}
+
+#[tokio::test]
+async fn a_server_cannot_send_data_connections_to_another_address() {
+    // The server's PASV answer names 10.255.255.1. The data connection must still go to the
+    // address the control connection is on, so the transfer works and nothing is sent elsewhere.
+    let server = spawn(Options {
+        tls: Tls::None,
+        mlsd: true,
+        bounce: true,
+    })
+    .await;
+    let s = setup(vec![Answer::Yes], Some("secret"));
+    let opened = FtpFiles::connect(
+        &target(&server, FtpSecurity::Plain, ""),
+        &s.keychain,
+        &s.prompter,
+    )
+    .await
+    .unwrap();
+    put(&opened.files, "/x.bin", b"data").await;
+    assert_eq!(get(&opened.files, "/x.bin").await, b"data");
 }

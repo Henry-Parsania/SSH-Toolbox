@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::State;
 use toolbox_core::reach::{self, Reach, Target};
+use toolbox_core::sessions::{SavedSession, SessionStore};
 use toolbox_core::ssh::backend::SshServices;
 use toolbox_core::ssh::install::run_exec;
 use toolbox_core::stats::{self, CpuTimes, LocalStats, Stats};
@@ -26,9 +27,40 @@ impl Default for StatsState {
     }
 }
 
-/// Tries to connect to each server's port, a few at a time, and says which answered.
+/// Tries to connect to the port of each saved server, a few at a time, and says which answered.
+/// The servers come from the saved sessions, not from the caller, so this can't be used to try
+/// other addresses. Sessions that go through a jump host aren't tried: their address may not
+/// be reachable directly.
 #[tauri::command]
-pub async fn reach_check(targets: Vec<Target>) -> Result<Vec<Reach>, AppError> {
+pub async fn reach_check(services: State<'_, Arc<SshServices>>) -> Result<Vec<Reach>, AppError> {
+    let path = services.sessions_file.clone();
+    let loaded = tokio::task::spawn_blocking(move || SessionStore::new(path).load())
+        .await
+        .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't read the saved sessions."))?;
+    let targets: Vec<Target> = loaded
+        .file
+        .sessions
+        .iter()
+        .filter_map(|s| match s {
+            SavedSession::Ssh {
+                id,
+                host,
+                port,
+                jump,
+                ..
+            } if jump.is_empty() => Some(Target {
+                id: id.clone(),
+                host: host.clone(),
+                port: *port,
+            }),
+            SavedSession::Ftp { id, host, port, .. } => Some(Target {
+                id: id.clone(),
+                host: host.clone(),
+                port: *port,
+            }),
+            _ => None,
+        })
+        .collect();
     Ok(reach::check_all(targets, reach::TIMEOUT).await)
 }
 

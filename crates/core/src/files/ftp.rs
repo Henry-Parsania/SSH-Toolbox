@@ -387,6 +387,10 @@ impl FtpFiles {
                     .map_err(|e| from_ftp(&e, &target.host))?;
             }
         }
+        // Passive mode: the server says where to open the data connection. A hostile server
+        // could name some other computer, so the address of the control connection is used
+        // instead, and only the port from the server's answer.
+        stream.set_passive_nat_workaround(true);
         stream
             .transfer_type(TransferType::Binary)
             .await
