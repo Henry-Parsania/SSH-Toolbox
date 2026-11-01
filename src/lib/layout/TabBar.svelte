@@ -17,9 +17,11 @@
     onsettings: () => void;
     onsidebar: () => void;
     sidebarOpen: boolean;
+    filesOpen: boolean;
+    onfiles: () => void;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -198,6 +200,15 @@
     >
       <Icon name="split-v" size={16} />
     </button>
+    <button
+      class="icon-btn"
+      class:on={filesOpen}
+      aria-label="Files"
+      title="Files: browse and transfer"
+      onclick={onfiles}
+    >
+      <Icon name="folder" size={16} />
+    </button>
     <span class="sep"></span>
     <button class="icon-btn" aria-label="Settings" title="Settings" onclick={onsettings}>
       <Icon name="settings" size={17} />
@@ -216,7 +227,8 @@
     border-bottom: 1px solid var(--border);
     user-select: none;
   }
-  .lead.on {
+  .lead.on,
+  .tools .on {
     color: var(--accent);
   }
   .tabs {

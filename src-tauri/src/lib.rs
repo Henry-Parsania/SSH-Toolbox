@@ -48,10 +48,27 @@ pub fn run() {
         .manage(broker)
         .manage(services)
         .manage(commands::keys::KeySetups::default())
+        .manage(commands::files::Files::default())
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::files::files_chmod,
+            commands::files::files_close,
+            commands::files::files_delete,
+            commands::files::files_delete_plan,
+            commands::files::files_list,
+            commands::files::files_mkdir,
+            commands::files::files_open_local,
+            commands::files::files_open_sftp,
+            commands::files::files_open_wsl,
+            commands::files::files_rename,
+            commands::files::transfer_add,
+            commands::files::transfer_answer,
+            commands::files::transfer_cancel,
+            commands::files::transfer_cancel_all,
+            commands::files::transfer_clear,
+            commands::files::transfers_subscribe,
             commands::forward::forward_list,
             commands::forward::forward_start,
             commands::forward::forward_stop,

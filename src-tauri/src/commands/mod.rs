@@ -1,3 +1,5 @@
+pub mod connect;
+pub mod files;
 pub mod forward;
 pub mod keychain;
 pub mod keys;

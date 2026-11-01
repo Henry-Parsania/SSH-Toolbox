@@ -17,6 +17,11 @@ pub fn config_dir() -> Option<PathBuf> {
         .map(|dirs| dirs.config_dir().to_path_buf())
 }
 
+/// The user's home folder.
+pub fn home_dir() -> Option<PathBuf> {
+    directories::UserDirs::new().map(|d| d.home_dir().to_path_buf())
+}
+
 fn write_failed() -> AppError {
     AppError::new(ErrorCode::Internal, "Couldn't save the file.")
 }

@@ -27,7 +27,9 @@
     | "up"
     | "down"
     | "serial"
-    | "ftp";
+    | "ftp"
+    | "file"
+    | "files";
 
   interface Props {
     name: IconName;
@@ -66,6 +68,8 @@
     down: "M12 5v14m0 0l-5-5m5 5l5-5",
     serial: "M5 8h14v8H5zM8 8V5M12 8V5M16 8V5M8 16v3M16 16v3",
     ftp: "M4 6h7l2 2h7v10H4zM12 11v5m0 0l-2-2m2 2l2-2",
+    file: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5",
+    files: "M4 6a2 2 0 012-2h3l2 2h5a2 2 0 012 2v1M3 11h15a1 1 0 011 1l-1 6a2 2 0 01-2 2H5a2 2 0 01-2-2v-7zM21 11v-0",
   };
 </script>
 

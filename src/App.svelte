@@ -12,10 +12,12 @@
   } from "./lib/backend";
   import PaneTree from "./lib/layout/PaneTree.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
+  import { leaves } from "./lib/layout/panes";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
   import { Library } from "./lib/sessions/library.svelte";
+  import FilesPanel from "./lib/files/FilesPanel.svelte";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
   import { loadSettings, settings } from "./lib/settings.svelte";
   import Icon from "./lib/ui/Icon.svelte";
@@ -25,9 +27,21 @@
   let distros = $state<string[]>([]);
   let showSettings = $state(false);
   let sidebarOpen = $state(true);
+  let filesOpen = $state(false);
   // Counts up each time something asks the sidebar to start a new session.
   let newSessionSignal = $state(0);
   const library = new Library();
+
+  // The server whose files the panel shows: the one in the active pane, if it is an SSH session.
+  const activeSession = $derived.by(() => {
+    const tab = workspace.activeTab;
+    const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
+    if (leaf?.spec?.type === "ssh") {
+      return { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title };
+    }
+    if (leaf?.spec?.type === "wsl") return { kind: "wsl" as const, distro: leaf.spec.distro, name: leaf.title };
+    return null;
+  });
 
   // The colour theme applies to the whole window, not only to the terminal.
   $effect(() => {
@@ -145,6 +159,8 @@
       onnew={newTab}
       onsettings={() => (showSettings = true)}
       onsidebar={() => (sidebarOpen = !sidebarOpen)}
+      {filesOpen}
+      onfiles={() => (filesOpen = !filesOpen)}
     />
     <div class="body">
       {#if sidebarOpen}
@@ -187,6 +203,9 @@
           </div>
         {/if}
       </main>
+      {#if filesOpen}
+        <FilesPanel source={activeSession} onclose={() => (filesOpen = false)} />
+      {/if}
     </div>
   </div>
   {#if showSettings}
