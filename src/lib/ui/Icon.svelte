@@ -34,7 +34,8 @@
     | "box"
     | "stop"
     | "info"
-    | "log";
+    | "log"
+    | "monitor";
 
   interface Props {
     name: IconName;
@@ -80,6 +81,7 @@
     stop: "M7 7h10v10H7z",
     info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5h.01",
     log: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M9 13h6M9 17h6",
+    monitor: "M3 5h18v11H3zM8 20h8M12 16v4M6 13l3-4 3 3 3-5 3 4",
   };
 </script>
 

@@ -34,6 +34,8 @@ pub struct SshServices {
 type Writer = ChannelWriteHalf<Msg>;
 
 pub struct SshBackend {
+    /// Runs a process monitor instead of the login shell.
+    monitor: bool,
     cancel: CancellationToken,
     writer: tokio::sync::Mutex<Option<Writer>>,
     size: Mutex<TermSize>,
@@ -91,7 +93,14 @@ impl SshBackend {
             )
             .await
             .map_err(|_| lost())?;
-        channel.request_shell(true).await.map_err(|_| lost())?;
+        if self.monitor {
+            channel
+                .exec(true, MONITOR_COMMAND)
+                .await
+                .map_err(|_| lost())?;
+        } else {
+            channel.request_shell(true).await.map_err(|_| lost())?;
+        }
         let (reader, writer) = channel.split();
         *self.writer.lock().await = Some(writer);
         Ok((reader, shared))
@@ -200,17 +209,23 @@ impl TerminalBackend for SshBackend {
     }
 }
 
+/// What a monitor pane runs: the best process viewer the server has. Fixed text, never built
+/// from anything the user or the server supplies.
+pub const MONITOR_COMMAND: &str = "if command -v btop >/dev/null 2>&1; then exec btop; elif command -v htop >/dev/null 2>&1; then exec htop; else exec top; fi";
+
 /// Opens a terminal on a saved SSH session. The session exists straight away; connecting
 /// carries on in the background and reports through the status messages.
 pub async fn open_ssh_terminal(
     registry: &SessionRegistry,
     services: Arc<SshServices>,
     saved_session_id: String,
+    monitor: bool,
     size: TermSize,
     sink: Arc<dyn OutputSink>,
 ) -> Result<String, AppError> {
     let (events, queue) = mpsc::channel(QUEUE_SIZE);
     let backend = Arc::new(SshBackend {
+        monitor,
         cancel: CancellationToken::new(),
         writer: tokio::sync::Mutex::new(None),
         size: Mutex::new(size),

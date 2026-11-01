@@ -104,6 +104,7 @@ async fn open(w: &World, id: &str) -> (String, Arc<RecordingSink>) {
         &w.registry,
         w.services.clone(),
         id.into(),
+        false,
         SIZE,
         sink.clone(),
     )

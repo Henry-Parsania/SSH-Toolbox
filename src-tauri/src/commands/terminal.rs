@@ -77,11 +77,15 @@ pub async fn terminal_open(
         status: on_status,
     });
     match spec {
-        SessionSpec::Ssh { saved_session_id } => {
+        SessionSpec::Ssh {
+            saved_session_id,
+            monitor,
+        } => {
             ssh::backend::open_ssh_terminal(
                 &terminals.sessions,
                 services.inner().clone(),
                 saved_session_id,
+                monitor,
                 size,
                 sink,
             )

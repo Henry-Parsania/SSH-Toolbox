@@ -28,6 +28,9 @@ pub enum SessionSpec {
     /// SSH services that `open_terminal` doesn't have.
     Ssh {
         saved_session_id: String,
+        /// Runs a process monitor (btop, htop or top) instead of the login shell.
+        #[serde(default)]
+        monitor: bool,
     },
     /// A saved serial session. Opened with `serial::open_serial_terminal`.
     Serial {
@@ -136,6 +139,23 @@ mod tests {
             let error = checked_size(cols, rows).unwrap_err();
             assert_eq!(error.code, ErrorCode::InvalidInput, "{cols}x{rows}");
         }
+    }
+
+    #[test]
+    fn an_ssh_spec_runs_a_shell_unless_a_monitor_is_asked_for() {
+        let plain: SessionSpec =
+            serde_json::from_str(r#"{"type":"ssh","saved_session_id":"s"}"#).unwrap();
+        assert_eq!(
+            plain,
+            SessionSpec::Ssh {
+                saved_session_id: "s".into(),
+                monitor: false
+            }
+        );
+        let top: SessionSpec =
+            serde_json::from_str(r#"{"type":"ssh","saved_session_id":"s","monitor":true}"#)
+                .unwrap();
+        assert!(matches!(top, SessionSpec::Ssh { monitor: true, .. }));
     }
 
     #[test]

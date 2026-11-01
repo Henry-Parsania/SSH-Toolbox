@@ -41,7 +41,7 @@ export interface Shell {
 export type SessionSpec =
   | { type: "local"; shell_id: string }
   | { type: "wsl"; distro: string }
-  | { type: "ssh"; saved_session_id: string }
+  | { type: "ssh"; saved_session_id: string; monitor?: boolean }
   | { type: "serial"; saved_session_id: string }
   | { type: "docker_logs"; docker_id: string; container_id: string }
   | { type: "docker_shell"; docker_id: string; container_id: string };

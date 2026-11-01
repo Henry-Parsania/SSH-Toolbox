@@ -16,6 +16,7 @@
   const features: [string, string][] = [
     ["Terminals and tabs", "Local shells and WSL, in tabs that can be split, dragged into a new order and renamed. The last layout comes back next time. Terminal menu."],
     ["SSH sessions", "Saved in the sessions list, in folders, with password, key or agent login and optional jump hosts. A dot shows which servers answer. File menu."],
+    ["Process monitor", "A button on each SSH session opens btop, htop or top (whichever the server has) in a new tab, to watch and manage processes. In the sessions list."],
     ["Key setup", "Make a key and put it on a server so passwords aren't needed. In the sessions list, on a session's key button."],
     ["Port forwarding", "Local, remote and SOCKS forwards for a session. In the sessions list, on a session's forward button."],
     ["Files", "Browse and copy between this computer and a server (SFTP, FTP or FTPS) by dragging. It can follow the folder the terminal is in. View menu."],

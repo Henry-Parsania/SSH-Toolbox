@@ -188,6 +188,13 @@
     document.documentElement.dataset.theme = settings.theme;
   });
 
+  // A tab that runs the server's process monitor (btop, htop or top) instead of a shell.
+  function openMonitor(session: SavedSession) {
+    if (session.type === "ssh") {
+      workspace.newTab({ type: "ssh", saved_session_id: session.id, monitor: true }, `${session.name} · top`);
+    }
+  }
+
   // Only SSH sessions can be opened so far. Serial and FTP arrive in phases 3 and 4.
   function openSaved(session: SavedSession) {
     if (session.type === "ssh") {
@@ -376,7 +383,7 @@
     <div class="body">
       {#if sidebarOpen}
         <div class="side column" style:width="{sidebarWidth}px">
-          <div class="top-part"><Sidebar {library} onopen={openSaved} {newSessionSignal} command={sidebarCommand} {reach} /></div>
+          <div class="top-part"><Sidebar {library} onopen={openSaved} onmonitor={openMonitor} {newSessionSignal} command={sidebarCommand} {reach} /></div>
           {#if dockerOpen}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="grip-h" onpointerdown={resizeDock}></div>

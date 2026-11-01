@@ -17,6 +17,8 @@
     library: Library;
     /** Open a saved session in a new tab. */
     onopen: (session: SavedSession) => void;
+    /** Open the server's process monitor (btop, htop or top) in a new tab. */
+    onmonitor?: (session: SavedSession) => void;
     /** Each time this goes up, the editor for a new session opens. */
     newSessionSignal?: number;
     /** A request from the menu bar. Each one has its own number, so the same command can repeat. */
@@ -25,7 +27,7 @@
     reach?: Reachability;
   }
 
-  let { library, onopen, newSessionSignal = 0, command = null, reach }: Props = $props();
+  let { library, onopen, onmonitor, newSessionSignal = 0, command = null, reach }: Props = $props();
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
@@ -202,6 +204,9 @@
           </button>
         {/if}
         {#if item.session.type === "ssh"}
+          <button class="icon-btn small" title="Process monitor (btop, htop or top)" onclick={() => onmonitor?.(item.session)}>
+            <Icon name="monitor" size={13} />
+          </button>
           <button class="icon-btn small" title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>
             <Icon name="route" size={13} />
           </button>
