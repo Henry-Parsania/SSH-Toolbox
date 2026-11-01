@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FileEntry } from "../backend/files";
 import {
   baseName,
+  shellQuote,
   crumbs,
   formatSize,
   joinPath,
@@ -94,5 +95,13 @@ describe("sorting and showing", () => {
     expect(percent(300, 200)).toBe(100);
     expect(percent(5, null)).toBeNull();
     expect(percent(5, 0)).toBeNull();
+  });
+});
+
+describe("shellQuote", () => {
+  it("keeps odd names literal", () => {
+    expect(shellQuote("/home/a b")).toBe("'/home/a b'");
+    expect(shellQuote("/tmp/it's; rm -rf ~")).toBe("'/tmp/it'\\''s; rm -rf ~'");
+    expect(shellQuote("$(whoami)")).toBe("'$(whoami)'");
   });
 });

@@ -34,23 +34,15 @@
 
   const REFRESH_MS = 4000;
   const LOCAL = "local";
-  const AUTO = "auto";
 
-  const servers = $derived(library.file.session.filter((s) => s.type === "ssh"));
-  let source = $state(localStorage.getItem("docker-source") ?? AUTO);
-  // A server that was deleted since last time falls back to following the active tab.
-  const chosen = $derived(
-    source === LOCAL || source === AUTO || servers.some((s) => s.id === source) ? source : AUTO,
-  );
-  // What Docker is wanted from right now: the active tab's server, this computer, or a pinned server.
-  const wanted = $derived(chosen === AUTO ? (active?.id ?? null) : chosen);
+  // The panel follows the SSH server in the active tab. This computer's own Docker is used only
+  // when asked for, until the next SSH tab is chosen.
+  let useLocal = $state(false);
+  const wanted = $derived(useLocal ? LOCAL : (active?.id ?? null));
 
   let dockerId = $state<string | null>(null);
-  let showSource = $state(false);
   // What the panel is showing, for its heading.
-  const shownName = $derived(
-    wanted === null ? "" : wanted === LOCAL ? "This computer" : (servers.find((s) => s.id === wanted)?.name ?? active?.name ?? ""),
-  );
+  let shownName = $state("");
   let connecting = $state(false);
   let error = $state("");
   let containers = $state<ContainerInfo[]>([]);
@@ -112,6 +104,7 @@
       connecting = false;
       return;
     }
+    shownName = wanted === LOCAL ? "This computer" : (active?.name ?? "");
     const target =
       wanted === LOCAL ? ({ type: "local" } as const) : ({ type: "ssh", saved_session_id: wanted } as const);
     try {
@@ -138,14 +131,23 @@
   }
 
   // Following the active tab: a different server means a different connection.
+  let followedId = "";
   $effect(() => {
-    if (chosen !== AUTO) return;
-    void active?.id;
+    const id = active?.id;
+    // The object changes when the tab's title does; only a different server matters.
+    if (!id || id === followedId) return;
+    followedId = id;
     untrack(() => {
-      // Moving to a tab that isn't an SSH server leaves the last one showing.
-      if (active) void connect();
+      useLocal = false;
+      void connect();
     });
   });
+
+  function useThisComputer() {
+    useLocal = true;
+    followedId = "";
+    void connect();
+  }
 
   function cancelConnecting() {
     if (operation) void keySetupCancel(operation).catch(() => {});
@@ -218,13 +220,6 @@
   }
 
   onDestroy(() => void disconnect());
-
-  function choose(id: string) {
-    source = id;
-    localStorage.setItem("docker-source", id);
-    void disconnect();
-    error = "";
-  }
 
   async function act(container: ContainerInfo, action: ContainerAction) {
     const id = dockerId;
@@ -332,9 +327,11 @@
   <header>
     <span class="heading"><Icon name="box" size={16} /> Docker{#if shownName}<span class="where">{shownName}</span>{/if}</span>
     <div class="head-tools">
-      <button class="icon-btn" class:on={showSource} aria-label="Choose where Docker runs" title="Choose where Docker runs" onclick={() => (showSource = !showSource)}>
-        <Icon name="settings" size={14} />
-      </button>
+      {#if !useLocal && !connecting}
+        <button class="btn small" title="Use the Docker on this computer instead" onclick={useThisComputer}>
+          This computer
+        </button>
+      {/if}
       {#if dockerId}
         <button class="icon-btn" aria-label="Refresh" title="Refresh" onclick={refresh}>
           <Icon name="refresh" size={15} />
@@ -346,27 +343,8 @@
     </div>
   </header>
 
-  {#if showSource || (chosen !== AUTO && !dockerId)}
-  <div class="source">
-    <select
-      aria-label="Where Docker runs"
-      value={chosen}
-      onchange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}
-    >
-      <option value={AUTO}>{active ? `Active tab: ${active.name}` : "Active SSH tab (none)"}</option>
-      <option value={LOCAL}>This computer</option>
-      {#each servers as s (s.id)}
-        <option value={s.id}>{s.name}</option>
-      {/each}
-    </select>
-    {#if dockerId}
-      <button class="btn small" onclick={disconnect}>Disconnect</button>
-    {:else if connecting}
-      <button class="btn small" onclick={cancelConnecting}>Cancel</button>
-    {:else}
-      <button class="btn small primary" disabled={!wanted} onclick={connect}>Connect</button>
-    {/if}
-  </div>
+  {#if connecting}
+    <div class="source"><button class="btn small" onclick={cancelConnecting}>Cancel</button></div>
   {/if}
 
   {#if error}
@@ -460,9 +438,8 @@
     {/if}
   {:else if !error}
     <p class="hint">
-      {chosen === AUTO && !active
-        ? "Open an SSH tab and its Docker appears here. Nothing is installed on the server; its user needs access to Docker."
-        : "Press Connect. Nothing is installed on a server; its user needs access to Docker."}
+      Open an SSH tab and its Docker appears here by itself. Nothing is installed on the server; its user
+      needs access to Docker.
     </p>
   {/if}
 
@@ -566,19 +543,12 @@
     font-size: 12px;
     font-weight: 500;
   }
-  .head-tools .on {
-    color: var(--accent);
-  }
   .source {
     display: flex;
     gap: 6px;
     margin: 6px 12px;
   }
-  .source select {
-    flex: 1;
-    min-width: 0;
-  }
-  .views {
+    .views {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;

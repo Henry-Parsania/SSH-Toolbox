@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from "svelte";
   import { wslPath } from "../terminal/cwd";
+  import { terminalWrite } from "../backend";
+  import { shellQuote } from "./paths";
   import { promptRespond, type Prompt, type PromptResponse } from "../backend";
   import {
     filesClose,
@@ -28,10 +30,12 @@
       | null;
     /** The folder the active terminal reported, if any. */
     follow?: string;
+    /** The backend session of the active terminal, so the panel can send it a folder to go to. */
+    terminalSession?: string;
     onclose: () => void;
   }
 
-  let { source, follow = "", onclose }: Props = $props();
+  let { source, follow = "", terminalSession = "", onclose }: Props = $props();
 
   // Where the divider between the server's files and this computer's sits, as the top list's
   // share of the height. It can be dragged, and is kept for next time.
@@ -211,6 +215,36 @@
     if (target !== untrack(() => remotePath)) remotePath = target;
   });
 
+  // ---- Moving the active SSH terminal to the folder shown here.
+  const canMoveTerminal = $derived(source?.kind === "ssh" && !!terminalSession && !!remote && !!remotePath);
+  let moved = $state("");
+
+  async function moveTerminal() {
+    if (!canMoveTerminal) return;
+    // Ctrl+U clears whatever was half typed on the line, so the command stands alone.
+    const line = `\x15cd -- ${shellQuote(remotePath)}\r`;
+    try {
+      await terminalWrite(terminalSession, new TextEncoder().encode(line));
+      moved = "";
+    } catch (err) {
+      moved = (err as { message?: string }).message ?? "Couldn't send that to the terminal.";
+    }
+  }
+
+  // Most shells don't say which folder they are in, so following needs a little help: this types
+  // one line into the shell that makes it report its folder (bash and zsh).
+  const REPORT_LINE =
+    ` __osc7(){ printf '\\033]7;file://%s%s\\007' "$HOSTNAME" "$PWD"; }; if [ -n "$ZSH_VERSION" ]; then precmd_functions+=(__osc7); else PROMPT_COMMAND="__osc7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"; fi; __osc7`;
+  async function setUpShell() {
+    if (!terminalSession) return;
+    try {
+      await terminalWrite(terminalSession, new TextEncoder().encode(`\x15${REPORT_LINE}\r`));
+      moved = "";
+    } catch (err) {
+      moved = (err as { message?: string }).message ?? "Couldn't send that to the terminal.";
+    }
+  }
+
   let refresh = $state(0);
   $effect(() => {
     const busy = jobs.some((j) => ["queued", "asking", "running"].includes(j.state.state));
@@ -223,20 +257,37 @@
   <header>
     <span class="heading"><Icon name="folder" size={15} /> Files</span>
     <span class="head-tools">
-    <button
-      class="icon-btn"
-      class:on={following}
-      title={following ? "Following the terminal's folder (click to stop)" : "Follow the terminal's folder"}
-      aria-pressed={following}
-      onclick={toggleFollow}
-    >
-      <Icon name="route" size={15} />
-    </button>
     <button class="icon-btn" title="Close the file panel" onclick={onclose}><Icon name="close" size={15} /></button>
     </span>
   </header>
 
   {#if message}<p class="message warn top">{message}</p>{/if}
+
+  {#if source && source.kind !== "ftp"}
+    <div class="options">
+      <label class="check" title="The server list shows the folder the terminal is in">
+        <input type="checkbox" checked={following} onchange={toggleFollow} />
+        Follow the terminal's folder
+      </label>
+      {#if source.kind === "ssh"}
+        <button
+          class="btn small"
+          disabled={!canMoveTerminal}
+          title="Type a cd command into the active terminal to go to the folder shown in the list below"
+          onclick={moveTerminal}
+        >
+          <Icon name="route" size={13} /> Go to this folder in the terminal
+        </button>
+      {/if}
+    </div>
+    {#if following && !follow && source.kind === "ssh" && terminalSession}
+      <p class="hint">
+        This terminal hasn't reported its folder. Most shells don't until asked.
+        <button class="btn small" onclick={setUpShell}>Set up this shell</button>
+      </p>
+    {/if}
+    {#if moved}<p class="message warn top">{moved}</p>{/if}
+  {/if}
 
   <div class="browsers" bind:this={browsersBox}>
     <div class="half" style:flex="{split} 1 0">
@@ -304,9 +355,6 @@
     display: flex;
     gap: 2px;
   }
-  .head-tools .on {
-    color: var(--accent);
-  }
   header {
     display: flex;
     align-items: center;
@@ -343,6 +391,25 @@
     font-weight: 600;
     pointer-events: none;
     box-shadow: var(--shadow-small);
+  }
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin: 2px 12px 6px;
+    font-size: 12px;
+  }
+  .options .check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .hint {
+    margin: 0 12px 6px;
+    color: var(--text-muted);
+    font-size: 12px;
   }
   .half {
     display: flex;

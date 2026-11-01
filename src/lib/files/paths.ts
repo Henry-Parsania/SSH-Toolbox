@@ -99,3 +99,8 @@ export function percent(done: number, total: number | null): number | null {
   if (!total || total <= 0) return null;
   return Math.min(100, Math.floor((done / total) * 100));
 }
+
+/** Wraps text in single quotes for a shell, so a folder name with spaces or symbols is taken literally. */
+export function shellQuote(text: string): string {
+  return `'${text.replace(/'/g, `'\\''`)}'`;
+}

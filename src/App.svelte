@@ -171,6 +171,12 @@
     return { id: leaf.spec.saved_session_id, name: leaf.title };
   });
 
+  // The backend session of the active pane, so the file panel can send it a folder to go to.
+  const activeTerminalSession = $derived.by(() => {
+    const tab = workspace.activeTab;
+    return tab ? (workspace.sessionIds[tab.active] ?? "") : "";
+  });
+
   // The folder the active pane's shell reported, for the file panel to follow.
   const followedFolder = $derived.by(() => {
     const tab = workspace.activeTab;
@@ -450,7 +456,11 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
         <div class="side" style:width="{filesWidth}px">
-          <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
+          <FilesPanel
+            source={activeSession}
+            follow={followedFolder}
+            terminalSession={activeTerminalSession}
+            onclose={() => (filesOpen = false)} />
         </div>
       {/if}
     </div>
