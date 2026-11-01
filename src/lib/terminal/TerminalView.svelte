@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { keepAlive } from "../layout/detach";
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -12,6 +13,7 @@
     promptRespond,
     startupReady,
     terminalAck,
+    terminalAttach,
     terminalClose,
     terminalSaveOutput,
     terminalOpen,
@@ -43,6 +45,8 @@
     searchSignal?: number;
     /** Saves the output to a file each time this number goes up. */
     saveSignal?: number;
+    /** Shows this open session (moved here from another window) instead of starting one. */
+    attachId?: string;
     /** Identify this pane, so typing can be copied to the others in the tab. */
     tabId?: string;
     paneId?: string;
@@ -60,6 +64,7 @@
     focused = true,
     searchSignal = 0,
     saveSignal = 0,
+    attachId = "",
     tabId = "",
     paneId = "",
     broadcasting = false,
@@ -351,19 +356,17 @@
     openedCols = term.cols;
     openedRows = term.rows;
 
-    terminalOpen(
-      spec,
-      openedCols,
-      openedRows,
-      (chunk) => {
-        reportStartup();
-        term.write(chunk, () => {
-          if (sessionId) acks.processed(chunk.length);
-          else earlyAcks += chunk.length;
-        });
-      },
-      handleStatus,
-    ).then(
+    const onChunk = (chunk: Uint8Array) => {
+      reportStartup();
+      term.write(chunk, () => {
+        if (sessionId) acks.processed(chunk.length);
+        else earlyAcks += chunk.length;
+      });
+    };
+    const starting = attachId
+      ? terminalAttach(attachId, onChunk, handleStatus)
+      : terminalOpen(spec, openedCols, openedRows, onChunk, handleStatus);
+    starting.then(
       (id) => {
         if (disposed) {
           void terminalClose(id).catch(() => {});
@@ -401,7 +404,9 @@
       dataSub.dispose();
       binarySub.dispose();
       resizeSub.dispose();
-      if (sessionId) void terminalClose(sessionId).catch(() => {});
+      // A session handed to another window keeps running.
+      if (sessionId && keepAlive.has(sessionId)) keepAlive.delete(sessionId);
+      else if (sessionId) void terminalClose(sessionId).catch(() => {});
       onsession?.(null);
       term.dispose();
     };

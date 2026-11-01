@@ -97,6 +97,14 @@ impl PumpHandle {
         self.flow.acked(bytes);
     }
 
+    /// Forgets output that was sent but never acknowledged. Used when the window that was
+    /// showing a session is gone, so the next window doesn't wait for acknowledgements that will
+    /// never come.
+    pub fn reset_flow(&self) {
+        self.flow.unacked.store(0, Ordering::SeqCst);
+        self.flow.notify.notify_one();
+    }
+
     /// Bytes sent but not yet acknowledged.
     pub fn unacked(&self) -> usize {
         self.flow.unacked()

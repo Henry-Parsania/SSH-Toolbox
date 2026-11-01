@@ -1,5 +1,7 @@
 // The only place that talks to Tauri. Everything else imports from here.
 import { Channel, invoke } from "@tauri-apps/api/core";
+// Only this folder may import from @tauri-apps (scripts/check-boundaries.mjs).
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export type ErrorCode =
   | "not_found"
@@ -106,6 +108,29 @@ export function listWslDistros(): Promise<string[]> {
  * Opens a terminal and returns its session ID. Output arrives as raw bytes, so a character
  * split across two chunks isn't broken: pass the chunks straight to xterm's `write`.
  */
+/** Shows an open session in this window instead of the one that was showing it. */
+export function terminalAttach(
+  sessionId: string,
+  onOutput: (chunk: Uint8Array) => void,
+  onStatus: (status: TerminalStatus) => void,
+): Promise<string> {
+  const output = new Channel<ArrayBuffer>();
+  output.onmessage = (chunk) => onOutput(new Uint8Array(chunk));
+  const status = new Channel<TerminalStatus>();
+  status.onmessage = onStatus;
+  return invoke<string>("terminal_attach", { sessionId, onOutput: output, onStatus: status });
+}
+
+/** Opens another window. `payload` says what it shows (see layout/detach.ts). */
+export function windowOpen(title: string, payload: string): Promise<void> {
+  return invoke<void>("window_open", { title, payload });
+}
+
+/** Closes the window this is called from. */
+export function windowCloseSelf(): Promise<void> {
+  return getCurrentWindow().close();
+}
+
 export function terminalOpen(
   spec: SessionSpec,
   cols: number,

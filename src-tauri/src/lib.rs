@@ -45,11 +45,17 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .setup(|app| {
-            if let (Some(window), Some(dir)) = (
-                app.get_webview_window("main"),
-                toolbox_core::config::config_dir(),
-            ) {
-                window_state::install(window, dir.join("window.json"));
+            if let Some(window) = app.get_webview_window("main") {
+                // Closing the main window ends the app, and with it any other windows.
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Destroyed = event {
+                        handle.exit(0);
+                    }
+                });
+                if let Some(dir) = toolbox_core::config::config_dir() {
+                    window_state::install(window, dir.join("window.json"));
+                }
             }
             Ok(())
         })
@@ -127,6 +133,8 @@ pub fn run() {
             commands::terminal::terminal_resize,
             commands::terminal::terminal_save_output,
             commands::terminal::terminal_ack,
+            commands::terminal::terminal_attach,
+            commands::window::window_open,
             commands::terminal::terminal_close,
         ])
         .build(tauri::generate_context!())

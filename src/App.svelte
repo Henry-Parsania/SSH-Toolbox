@@ -7,13 +7,15 @@
     listShells,
     listWslDistros,
     platformInfo,
+    windowOpen,
     type PlatformInfo,
     type SavedSession,
     type Shell,
   } from "./lib/backend";
   import PaneTree from "./lib/layout/PaneTree.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
-  import { leaves } from "./lib/layout/panes";
+  import { encodePayload } from "./lib/layout/detach";
+  import { leaves, newLeaf } from "./lib/layout/panes";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
@@ -188,11 +190,21 @@
     document.documentElement.dataset.theme = settings.theme;
   });
 
-  // A tab that runs the server's process monitor (btop, htop or top) instead of a shell.
+  // A pop-up window with the server's process monitor (btop, htop or top) instead of a shell.
   function openMonitor(session: SavedSession) {
-    if (session.type === "ssh") {
-      workspace.newTab({ type: "ssh", saved_session_id: session.id, monitor: true }, `${session.name} · top`);
-    }
+    if (session.type !== "ssh") return;
+    const title = `${session.name} · top`;
+    const pane = newLeaf({ type: "ssh", saved_session_id: session.id, monitor: true }, title);
+    void windowOpen(title, encodePayload({ title, root: pane, attach: {}, active: pane.pane_id })).catch(() => {});
+  }
+
+  // Moves the active tab into a window of its own. Its programs keep running; the new window
+  // starts with an empty screen.
+  function detachActiveTab() {
+    const tab = workspace.activeTab;
+    if (!tab) return;
+    const payload = workspace.detachTab(tab.id);
+    if (payload) void windowOpen(payload.title, encodePayload(payload)).catch(() => {});
   }
 
   // Only SSH sessions can be opened so far. Serial and FTP arrive in phases 3 and 4.
@@ -269,6 +281,7 @@
         { label: "Split side by side", hint: "Ctrl+Shift+E", onselect: () => workspace.split("row") },
         { label: "Split top and bottom", hint: "Ctrl+Shift+O", onselect: () => workspace.split("column") },
         { label: "Close pane", hint: "Ctrl+Shift+W", onselect: () => workspace.closeActivePane() },
+        { label: "Move this tab to its own window", disabled: workspace.tabs.length === 0, onselect: detachActiveTab },
         "separator",
         { label: "Search the output", hint: "Ctrl+Shift+F", onselect: () => workspace.requestSearch() },
         { label: "Save the output to Downloads", hint: "Ctrl+Shift+S", onselect: () => workspace.requestSave() },

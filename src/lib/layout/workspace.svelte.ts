@@ -2,6 +2,7 @@
 // the screen draws.
 
 import type { SavedLayout, SavedPane, SessionSpec } from "../backend";
+import { keepAlive, type WindowPayload } from "./detach";
 import {
   closePane,
   findLeaf,
@@ -43,6 +44,29 @@ export class Workspace {
   /** Marks a pane as connected by the user, so it can open. */
   connect(paneId: string) {
     delete this.waiting[paneId];
+  }
+
+  /** Panes that show a session that is already open (a tab moved here from another window). */
+  attach = $state<Record<string, string>>({});
+
+  /**
+   * Takes a tab out of this window and returns what another window needs to show it. Its
+   * sessions are not ended: they carry on and the other window picks them up.
+   */
+  detachTab(id: string): WindowPayload | null {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return null;
+    const attach: Record<string, string> = {};
+    for (const leaf of leaves(tab.root)) {
+      const session = this.sessionIds[leaf.pane_id];
+      if (session) {
+        attach[leaf.pane_id] = session;
+        keepAlive.add(session);
+      }
+    }
+    const payload: WindowPayload = { title: tab.title, root: $state.snapshot(tab.root) as PaneNode, attach, active: tab.active };
+    this.closeTab(id);
+    return payload;
   }
 
   /** The backend session behind each pane, for controls that act on it (serial lines). */

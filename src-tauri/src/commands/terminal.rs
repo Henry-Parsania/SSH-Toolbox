@@ -7,7 +7,7 @@ use toolbox_core::serial::{self, PortInfo, SerialConfig};
 use toolbox_core::sessions::SessionStore;
 use toolbox_core::ssh::{self, backend::SshServices};
 use toolbox_core::terminal::{
-    self, OutputSink, PortControl, SessionRegistry, SessionSpec, Shell, TerminalStatus,
+    self, OutputSink, PortControl, SessionRegistry, SessionSpec, Shell, SwitchSink, TerminalStatus,
     checked_size,
 };
 use toolbox_core::{AppError, ErrorCode};
@@ -16,6 +16,8 @@ use toolbox_core::{AppError, ErrorCode};
 #[derive(Default)]
 pub struct Terminals {
     pub sessions: SessionRegistry,
+    /// Where each session's output goes, so a session can be shown by another window.
+    switches: std::sync::Mutex<std::collections::HashMap<String, Arc<SwitchSink>>>,
 }
 
 /// Delivers a session's output through Tauri channels. Output goes as raw bytes, never as
@@ -72,11 +74,12 @@ pub async fn terminal_open(
     on_status: Channel<TerminalStatus>,
 ) -> Result<String, AppError> {
     let size = checked_size(cols, rows)?;
-    let sink = Arc::new(ChannelSink {
+    let switch = Arc::new(SwitchSink::new(Arc::new(ChannelSink {
         output: on_output,
         status: on_status,
-    });
-    match spec {
+    })));
+    let sink = switch.clone();
+    let id = match spec {
         SessionSpec::Ssh {
             saved_session_id,
             monitor,
@@ -139,7 +142,40 @@ pub async fn terminal_open(
             .await
         }
         other => terminal::open_terminal(&terminals.sessions, other, size, sink).await,
-    }
+    }?;
+    terminals
+        .switches
+        .lock()
+        .unwrap()
+        .insert(id.clone(), switch);
+    Ok(id)
+}
+
+/// Shows an open session in the calling window instead of the one that was showing it. Used
+/// when a tab is moved to its own window: the programs keep running, but the new window starts
+/// with an empty screen.
+#[tauri::command]
+pub async fn terminal_attach(
+    terminals: State<'_, Terminals>,
+    session_id: String,
+    on_output: Channel<InvokeResponseBody>,
+    on_status: Channel<TerminalStatus>,
+) -> Result<String, AppError> {
+    let session = terminals.sessions.get(&session_id)?;
+    let switch = terminals
+        .switches
+        .lock()
+        .unwrap()
+        .get(&session_id)
+        .cloned()
+        .ok_or_else(|| AppError::new(ErrorCode::NotFound, "That session has ended."))?;
+    switch.switch_to(Arc::new(ChannelSink {
+        output: on_output,
+        status: on_status,
+    }));
+    session.pump().reset_flow();
+    let _ = switch.send_status(TerminalStatus::Connected);
+    Ok(session_id)
 }
 
 #[tauri::command]
@@ -177,6 +213,7 @@ pub async fn terminal_close(
     terminals: State<'_, Terminals>,
     session_id: String,
 ) -> Result<(), AppError> {
+    terminals.switches.lock().unwrap().remove(&session_id);
     terminals.sessions.close(&session_id).await
 }
 

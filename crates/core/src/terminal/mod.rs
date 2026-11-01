@@ -21,7 +21,7 @@ pub use pump::{
 };
 pub use registry::{Session, SessionRegistry};
 pub use shells::{Shell, list_shells, shell_spec};
-pub use sink::{OutputSink, TerminalStatus};
+pub use sink::{OutputSink, SwitchSink, TerminalStatus};
 pub use wsl::{list_wsl_distros, wsl_spec};
 
 #[cfg(test)]
