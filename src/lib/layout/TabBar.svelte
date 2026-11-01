@@ -42,7 +42,7 @@
   /** The icon says what kind of session the tab holds. */
   function iconFor(tab: Tab): IconName {
     const spec = leaves(tab.root)[0]?.spec;
-    return spec?.type === "ssh" ? "server" : "terminal";
+    return spec?.type === "ssh" ? "server" : spec?.type === "serial" ? "serial" : "terminal";
   }
 
   // Reordering uses pointer events. HTML drag and drop is switched off by Tauri's file drop.

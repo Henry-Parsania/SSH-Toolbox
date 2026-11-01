@@ -41,7 +41,8 @@ export interface Shell {
 export type SessionSpec =
   | { type: "local"; shell_id: string }
   | { type: "wsl"; distro: string }
-  | { type: "ssh"; saved_session_id: string };
+  | { type: "ssh"; saved_session_id: string }
+  | { type: "serial"; saved_session_id: string };
 
 export type TerminalStatus =
   | { type: "connecting" }

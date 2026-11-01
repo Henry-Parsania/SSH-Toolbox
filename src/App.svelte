@@ -131,6 +131,8 @@
       // The server's files appear beside the terminal.
       filesOpen = true;
       ftpOpened = null;
+    } else if (session.type === "serial") {
+      workspace.newTab({ type: "serial", saved_session_id: session.id }, session.name);
     } else if (session.type === "ftp") {
       ftpOpened = { kind: "ftp", id: session.id, name: session.name };
       filesOpen = true;

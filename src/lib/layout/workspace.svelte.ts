@@ -43,6 +43,9 @@ export class Workspace {
     delete this.waiting[paneId];
   }
 
+  /** The backend session behind each pane, for controls that act on it (serial lines). */
+  sessionIds = $state<Record<string, string>>({});
+
   /** The folder each pane's shell last reported (OSC 7). Not saved: it is only a hint. */
   cwd = $state<Record<string, string>>({});
 
@@ -170,7 +173,8 @@ export class Workspace {
     this.waiting = {};
     for (const tab of layout.tabs) {
       for (const leaf of leavesOf(tab.root)) {
-        if (leaf.spec?.type === "ssh") this.waiting[leaf.pane_id] = true;
+        // Neither SSH nor serial panes connect by themselves.
+        if (leaf.spec?.type === "ssh" || leaf.spec?.type === "serial") this.waiting[leaf.pane_id] = true;
       }
     }
     this.tabs = layout.tabs.map((t) => ({

@@ -28,6 +28,15 @@ pub const QUEUE_SIZE: usize = 32;
 /// Largest piece of output a backend sends as one `Data` event.
 pub const MAX_BACKEND_READ: usize = 16 * 1024;
 
+/// A change to a serial line's control signals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortControl {
+    Dtr(bool),
+    Rts(bool),
+    /// Holds the line low for a moment.
+    Break,
+}
+
 #[async_trait]
 pub trait TerminalBackend: Send + Sync {
     async fn write(&self, data: &[u8]) -> Result<(), AppError>;
@@ -35,4 +44,11 @@ pub trait TerminalBackend: Send + Sync {
     async fn resize(&self, size: TermSize) -> Result<(), AppError>;
     /// Ends the session. Safe to call twice.
     async fn close(&self) -> Result<(), AppError>;
+    /// Serial lines only. Other kinds of session have none.
+    async fn control(&self, _control: PortControl) -> Result<(), AppError> {
+        Err(AppError::new(
+            crate::error::ErrorCode::Unsupported,
+            "This session has no serial lines.",
+        ))
+    }
 }

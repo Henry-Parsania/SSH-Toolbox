@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PlatformInfo, TerminalStatus } from "../backend";
+  import { serialSendBreak, serialSetControl } from "../backend/serial";
   import TerminalView from "../terminal/TerminalView.svelte";
   import Icon from "../ui/Icon.svelte";
   import type { Leaf } from "./panes";
@@ -24,7 +25,24 @@
   let attempt = $state(0);
   let connecting = $state(false);
 
+  // The serial lines are shown as the user last set them. Devices start with both low.
+  let dtr = $state(false);
+  let rts = $state(false);
+  let lineError = $state("");
+  const sessionId = $derived(workspace.sessionIds[node.pane_id]);
+
+  async function line(change: () => Promise<void>) {
+    lineError = "";
+    try {
+      await change();
+    } catch (err) {
+      lineError = (err as { message?: string }).message ?? "That didn't work.";
+    }
+  }
+
   function reconnect() {
+    dtr = false;
+    rts = false;
     ended = null;
     attempt++;
   }
@@ -66,12 +84,38 @@
         paneId={node.pane_id}
         broadcasting={workspace.broadcast}
         oncwd={(path) => (workspace.cwd[node.pane_id] = path)}
+        onsession={(id) => {
+          if (id) workspace.sessionIds[node.pane_id] = id;
+          else delete workspace.sessionIds[node.pane_id];
+        }}
         {onstatus}
       />
     {/key}
     {#if connecting && !ended}
       <div class="connecting"><span class="spinner"></span> Connecting…</div>
     {/if}
+  {/if}
+  {#if node.spec?.type === "serial" && sessionId && !ended}
+    <div class="lines" role="toolbar" aria-label="Serial lines">
+      <button
+        class="chip"
+        class:on={dtr}
+        aria-pressed={dtr}
+        title="Data Terminal Ready line"
+        onclick={() => line(async () => { await serialSetControl(sessionId, { dtr: !dtr }); dtr = !dtr; })}
+      >DTR</button>
+      <button
+        class="chip"
+        class:on={rts}
+        aria-pressed={rts}
+        title="Request To Send line"
+        onclick={() => line(async () => { await serialSetControl(sessionId, { rts: !rts }); rts = !rts; })}
+      >RTS</button>
+      <button class="chip" title="Send a break signal" onclick={() => line(() => serialSendBreak(sessionId))}>
+        Break
+      </button>
+      {#if lineError}<span class="line-error">{lineError}</span>{/if}
+    </div>
   {/if}
   {#if crowded}
     <button
@@ -87,7 +131,7 @@
     <div class="ended" role="alert">
       <span class="text">{ended}</span>
       <span class="actions">
-        {#if node.spec?.type === "ssh"}
+        {#if node.spec?.type === "ssh" || node.spec?.type === "serial"}
           <button class="btn small primary" onclick={reconnect}>
             <Icon name="refresh" size={13} /> Reconnect
           </button>
@@ -116,6 +160,42 @@
     box-shadow: inset 0 0 0 1px var(--accent);
     opacity: 0.8;
     z-index: 3;
+  }
+  .lines {
+    position: absolute;
+    top: 6px;
+    right: 44px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.85;
+  }
+  .lines:hover {
+    opacity: 1;
+  }
+  .chip {
+    padding: 2px 9px;
+    color: var(--text-muted);
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chip.on {
+    color: var(--on-accent);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .line-error {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--danger);
+    font-size: 11px;
   }
   .close-pane {
     position: absolute;

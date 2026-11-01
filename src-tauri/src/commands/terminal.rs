@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use tauri::State;
 use tauri::ipc::{Channel, InvokeResponseBody};
+use toolbox_core::serial::{self, PortInfo, SerialConfig};
+use toolbox_core::sessions::SessionStore;
 use toolbox_core::ssh::{self, backend::SshServices};
 use toolbox_core::terminal::{
-    self, OutputSink, SessionRegistry, SessionSpec, Shell, TerminalStatus, checked_size,
+    self, OutputSink, PortControl, SessionRegistry, SessionSpec, Shell, TerminalStatus,
+    checked_size,
 };
 use toolbox_core::{AppError, ErrorCode};
 
@@ -80,6 +83,27 @@ pub async fn terminal_open(
             )
             .await
         }
+        SessionSpec::Serial { saved_session_id } => {
+            let path = services.sessions_file.clone();
+            let loaded = tokio::task::spawn_blocking(move || SessionStore::new(path).load())
+                .await
+                .map_err(|_| {
+                    AppError::new(ErrorCode::Internal, "Couldn't read the saved sessions.")
+                })?;
+            if let Some(problem) = loaded.problem {
+                return Err(AppError::new(ErrorCode::InvalidInput, problem));
+            }
+            let session = loaded
+                .file
+                .sessions
+                .iter()
+                .find(|s| s.id() == saved_session_id)
+                .ok_or_else(|| {
+                    AppError::new(ErrorCode::NotFound, "That saved session no longer exists.")
+                })?;
+            let config = SerialConfig::from_saved(session)?;
+            serial::open_serial_terminal(&terminals.sessions, config, sink).await
+        }
         other => terminal::open_terminal(&terminals.sessions, other, size, sink).await,
     }
 }
@@ -120,4 +144,41 @@ pub async fn terminal_close(
     session_id: String,
 ) -> Result<(), AppError> {
     terminals.sessions.close(&session_id).await
+}
+
+/// The serial ports this computer has right now (R1).
+#[tauri::command]
+pub async fn serial_list_ports() -> Result<Vec<PortInfo>, AppError> {
+    serial::list_ports().await
+}
+
+/// Sets the DTR and RTS lines of a serial session. Lines left out stay as they are (R7).
+#[tauri::command]
+pub async fn serial_set_control(
+    terminals: State<'_, Terminals>,
+    session_id: String,
+    dtr: Option<bool>,
+    rts: Option<bool>,
+) -> Result<(), AppError> {
+    let session = terminals.sessions.get(&session_id)?;
+    if let Some(on) = dtr {
+        session.control(PortControl::Dtr(on)).await?;
+    }
+    if let Some(on) = rts {
+        session.control(PortControl::Rts(on)).await?;
+    }
+    Ok(())
+}
+
+/// Sends a break on a serial session (R7).
+#[tauri::command]
+pub async fn serial_send_break(
+    terminals: State<'_, Terminals>,
+    session_id: String,
+) -> Result<(), AppError> {
+    terminals
+        .sessions
+        .get(&session_id)?
+        .control(PortControl::Break)
+        .await
 }

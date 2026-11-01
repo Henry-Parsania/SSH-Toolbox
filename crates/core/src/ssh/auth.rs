@@ -289,8 +289,7 @@ async fn agent_login(connection: &mut Connection, user: &str) -> Result<(), AppE
     // The Windows agent sometimes drops the first request on a fresh pipe, so one more try
     // is made on a new connection before giving up.
     for attempt in 0..2 {
-        let Ok(agent) = AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await
-        else {
+        let Ok(agent) = AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await else {
             break;
         };
         reached = true;

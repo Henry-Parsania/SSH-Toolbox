@@ -29,6 +29,10 @@ pub enum SessionSpec {
     Ssh {
         saved_session_id: String,
     },
+    /// A saved serial session. Opened with `serial::open_serial_terminal`.
+    Serial {
+        saved_session_id: String,
+    },
 }
 
 const MAX_DIMENSION: u16 = 1000;
@@ -72,6 +76,12 @@ pub async fn open_terminal(
             return Err(AppError::new(
                 ErrorCode::Unsupported,
                 "SSH sessions are opened through the SSH services.",
+            ));
+        }
+        SessionSpec::Serial { .. } => {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "Serial sessions are opened through the serial module.",
             ));
         }
         SessionSpec::Wsl { distro } => {

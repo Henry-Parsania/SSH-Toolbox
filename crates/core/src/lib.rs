@@ -10,6 +10,7 @@ pub mod platform;
 pub mod prompt;
 pub mod reach;
 pub mod secret;
+pub mod serial;
 pub mod sessions;
 pub mod settings;
 pub mod ssh;

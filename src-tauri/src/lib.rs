@@ -54,6 +54,9 @@ pub fn run() {
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::terminal::serial_list_ports,
+            commands::terminal::serial_send_break,
+            commands::terminal::serial_set_control,
             commands::status::reach_check,
             commands::status::stats_local,
             commands::status::stats_remote,

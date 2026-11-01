@@ -11,7 +11,9 @@ mod sink;
 pub(crate) mod testing;
 mod wsl;
 
-pub use backend::{BackendEvent, MAX_BACKEND_READ, QUEUE_SIZE, TermSize, TerminalBackend};
+pub use backend::{
+    BackendEvent, MAX_BACKEND_READ, PortControl, QUEUE_SIZE, TermSize, TerminalBackend,
+};
 pub use local::{LocalShell, ShellSpec};
 pub use open::{SessionSpec, checked_size, open_terminal};
 pub use pump::{

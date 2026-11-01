@@ -46,6 +46,8 @@
     broadcasting?: boolean;
     /** Called with the folder the shell says it is in (OSC 7). */
     oncwd?: (path: string) => void;
+    /** Told the backend session ID once it is open, and null when it is closed. */
+    onsession?: (id: string | null) => void;
   }
 
   let {
@@ -58,6 +60,7 @@
     paneId = "",
     broadcasting = false,
     oncwd,
+    onsession,
   }: Props = $props();
 
   let searching = $state(false);
@@ -339,6 +342,7 @@
           return;
         }
         sessionId = id;
+        onsession?.(id);
         input.enable();
         if (earlyAcks > 0) acks.processed(earlyAcks);
         earlyAcks = 0;
@@ -370,6 +374,7 @@
       binarySub.dispose();
       resizeSub.dispose();
       if (sessionId) void terminalClose(sessionId).catch(() => {});
+      onsession?.(null);
       term.dispose();
     };
   }

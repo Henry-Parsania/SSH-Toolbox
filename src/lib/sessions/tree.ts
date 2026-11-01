@@ -3,6 +3,7 @@
 import type { SavedFolder, SavedSession, SessionsFile } from "../backend";
 
 export type SshSession = Extract<SavedSession, { type: "ssh" }>;
+export type SerialSession = Extract<SavedSession, { type: "serial" }>;
 export type FtpSession = Extract<SavedSession, { type: "ftp" }>;
 
 export type TreeItem =

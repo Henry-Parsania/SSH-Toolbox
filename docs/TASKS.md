@@ -94,11 +94,11 @@ Build and test against the local test container. This phase also adds SSH to `Se
 
 ## Phase 4: Serial
 
-- [ ] **4.1 Port listing (R1).** With a refresh button. Linux adds USB names through `libudev`.
-- [ ] **4.2 Serial backend (R2, R5, P4).** `TerminalBackend`, where `resize` does nothing. A read error or end of stream becomes a `failed` status with a reconnect offer. Test on Linux CI with virtual ports from `socat`.
-- [ ] **4.3 Saved setups (R3).** Add serial sessions to the editor, with the fields in IF section 9.
-- [ ] **4.4 Permission help (R4).** On Linux, a permission error explains this fix: `sudo usermod -aG dialout $USER`, then log out and back in. The app never runs it itself.
-- [ ] **4.5 Should items (R6, R7).** Local echo, line endings, send break, and DTR and RTS toggles.
+- [x] **4.1 Port listing (R1).** With a refresh button. Linux adds USB names through `libudev`.
+- [x] **4.2 Serial backend (R2, R5, P4).** `TerminalBackend`, where `resize` does nothing. A read error or end of stream becomes a `failed` status with a reconnect offer. Test on Linux CI with virtual ports from `socat`.
+- [x] **4.3 Saved setups (R3).** Add serial sessions to the editor, with the fields in IF section 9.
+- [x] **4.4 Permission help (R4).** On Linux, a permission error explains this fix: `sudo usermod -aG dialout $USER`, then log out and back in. The app never runs it itself.
+- [x] **4.5 Should items (R6, R7).** Local echo, line endings, send break, and DTR and RTS toggles.
 - [ ] **4.6 Owner tries it** with a real device.
 
 ## Phase 5: Docker

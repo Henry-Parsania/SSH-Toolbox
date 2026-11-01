@@ -20,6 +20,10 @@ impl Session {
         self.backend.write(data).await
     }
 
+    pub async fn control(&self, control: super::backend::PortControl) -> Result<(), AppError> {
+        self.backend.control(control).await
+    }
+
     pub async fn resize(&self, size: TermSize) -> Result<(), AppError> {
         self.backend.resize(size).await
     }
