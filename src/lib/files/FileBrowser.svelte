@@ -33,9 +33,11 @@
     highlight?: boolean;
     /** Called when rows are dragged away, with how many. */
     onstartdrag?: (count: number) => void;
+    /** An extra small button among the tools, such as sending the folder to a terminal. */
+    extra?: { icon: IconName; title: string; disabled?: boolean; onclick: () => void };
   }
 
-  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag }: Props = $props();
+  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra }: Props = $props();
 
   let entries = $state<FileEntry[]>([]);
   let loading = $state(false);
@@ -246,6 +248,11 @@
       <button class="icon-btn small" title="Refresh" disabled={!files} onclick={reload}>
         <Icon name="refresh" size={14} />
       </button>
+      {#if extra}
+        <button class="icon-btn small" title={extra.title} aria-label={extra.title} disabled={!files || extra.disabled} onclick={extra.onclick}>
+          <Icon name={extra.icon} size={14} />
+        </button>
+      {/if}
       <button class="icon-btn small" title="New folder" disabled={!files} onclick={() => (dialog = { kind: "mkdir", value: "" })}>
         <Icon name="folder-plus" size={14} />
       </button>
@@ -301,7 +308,18 @@
     <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown}>
       {#if parentPath(path, sep) !== path}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row up" role="option" aria-selected="false" tabindex="-1" onclick={() => go(parentPath(path, sep))}>
+        <div
+          class="row up"
+          role="option"
+          aria-selected="false"
+          tabindex="-1"
+          title="Double-click to go up one folder"
+          onclick={() => {
+            selected = [];
+            anchor = null;
+          }}
+          ondblclick={() => go(parentPath(path, sep))}
+        >
           <span class="icon dir"><Icon name="up" size={14} /></span>
           <span class="name">..</span>
         </div>

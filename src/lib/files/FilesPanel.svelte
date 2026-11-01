@@ -269,16 +269,6 @@
         <input type="checkbox" checked={following} onchange={toggleFollow} />
         Follow the terminal's folder
       </label>
-      {#if source.kind === "ssh"}
-        <button
-          class="btn small"
-          disabled={!canMoveTerminal}
-          title="Type a cd command into the active terminal to go to the folder shown in the list below"
-          onclick={moveTerminal}
-        >
-          <Icon name="route" size={13} /> Go to this folder in the terminal
-        </button>
-      {/if}
     </div>
     {#if following && !follow && source.kind === "ssh" && terminalSession}
       <p class="hint">
@@ -299,6 +289,14 @@
         onstartdrag={(count) => startDrag("remote", count)}
         reloadSignal={refresh}
         files={remote}
+        extra={source?.kind === "ssh"
+          ? {
+              icon: "terminal",
+              title: "Go to this folder in the terminal (types a cd command)",
+              disabled: !canMoveTerminal,
+              onclick: moveTerminal,
+            }
+          : undefined}
         status={source ? remoteStatus : "Open an SSH or WSL session, or an FTP session from the list, to see its files here."}
         bind:path={remotePath}
         transferLabel="Download"
