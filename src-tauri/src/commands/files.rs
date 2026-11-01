@@ -6,15 +6,18 @@ use tauri::State;
 use tauri::ipc::Channel;
 use toolbox_core::files::PendingAnswers;
 use toolbox_core::files::{
-    CopyRequest, FileBackend, FileEntry, FileKind, JobSnapshot, LocalFiles, OverwriteChoice,
-    SftpFiles, TransferQueue, check_remote_name, plan_delete, plan_tree, queue_tree, run_delete,
+    CopyRequest, FileBackend, FileEntry, FileKind, FtpFiles, FtpTarget, JobSnapshot, LocalFiles,
+    OverwriteChoice, SftpFiles, TransferQueue, check_remote_name, plan_delete, plan_tree,
+    queue_tree, run_delete,
 };
+use toolbox_core::prompt::Prompter;
+use toolbox_core::sessions::{SavedSession, SessionStore};
 use toolbox_core::ssh::backend::SshServices;
 use toolbox_core::terminal::TerminalStatus;
 use toolbox_core::{AppError, ErrorCode};
 
 use super::connect::shared_connection;
-use super::keys::KeySetups;
+use super::keys::{KeySetups, QuestionSink};
 
 /// Open file backends (this computer, and servers), by ID, and the transfer queue.
 #[derive(Default)]
@@ -114,6 +117,105 @@ pub async fn files_open_sftp(
     let sftp = SftpFiles::open(shared).await?;
     let home = sftp.home().await.unwrap_or_else(|_| "/".into());
     Ok(register(&files, Arc::new(sftp), home, "/"))
+}
+
+/// The files of an FTP or FTPS session. Plain FTP is warned about, and a certificate that doesn't
+/// check out is asked about, through `on_status`. A certificate the user accepts is saved with
+/// the session, so that it is only asked about again if it changes (SEC6, SEC8).
+#[tauri::command]
+pub async fn files_open_ftp(
+    files: State<'_, Files>,
+    setups: State<'_, KeySetups>,
+    services: State<'_, Arc<SshServices>>,
+    operation_id: String,
+    saved_session_id: String,
+    on_status: Channel<TerminalStatus>,
+) -> Result<OpenedFiles, AppError> {
+    let cancel = tokio_util::sync::CancellationToken::new();
+    setups
+        .running
+        .lock()
+        .unwrap()
+        .insert(operation_id.clone(), cancel.clone());
+    let result = async {
+        let path = services.sessions_file.clone();
+        let loaded = tokio::task::spawn_blocking({
+            let path = path.clone();
+            move || SessionStore::new(path).load()
+        })
+        .await
+        .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't read the saved sessions."))?;
+        if let Some(problem) = loaded.problem {
+            return Err(AppError::new(ErrorCode::InvalidInput, problem));
+        }
+        let Some(SavedSession::Ftp {
+            host,
+            port,
+            user,
+            security,
+            trusted_cert_sha256,
+            ..
+        }) = loaded
+            .file
+            .sessions
+            .iter()
+            .find(|s| s.id() == saved_session_id)
+            .cloned()
+        else {
+            return Err(AppError::new(
+                ErrorCode::NotFound,
+                "That isn't a saved FTP session.",
+            ));
+        };
+        let target = FtpTarget {
+            session_id: saved_session_id.clone(),
+            host,
+            port,
+            user,
+            security,
+            trusted_cert_sha256,
+        };
+        let prompter = Prompter::new(
+            services.broker.clone(),
+            Arc::new(QuestionSink { status: on_status }),
+            cancel.clone(),
+        );
+        let connecting = FtpFiles::connect(&target, &services.keychain, &prompter);
+        let opened = tokio::select! {
+            opened = connecting => opened?,
+            _ = cancel.cancelled() => return Err(AppError::new(ErrorCode::Cancelled, "Cancelled.")),
+        };
+        if let Some(fingerprint) = opened.accepted_cert {
+            // Remembering it is a convenience: if the file can't be written, the user is
+            // simply asked again next time.
+            let id = saved_session_id.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                let store = SessionStore::new(path);
+                let mut loaded = store.load();
+                if loaded.problem.is_some() {
+                    return;
+                }
+                for session in &mut loaded.file.sessions {
+                    if let SavedSession::Ftp {
+                        id: sid,
+                        trusted_cert_sha256,
+                        ..
+                    } = session
+                        && *sid == id
+                    {
+                        *trusted_cert_sha256 = fingerprint.clone();
+                    }
+                }
+                let _ = store.save(&loaded.file);
+            })
+            .await;
+        }
+        let home = opened.files.home().await.unwrap_or_else(|_| "/".into());
+        Ok(register(&files, Arc::new(opened.files), home, "/"))
+    }
+    .await;
+    setups.running.lock().unwrap().remove(&operation_id);
+    result
 }
 
 /// The files inside a WSL distribution, through its \\wsl.localhost\<distro>\ folder (W4).

@@ -2,6 +2,9 @@
 
 mod answers;
 mod backend;
+mod ftp;
+#[cfg(test)]
+mod ftp_tests;
 mod local;
 #[cfg(test)]
 pub(crate) mod memory;
@@ -15,6 +18,7 @@ mod sftp_tests;
 
 pub use answers::PendingAnswers;
 pub use backend::{COPY_BUFFER, FileBackend, FileCapabilities, FileEntry, FileKind, Progress};
+pub use ftp::{FtpFiles, FtpOpened, FtpTarget};
 pub use local::LocalFiles;
 pub use names::check_remote_name;
 pub use queue::{

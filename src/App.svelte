@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import "./lib/ui/theme.css";
   import {
     layoutGet,
@@ -62,6 +63,9 @@
   let newSessionSignal = $state(0);
   const library = new Library();
 
+  // An FTP session has no terminal. Opening one shows its files until another pane is chosen.
+  let ftpOpened = $state<{ kind: "ftp"; id: string; name: string } | null>(null);
+
   // The server whose files the panel shows: the one in the active pane, if it is an SSH session.
   const activeSession = $derived.by(() => {
     const tab = workspace.activeTab;
@@ -69,6 +73,7 @@
     if (leaf?.spec?.type === "ssh") {
       return { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title };
     }
+    if (ftpOpened) return ftpOpened;
     if (leaf?.spec?.type === "wsl") return { kind: "wsl" as const, distro: leaf.spec.distro, name: leaf.title };
     return null;
   });
@@ -84,8 +89,18 @@
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
       // The server's files appear beside the terminal.
       filesOpen = true;
+      ftpOpened = null;
+    } else if (session.type === "ftp") {
+      ftpOpened = { kind: "ftp", id: session.id, name: session.name };
+      filesOpen = true;
     }
   }
+  // Choosing another tab or pane goes back to following the terminal.
+  $effect(() => {
+    void workspace.activeTabId;
+    void workspace.activeTab?.active;
+    untrack(() => (ftpOpened = null));
+  });
   let restored = false;
   const options = $derived<NewTabOption[]>([
     ...[...shells]

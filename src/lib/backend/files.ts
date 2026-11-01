@@ -64,6 +64,20 @@ export function filesOpenSftp(
   return invoke<OpenedFiles>("files_open_sftp", { operationId, savedSessionId, onStatus: channel });
 }
 
+/**
+ * The files of a saved FTP or FTPS session. Plain FTP is warned about, and an unchecked
+ * certificate is asked about, through onStatus.
+ */
+export function filesOpenFtp(
+  operationId: string,
+  savedSessionId: string,
+  onStatus: (status: TerminalStatus) => void,
+): Promise<OpenedFiles> {
+  const channel = new Channel<TerminalStatus>();
+  channel.onmessage = onStatus;
+  return invoke<OpenedFiles>("files_open_ftp", { operationId, savedSessionId, onStatus: channel });
+}
+
 /** The files inside a WSL distribution (Windows only). */
 export function filesOpenWsl(distro: string): Promise<OpenedFiles> {
   return invoke<OpenedFiles>("files_open_wsl", { distro });

@@ -2,11 +2,12 @@
   import type { SavedSession } from "../backend";
   import Icon from "../ui/Icon.svelte";
   import ForwardsDialog from "./ForwardsDialog.svelte";
+  import FtpEditor from "./FtpEditor.svelte";
   import ImportDialog from "./ImportDialog.svelte";
   import KeySetupDialog from "./KeySetupDialog.svelte";
   import type { Library } from "./library.svelte";
   import SessionEditor from "./SessionEditor.svelte";
-  import { buildTree, newId, type SshSession, type TreeItem } from "./tree";
+  import { buildTree, newId, type FtpSession, type SshSession, type TreeItem } from "./tree";
 
   interface Props {
     library: Library;
@@ -22,6 +23,7 @@
   let collapsed = $state<Record<string, boolean>>({});
   let editor = $state<{ editing?: SshSession; folder?: string } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
+  let ftpEditor = $state<{ editing?: FtpSession; folder?: string } | null>(null);
   let importing = $state(false);
   let forwardsFor = $state<SshSession | null>(null);
   let keySetupFor = $state<SshSession | null>(null);
@@ -154,6 +156,11 @@
         <button class="icon-btn small accent" title="Connect in a new tab" onclick={() => onopen(item.session)}>
           <Icon name="play" size={13} />
         </button>
+        {#if item.session.type === "ftp"}
+          <button class="icon-btn small" title="Edit" onclick={() => (ftpEditor = { editing: item.session as FtpSession })}>
+            <Icon name="edit" size={13} />
+          </button>
+        {/if}
         {#if item.session.type === "ssh"}
           <button class="icon-btn small" title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>
             <Icon name="route" size={13} />
@@ -183,6 +190,9 @@
     <span class="head-tools">
       <button class="icon-btn" title="New SSH session" onclick={() => (editor = {})}>
         <Icon name="plus" size={16} />
+      </button>
+      <button class="icon-btn" title="New FTP session" onclick={() => (ftpEditor = {})}>
+        <Icon name="ftp" size={16} />
       </button>
       <button class="icon-btn" title="New folder" onclick={() => addFolder("")}>
         <Icon name="folder-plus" size={16} />
@@ -244,6 +254,10 @@
 
 {#if editor}
   <SessionEditor {library} editing={editor.editing} folder={editor.folder} onclose={() => (editor = null)} />
+{/if}
+
+{#if ftpEditor}
+  <FtpEditor {library} editing={ftpEditor.editing} folder={ftpEditor.folder} onclose={() => (ftpEditor = null)} />
 {/if}
 
 {#if forwardsFor}

@@ -59,6 +59,7 @@ pub fn run() {
             commands::files::files_delete_plan,
             commands::files::files_list,
             commands::files::files_mkdir,
+            commands::files::files_open_ftp,
             commands::files::files_open_local,
             commands::files::files_open_sftp,
             commands::files::files_open_wsl,

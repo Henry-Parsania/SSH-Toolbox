@@ -3,6 +3,7 @@
   import { promptRespond, type Prompt, type PromptResponse } from "../backend";
   import {
     filesClose,
+    filesOpenFtp,
     filesOpenLocal,
     filesOpenSftp,
     filesOpenWsl,
@@ -19,7 +20,11 @@
 
   interface Props {
     /** Whose files to show beside this computer's: a saved SSH session or a WSL distribution. */
-    source: { kind: "ssh"; id: string; name: string } | { kind: "wsl"; distro: string; name: string } | null;
+    source:
+      | { kind: "ssh"; id: string; name: string }
+      | { kind: "ftp"; id: string; name: string }
+      | { kind: "wsl"; distro: string; name: string }
+      | null;
     onclose: () => void;
   }
 
@@ -46,7 +51,11 @@
   // The server side follows the active pane: a different server means a different list.
   let openedFor: string | null = null;
   $effect(() => {
-    const wanted = source ? (source.kind === "ssh" ? `ssh:${source.id}` : `wsl:${source.distro}`) : null;
+    const wanted = source
+      ? source.kind === "wsl"
+        ? `wsl:${source.distro}`
+        : `${source.kind}:${source.id}`
+      : null;
     if (wanted === openedFor) return;
     openedFor = wanted;
     const old = remote;
@@ -59,12 +68,15 @@
     }
     remoteStatus = "Connecting…";
     const operation = crypto.randomUUID();
+    const ask = (status: { type: string; prompt_id?: string; prompt?: Prompt }) => {
+      if (status.type === "prompt") question = { id: status.prompt_id!, prompt: status.prompt! };
+    };
     const opening =
       source?.kind === "wsl"
         ? filesOpenWsl(source.distro)
-        : filesOpenSftp(operation, source!.kind === "ssh" ? source!.id : "", (status) => {
-            if (status.type === "prompt") question = { id: status.prompt_id, prompt: status.prompt };
-          });
+        : source?.kind === "ftp"
+          ? filesOpenFtp(operation, source.id, ask)
+          : filesOpenSftp(operation, source!.kind === "ssh" ? source!.id : "", ask);
     opening.then(
       (opened) => {
         question = null;
@@ -178,7 +190,7 @@
         onstartdrag={(count) => startDrag("remote", count)}
         reloadSignal={refresh}
         files={remote}
-        status={source ? remoteStatus : "Open an SSH or WSL session in the active pane to see its files here."}
+        status={source ? remoteStatus : "Open an SSH or WSL session, or an FTP session from the list, to see its files here."}
         bind:path={remotePath}
         transferLabel="Download"
         transferIcon="down"

@@ -3,6 +3,7 @@
 import type { SavedFolder, SavedSession, SessionsFile } from "../backend";
 
 export type SshSession = Extract<SavedSession, { type: "ssh" }>;
+export type FtpSession = Extract<SavedSession, { type: "ftp" }>;
 
 export type TreeItem =
   | { kind: "folder"; folder: SavedFolder; children: TreeItem[] }
@@ -79,6 +80,17 @@ export function checkSshForm(form: SshForm): string | null {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return "The port must be between 1 and 65535.";
   if (!form.user.trim()) return "Enter the user name.";
   if (form.auth === "key" && !form.key_path.trim()) return "Choose the private key file.";
+  return null;
+}
+
+/** The message for the first thing wrong with an FTP form, or null if it is fine. */
+export function checkFtpForm(form: { name: string; host: string; port: string | number }): string | null {
+  if (!form.name.trim()) return "Give the session a name.";
+  const host = form.host.trim();
+  if (!host) return "Enter the host.";
+  if (/\s/.test(host)) return "The host can't contain spaces.";
+  const port = Number(form.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return "The port must be between 1 and 65535.";
   return null;
 }
 
