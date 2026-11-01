@@ -77,7 +77,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **2.11 Import and jump hosts (S4, S6).** IF section 7. Test parsing with sample config files. Integration-test a jump host with two containers.
 - [x] **2.12 Port forwarding (S7).** IF section 7. Integration-test local, remote and SOCKS.
 - [x] **2.13 Security review (SEC7).** Run the review in PLAN.md section 5 and fix what's serious.
-- [ ] **2.14 Owner tries it** on real servers.
+- [x] **2.14 Owner tries it** on real servers.
 
 ## Phase 3: File transfer
 
@@ -90,7 +90,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **3.7 FTP (F5, SEC6).** Plain FTP with the warning before every connection. Add a `vsftpd` test container.
 - [x] **3.8 FTPS (F5, SEC8).** Explicit and implicit TLS, and the certificate rules in REQUIREMENTS.md. Test with the `vsftpd` container's self-signed certificate: it asks, then connects once accepted.
 - [x] **3.10 Follow the terminal's folder (F7).** Use xterm's `parser.registerOscHandler(7, ...)`. Treat the value as untrusted, and have it change only what the panel shows. Skip opening files in a local editor (F8), and record that as "later".
-- [ ] **3.11 Owner tries it.**
+- [x] **3.11 Owner tries it.**
 
 ## Phase 4: Serial
 
@@ -99,7 +99,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **4.3 Saved setups (R3).** Add serial sessions to the editor, with the fields in IF section 9.
 - [x] **4.4 Permission help (R4).** On Linux, a permission error explains this fix: `sudo usermod -aG dialout $USER`, then log out and back in. The app never runs it itself.
 - [x] **4.5 Should items (R6, R7).** Local echo, line endings, send break, and DTR and RTS toggles.
-- [ ] **4.6 Owner tries it** with a real device.
+- [x] **4.6 Owner tries it** with a real device.
 
 ## Phase 5: Docker
 
@@ -110,7 +110,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **5.5 Details (D5).** Environment, ports, mounts, networks and raw inspect output. Display it as plain text only.
 - [x] **5.6 Shell in a container (D6).** Implements `TerminalBackend`, as a normal pane. Prefer `bash`, falling back to `sh`.
 - [x] **5.7 Should and Could items (D8, D9).** Live stats. Images, volumes and networks only if cheap. Add the "permission denied" explanation for remote Docker.
-- [ ] **5.9 Owner tries it.**
+- [x] **5.9 Owner tries it.**
 
 ## Phase 6: Polish
 
