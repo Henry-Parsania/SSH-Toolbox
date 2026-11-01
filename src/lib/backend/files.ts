@@ -23,6 +23,8 @@ export interface OpenedFiles {
   home: string;
   /** Whether permissions can be changed here. */
   chmod: boolean;
+  /** Whether "delete as root" (sudo) is offered. */
+  root_delete: boolean;
   /** "/" for servers; a backslash or "/" for this computer. */
   separator: string;
 }
@@ -129,6 +131,14 @@ export function filesDeletePlan(id: string, path: string): Promise<{ files: numb
 
 export function filesDelete(id: string, path: string): Promise<void> {
   return invoke<void>("files_delete", { id, path });
+}
+
+/**
+ * Deletes with sudo on the server. `password` is the sudo password (empty if none is needed). It
+ * is sent once and not kept.
+ */
+export function filesDeleteAsRoot(id: string, path: string, password: string): Promise<void> {
+  return invoke<void>("files_delete_as_root", { id, path, password });
 }
 
 /** Queues a file or folder: fromPath on one side is copied into the folder toDir on the other. */

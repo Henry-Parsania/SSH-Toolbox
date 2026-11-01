@@ -487,7 +487,10 @@ fn parse_line(line: &str, machine: bool) -> Option<ListedFile> {
 #[async_trait]
 impl FileBackend for FtpFiles {
     fn capabilities(&self) -> FileCapabilities {
-        FileCapabilities { chmod: false }
+        FileCapabilities {
+            chmod: false,
+            root_delete: false,
+        }
     }
 
     async fn list(&self, path: &str) -> Result<Vec<FileEntry>, AppError> {

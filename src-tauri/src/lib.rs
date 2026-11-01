@@ -88,6 +88,7 @@ pub fn run() {
             commands::files::files_chmod,
             commands::files::files_close,
             commands::files::files_delete,
+            commands::files::files_delete_as_root,
             commands::files::files_delete_plan,
             commands::files::files_list,
             commands::files::files_mkdir,

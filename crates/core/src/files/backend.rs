@@ -3,7 +3,7 @@ use serde::Serialize;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::sync::CancellationToken;
 
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -29,6 +29,8 @@ pub struct FileEntry {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct FileCapabilities {
     pub chmod: bool,
+    /// Whether `remove_as_root` works (servers reached over SSH).
+    pub root_delete: bool,
 }
 
 /// Reports how many bytes have been moved so far.
@@ -49,6 +51,15 @@ pub trait FileBackend: Send + Sync {
     async fn remove_dir(&self, path: &str) -> Result<(), AppError>;
     /// `Unsupported` when `capabilities().chmod` is false.
     async fn chmod(&self, path: &str, mode: u32) -> Result<(), AppError>;
+    /// Deletes a file or a folder with everything in it, as the server's administrator, using
+    /// `sudo`. `password` is the sudo password, or none if none is needed. `Unsupported` when
+    /// `capabilities().root_delete` is false.
+    async fn remove_as_root(&self, _path: &str, _password: Option<&str>) -> Result<(), AppError> {
+        Err(AppError::new(
+            ErrorCode::Unsupported,
+            "Deleting as root isn't available here.",
+        ))
+    }
     /// Streams the file into `dest`. Stops with `Cancelled` when `cancel` fires.
     async fn read_to(
         &self,

@@ -65,6 +65,8 @@ pub struct OpenedFiles {
     /// Where to start looking.
     pub home: String,
     pub chmod: bool,
+    /// Whether "delete as root" is offered.
+    pub root_delete: bool,
     /// `/` for servers; `\` or `/` for this computer.
     pub separator: String,
 }
@@ -76,12 +78,13 @@ fn register(
     separator: &str,
 ) -> OpenedFiles {
     let id = uuid::Uuid::new_v4().to_string();
-    let chmod = backend.capabilities().chmod;
+    let caps = backend.capabilities();
     files.backends.lock().unwrap().insert(id.clone(), backend);
     OpenedFiles {
         id,
         home,
-        chmod,
+        chmod: caps.chmod,
+        root_delete: caps.root_delete,
         separator: separator.to_string(),
     }
 }
@@ -330,6 +333,19 @@ pub async fn files_delete(
     } else {
         backend.remove_file(&path).await
     }
+}
+
+/// Deletes as the server's administrator with `sudo`. `password` is the sudo password, or empty
+/// if none is needed. It is passed on and forgotten: never stored, logged or returned.
+#[tauri::command]
+pub async fn files_delete_as_root(
+    files: State<'_, Files>,
+    id: String,
+    path: String,
+    password: Option<String>,
+) -> Result<(), AppError> {
+    let backend = files.backend(&id)?;
+    backend.remove_as_root(&path, password.as_deref()).await
 }
 
 #[derive(Serialize)]

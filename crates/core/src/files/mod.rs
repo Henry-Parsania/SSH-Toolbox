@@ -15,6 +15,7 @@ mod queue_tests;
 mod sftp;
 #[cfg(test)]
 mod sftp_tests;
+mod sudo;
 
 pub use answers::PendingAnswers;
 pub use backend::{COPY_BUFFER, FileBackend, FileCapabilities, FileEntry, FileKind, Progress};

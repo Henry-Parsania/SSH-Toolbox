@@ -35,7 +35,9 @@
     | "stop"
     | "info"
     | "log"
-    | "monitor";
+    | "monitor"
+    | "copy"
+    | "shield";
 
   interface Props {
     name: IconName;
@@ -82,6 +84,8 @@
     info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5h.01",
     log: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M9 13h6M9 17h6",
     monitor: "M3 5h18v11H3zM8 20h8M12 16v4M6 13l3-4 3 3 3-5 3 4",
+    copy: "M9 9h10a1 1 0 011 1v10a1 1 0 01-1 1H9a1 1 0 01-1-1V10a1 1 0 011-1zM16 9V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3",
+    shield: "M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3zM9.5 12l2 2 3.5-4",
   };
 </script>
 

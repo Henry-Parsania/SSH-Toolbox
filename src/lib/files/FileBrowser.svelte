@@ -3,6 +3,7 @@
   import {
     filesChmod,
     filesDelete,
+    filesDeleteAsRoot,
     filesDeletePlan,
     filesList,
     filesMkdir,
@@ -11,7 +12,7 @@
     type OpenedFiles,
   } from "../backend/files";
   import Icon, { type IconName } from "../ui/Icon.svelte";
-  import { baseName, formatSize, formatTime, joinPath, modeToText, parentPath, parseMode, rootPath, sortEntries } from "./paths";
+  import { baseName, formatSize, formatTime, joinPath, modeToText, parentPath, parseMode, rootPath, shellQuote, sortEntries } from "./paths";
 
   interface Props {
     title: string;
@@ -35,9 +36,11 @@
     onstartdrag?: (count: number) => void;
     /** An extra small button among the tools, such as sending the folder to a terminal. */
     extra?: { icon: IconName; title: string; disabled?: boolean; onclick: () => void };
+    /** Types text at the prompt of the terminal this list belongs to (not available on every list). */
+    oncopytoterminal?: (text: string) => void;
   }
 
-  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra }: Props = $props();
+  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
 
   let entries = $state<FileEntry[]>([]);
   let loading = $state(false);
@@ -51,8 +54,14 @@
     | { kind: "mkdir"; value: string }
     | { kind: "rename"; entry: FileEntry; value: string }
     | { kind: "delete"; entries: FileEntry[]; files: number; folders: number }
-    | { kind: "chmod"; entry: FileEntry; value: string };
+    | { kind: "chmod"; entry: FileEntry; value: string }
+    | { kind: "props"; entry: FileEntry }
+    | { kind: "root"; entries: FileEntry[]; password: string };
   let dialog = $state<Dialog | null>(null);
+
+  // The right-click menu. `entry` is null when the click was on empty space.
+  let menu = $state<{ x: number; y: number; entry: FileEntry | null } | null>(null);
+  let note = $state("");
   let dialogError = $state("");
   let working = $state(false);
 
@@ -186,9 +195,69 @@
     }
   }
 
+  function openMenu(e: MouseEvent, entry: FileEntry | null) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (entry && !selected.includes(entry.name)) {
+      selected = [entry.name];
+      anchor = entry.name;
+    }
+    // Keep the menu on screen; it is about 230 by 330 pixels.
+    menu = { x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 340), entry };
+  }
+
+  function closeMenu() {
+    menu = null;
+  }
+
+  function startRootDelete() {
+    if (chosen.length === 0) return;
+    dialogError = "";
+    dialog = { kind: "root", entries: chosen, password: "" };
+  }
+
+  function say(text: string) {
+    note = text;
+    setTimeout(() => {
+      if (note === text) note = "";
+    }, 2500);
+  }
+
+  function copyPaths() {
+    const text = chosen.map(pathOf).join("\n");
+    navigator.clipboard.writeText(text).then(
+      () => say(chosen.length === 1 ? "Path copied." : `${chosen.length} paths copied.`),
+      () => say("Couldn't copy to the clipboard."),
+    );
+  }
+
+  /** Types the selected paths, quoted for the shell, at the terminal's prompt. Nothing is run. */
+  function copyToTerminal(rows: FileEntry[] = chosen) {
+    if (!oncopytoterminal || rows.length === 0) return;
+    oncopytoterminal(rows.map((r) => shellQuote(pathOf(r))).join(" ") + " ");
+    say("Typed into the terminal.");
+  }
+
+  function showProperties() {
+    if (chosen.length === 1) dialog = { kind: "props", entry: chosen[0] };
+  }
+
+  function startChmod() {
+    if (chosen.length !== 1) return;
+    dialog = {
+      kind: "chmod",
+      entry: chosen[0],
+      value: chosen[0].permissions === null ? "" : (chosen[0].permissions & 0o777).toString(8),
+    };
+  }
+
   async function confirm() {
     const d = dialog;
     if (!d || !files) return;
+    if (d.kind === "props") {
+      dialog = null;
+      return;
+    }
     working = true;
     dialogError = "";
     try {
@@ -206,12 +275,15 @@
         const mode = parseMode(d.value);
         if (mode === null) throw { message: "Use three or four digits from 0 to 7, such as 755." };
         await filesChmod(files.id, pathOf(d.entry), mode);
+      } else if (d.kind === "root") {
+        for (const entry of d.entries) await filesDeleteAsRoot(files.id, pathOf(entry), d.password);
+        d.password = "";
       }
       dialog = null;
       reload();
     } catch (err) {
       dialogError = (err as { message?: string }).message ?? "That didn't work.";
-      if (d.kind === "delete") reload();
+      if (d.kind === "delete" || d.kind === "root") reload();
     } finally {
       working = false;
     }
@@ -223,7 +295,8 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (dialog) return;
-    if (e.key === "Delete") void startDelete();
+    if (e.key === "Delete" && e.shiftKey && files?.root_delete) startRootDelete();
+    else if (e.key === "Delete") void startDelete();
     else if (e.key === "F2" && chosen.length === 1) dialog = { kind: "rename", entry: chosen[0], value: chosen[0].name };
     else if (e.key === "Enter" && chosen.length === 1) open(chosen[0]);
     else if (e.key === "Backspace") go(parentPath(path, sep));
@@ -305,7 +378,7 @@
   {:else}
     {#if error}<p class="message error inline">{error}</p>{/if}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown}>
+    <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown} oncontextmenu={(e) => openMenu(e, null)}>
       {#if parentPath(path, sep) !== path}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
@@ -333,6 +406,9 @@
           aria-selected={selected.includes(entry.name)}
           tabindex="-1"
           onpointerdown={(e) => rowPointerDown(entry, e)}
+          onmousedown={(e) => e.button === 1 && e.preventDefault()}
+          onauxclick={(e) => e.button === 1 && copyToTerminal([entry])}
+          oncontextmenu={(e) => openMenu(e, entry)}
           onclick={(e) => pick(entry, e)}
           ondblclick={() => open(entry)}
         >
@@ -358,7 +434,7 @@
         <input type="checkbox" bind:checked={showHidden} /> Hidden files
       </label>
       <span class="count">
-        {#if chosen.length}{chosen.length} selected{:else}{visible.length} items{/if}
+        {#if note}{note}{:else if chosen.length}{chosen.length} selected{:else}{visible.length} items{/if}
       </span>
       {#if ontransfer}
         <button class="btn small primary" disabled={chosen.length === 0} onclick={transfer}>
@@ -369,6 +445,45 @@
     </footer>
   {/if}
 </section>
+
+<svelte:window onpointerdown={closeMenu} onblur={closeMenu} onkeydown={(e) => e.key === "Escape" && closeMenu()} />
+
+{#if menu}
+  {@const one = chosen.length === 1 ? chosen[0] : null}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <ul class="menu ctx" role="menu" style:left="{menu.x}px" style:top="{menu.y}px" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    {#if menu.entry && chosen.length > 0}
+      {#if one && (one.kind === "dir" || one.kind === "symlink")}
+        <li><button onclick={() => { closeMenu(); open(one); }}><Icon name="folder" size={14} /> Open</button></li>
+      {/if}
+      {#if ontransfer}
+        <li><button onclick={() => { closeMenu(); transfer(); }}><Icon name={transferIcon} size={14} /> {transferLabel}</button></li>
+      {/if}
+      <li class="sep" role="separator"></li>
+      <li><button onclick={() => { closeMenu(); void startDelete(); }}><Icon name="trash" size={14} /> Delete</button></li>
+      {#if files?.root_delete}
+        <li><button onclick={() => { closeMenu(); startRootDelete(); }}><Icon name="shield" size={14} /> Delete as root (sudo)…</button></li>
+      {/if}
+      {#if one}
+        <li><button onclick={() => { closeMenu(); dialog = { kind: "rename", entry: one, value: one.name }; }}><Icon name="edit" size={14} /> Rename</button></li>
+      {/if}
+      <li class="sep" role="separator"></li>
+      <li><button onclick={() => { closeMenu(); copyPaths(); }}><Icon name="copy" size={14} /> Copy file path</button></li>
+      {#if oncopytoterminal}
+        <li><button onclick={() => { closeMenu(); copyToTerminal(); }}><Icon name="terminal" size={14} /> Copy file path to terminal <span class="hintkey">(middle click)</span></button></li>
+      {/if}
+      {#if one}
+        <li><button onclick={() => { closeMenu(); showProperties(); }}><Icon name="info" size={14} /> Properties</button></li>
+        {#if files?.chmod}
+          <li><button onclick={() => { closeMenu(); startChmod(); }}><Icon name="key" size={14} /> Permissions</button></li>
+        {/if}
+      {/if}
+      <li class="sep" role="separator"></li>
+    {/if}
+    <li><button onclick={() => { closeMenu(); dialog = { kind: "mkdir", value: "" }; }}><Icon name="folder-plus" size={14} /> New folder</button></li>
+    <li><button onclick={() => { closeMenu(); reload(); }}><Icon name="refresh" size={14} /> Refresh</button></li>
+  </ul>
+{/if}
 
 {#if dialog}
   <div class="modal-backdrop">
@@ -407,6 +522,31 @@
             {#if parseMode(dialog.value) !== null}{modeToText(parseMode(dialog.value)!)}{:else}Three digits, for example 644 or 755.{/if}
           </small>
         </label>
+      {:else if dialog.kind === "props"}
+        {@const p = dialog.entry}
+        <h2>Properties</h2>
+        <dl class="props">
+          <dt>Name</dt><dd>{p.name}</dd>
+          <dt>Path</dt><dd class="mono">{pathOf(p)}</dd>
+          <dt>Type</dt><dd>{p.kind === "dir" ? "Folder" : p.kind === "symlink" ? "Link" : p.kind === "file" ? "File" : "Other"}</dd>
+          {#if p.size !== null}<dt>Size</dt><dd>{formatSize(p.size)} ({p.size.toLocaleString()} bytes)</dd>{/if}
+          {#if p.modified !== null}<dt>Changed</dt><dd>{formatTime(p.modified)}</dd>{/if}
+          {#if p.permissions !== null}
+            <dt>Permissions</dt><dd class="mono">{modeToText(p.permissions & 0o777)} ({(p.permissions & 0o777).toString(8)})</dd>
+          {/if}
+        </dl>
+      {:else if dialog.kind === "root"}
+        <h2>Delete as root</h2>
+        <p class="lead">
+          {#if dialog.entries.length === 1}{dialog.entries[0].name}{:else}{dialog.entries.length} items{/if}
+          will be removed with <code>sudo rm -r</code> on the server, including everything inside folders. This can't be undone.
+        </p>
+        <label class="field">
+          sudo password
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="password" autofocus autocomplete="off" bind:value={dialog.password} placeholder="Leave empty if sudo doesn't ask" onkeydown={(e) => e.key === "Enter" && confirm()} />
+          <small>Used once to run this command. It isn't saved.</small>
+        </label>
       {:else}
         <h2>Delete {dialog.entries.length === 1 ? baseName(dialog.entries[0].name) : `${dialog.entries.length} items`}?</h2>
         <p class="lead">
@@ -420,9 +560,11 @@
       {#if dialogError}<p class="message error">{dialogError}</p>{/if}
       <div class="modal-actions">
         <!-- svelte-ignore a11y_autofocus -->
-        <button class="btn" autofocus={dialog.kind === "delete"} onclick={() => (dialog = null)}>Cancel</button>
-        <button class="btn {dialog.kind === 'delete' ? 'danger' : 'primary'}" disabled={working} onclick={confirm}>
-          {dialog.kind === "delete" ? "Delete" : dialog.kind === "mkdir" ? "Create" : "OK"}
+        {#if dialog.kind !== "props"}
+          <button class="btn" autofocus={dialog.kind === "delete"} onclick={() => (dialog = null)}>Cancel</button>
+        {/if}
+        <button class="btn {dialog.kind === 'delete' || dialog.kind === 'root' ? 'danger' : 'primary'}" disabled={working} onclick={confirm}>
+          {dialog.kind === "delete" || dialog.kind === "root" ? "Delete" : dialog.kind === "mkdir" ? "Create" : dialog.kind === "props" ? "Close" : "OK"}
         </button>
       </div>
     </div>
@@ -460,6 +602,40 @@
   .tools :global(.icon-btn:disabled) {
     opacity: 0.35;
     pointer-events: none;
+  }
+  .ctx {
+    position: fixed;
+    z-index: 60;
+    min-width: 230px;
+  }
+  .ctx li {
+    list-style: none;
+  }
+  .ctx .sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
+  }
+  .hintkey {
+    color: var(--text-faint);
+    font-size: 11px;
+  }
+  .props {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 14px;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  .props dt {
+    color: var(--text-faint);
+  }
+  .props dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .mono {
+    font-family: var(--mono);
   }
   .pathbar {
     padding: 0 10px 6px;

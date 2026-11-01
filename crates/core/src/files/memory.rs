@@ -120,7 +120,10 @@ fn not_found(path: &str) -> AppError {
 #[async_trait]
 impl FileBackend for MemoryFiles {
     fn capabilities(&self) -> FileCapabilities {
-        FileCapabilities { chmod: false }
+        FileCapabilities {
+            chmod: false,
+            root_delete: false,
+        }
     }
 
     async fn list(&self, path: &str) -> Result<Vec<FileEntry>, AppError> {

@@ -80,7 +80,10 @@ fn cancelled() -> AppError {
 #[async_trait]
 impl FileBackend for LocalFiles {
     fn capabilities(&self) -> FileCapabilities {
-        FileCapabilities { chmod: cfg!(unix) }
+        FileCapabilities {
+            chmod: cfg!(unix),
+            root_delete: false,
+        }
     }
 
     async fn list(&self, path: &str) -> Result<Vec<FileEntry>, AppError> {

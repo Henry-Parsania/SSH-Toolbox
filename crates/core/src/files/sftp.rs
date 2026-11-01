@@ -125,7 +125,14 @@ impl SftpFiles {
 #[async_trait]
 impl FileBackend for SftpFiles {
     fn capabilities(&self) -> FileCapabilities {
-        FileCapabilities { chmod: true }
+        FileCapabilities {
+            chmod: true,
+            root_delete: true,
+        }
+    }
+
+    async fn remove_as_root(&self, path: &str, password: Option<&str>) -> Result<(), AppError> {
+        super::sudo::remove_as_root(&self._connection.handle, path, password).await
     }
 
     async fn list(&self, path: &str) -> Result<Vec<FileEntry>, AppError> {

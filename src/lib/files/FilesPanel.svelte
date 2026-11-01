@@ -231,6 +231,16 @@
     }
   }
 
+  /** Types text at the terminal's prompt without pressing Enter. */
+  async function typeAtPrompt(text: string) {
+    try {
+      await terminalWrite(terminalSession, new TextEncoder().encode(text));
+      moved = "";
+    } catch (err) {
+      moved = (err as { message?: string }).message ?? "Couldn't send that to the terminal.";
+    }
+  }
+
   // Most shells don't say which folder they are in, so following needs a little help: this types
   // one line into the shell that makes it report its folder (bash and zsh).
   const REPORT_LINE =
@@ -289,6 +299,7 @@
         onstartdrag={(count) => startDrag("remote", count)}
         reloadSignal={refresh}
         files={remote}
+        oncopytoterminal={source?.kind === "ssh" && terminalSession ? typeAtPrompt : undefined}
         extra={source?.kind === "ssh"
           ? {
               icon: "terminal",
