@@ -542,6 +542,24 @@
           Octal mode
           <!-- svelte-ignore a11y_autofocus -->
           <input type="text" autofocus bind:value={dialog.value} placeholder="755" onkeydown={(e) => e.key === "Enter" && confirm()} />
+          <div class="bits" role="group" aria-label="Permission bits">
+            <span></span><span>Read</span><span>Write</span><span>Run</span>
+            {#each [["Owner", 6], ["Group", 3], ["Others", 0]] as [who, shift] (who)}
+              <span class="who">{who}</span>
+              {#each [4, 2, 1] as bit (bit)}
+                <input
+                  type="checkbox"
+                  aria-label="{who} {bit === 4 ? 'read' : bit === 2 ? 'write' : 'run'}"
+                  checked={((parseMode(dialog.value) ?? 0) & (bit << Number(shift))) !== 0}
+                  onchange={() => {
+                    if (dialog?.kind !== "chmod") return;
+                    const next = (parseMode(dialog.value) ?? 0) ^ (bit << Number(shift));
+                    dialog.value = (next & 0o777).toString(8).padStart(3, "0");
+                  }}
+                />
+              {/each}
+            {/each}
+          </div>
           <small>
             {#if parseMode(dialog.value) !== null}{modeToText(parseMode(dialog.value)!)}{:else}Three digits, for example 644 or 755.{/if}
           </small>
@@ -643,6 +661,19 @@
   .hintkey {
     color: var(--text-faint);
     font-size: 11px;
+  }
+  .bits {
+    display: grid;
+    grid-template-columns: 70px repeat(3, 1fr);
+    gap: 6px 8px;
+    align-items: center;
+    justify-items: start;
+    margin: 10px 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .bits input {
+    margin: 0 0 0 6px;
   }
   .props {
     display: grid;
