@@ -11,7 +11,7 @@
     type OpenedFiles,
   } from "../backend/files";
   import Icon, { type IconName } from "../ui/Icon.svelte";
-  import { baseName, formatSize, formatTime, joinPath, modeToText, parentPath, parseMode, sortEntries } from "./paths";
+  import { baseName, formatSize, formatTime, joinPath, modeToText, parentPath, parseMode, rootPath, sortEntries } from "./paths";
 
   interface Props {
     title: string;
@@ -238,7 +238,10 @@
         <Icon name="up" size={14} />
       </button>
       <button class="icon-btn small" title="Home folder" disabled={!files} onclick={() => files && go(files.home)}>
-        <Icon name="folder" size={14} />
+        <Icon name="home" size={14} />
+      </button>
+      <button class="icon-btn small" title="Top folder (root)" disabled={!files} onclick={() => files && go(rootPath(path, sep))}>
+        <Icon name="server" size={14} />
       </button>
       <button class="icon-btn small" title="Refresh" disabled={!files} onclick={reload}>
         <Icon name="refresh" size={14} />
@@ -296,6 +299,13 @@
     {#if error}<p class="message error inline">{error}</p>{/if}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown}>
+      {#if parentPath(path, sep) !== path}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="row up" role="option" aria-selected="false" tabindex="-1" onclick={() => go(parentPath(path, sep))}>
+          <span class="icon dir"><Icon name="up" size={14} /></span>
+          <span class="name">..</span>
+        </div>
+      {/if}
       {#each visible as entry (entry.name)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
@@ -455,6 +465,9 @@
     border-radius: var(--radius-s);
     cursor: default;
     user-select: none;
+  }
+  .row.up .name {
+    color: var(--text-muted);
   }
   .row:hover {
     background: var(--bg-hover);

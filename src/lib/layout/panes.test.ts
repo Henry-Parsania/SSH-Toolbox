@@ -6,6 +6,7 @@ import {
   leaves,
   moveDivider,
   neighbour,
+  placeAll,
   newLeaf,
   splitPane,
   updateLeaf,
@@ -235,5 +236,24 @@ describe("helpers", () => {
 
   it("gives each new pane its own id", () => {
     expect(newLeaf(null, "x").pane_id).not.toBe(newLeaf(null, "x").pane_id);
+  });
+});
+
+describe("placeAll", () => {
+  it("lets each column of a grid have its own horizontal divider", () => {
+    const [a, b, c, d] = ["a", "b", "c", "d"].map((id) => newLeaf(null, id, id));
+    let tree: PaneNode = splitPane(a, "a", "row", b);
+    tree = splitPane(tree, "a", "column", c);
+    tree = splitPane(tree, "b", "column", d);
+    const before = placeAll(tree);
+    expect(before.panes).toHaveLength(4);
+    expect(before.dividers.filter((x) => x.direction === "column")).toHaveLength(2);
+
+    const left = before.dividers.find((x) => x.direction === "column" && x.split.left === 0)!;
+    tree = moveDivider(tree, left.path, left.index, 0.2);
+    const after = placeAll(tree);
+    const edge = (id: string) => after.panes.find((p) => p.leaf.pane_id === id)!.rect.bottom;
+    expect(edge("a")).toBeCloseTo(0.7);
+    expect(edge("b")).toBeCloseTo(0.5);
   });
 });

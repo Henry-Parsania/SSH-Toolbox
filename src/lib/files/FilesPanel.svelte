@@ -220,7 +220,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    width: 420px;
+    width: 100%;
     flex: none;
     min-height: 0;
     background: var(--bg-1);

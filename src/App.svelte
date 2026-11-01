@@ -28,6 +28,36 @@
   let showSettings = $state(false);
   let sidebarOpen = $state(true);
   let filesOpen = $state(false);
+  // Widths of the two side panels, which can be dragged. They are kept for next time.
+  const saved = (key: string, fallback: number) => {
+    const n = Number(localStorage.getItem(key));
+    return n >= 180 && n <= 1200 ? n : fallback;
+  };
+  let sidebarWidth = $state(saved("sidebar-width", 264));
+  let filesWidth = $state(saved("files-width", 460));
+
+  function resizeSide(e: PointerEvent, side: "sidebar" | "files") {
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const start = e.clientX;
+    const from = side === "sidebar" ? sidebarWidth : filesWidth;
+    const move = (ev: PointerEvent) => {
+      const delta = ev.clientX - start;
+      const wanted = Math.round(side === "sidebar" ? from + delta : from - delta);
+      const width = Math.min(Math.max(wanted, 200), Math.max(240, window.innerWidth - 360));
+      if (side === "sidebar") sidebarWidth = width;
+      else filesWidth = width;
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", stop);
+      handle.removeEventListener("pointercancel", stop);
+      localStorage.setItem(side === "sidebar" ? "sidebar-width" : "files-width", String(side === "sidebar" ? sidebarWidth : filesWidth));
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+  }
   // Counts up each time something asks the sidebar to start a new session.
   let newSessionSignal = $state(0);
   const library = new Library();
@@ -166,7 +196,11 @@
     />
     <div class="body">
       {#if sidebarOpen}
-        <Sidebar {library} onopen={openSaved} {newSessionSignal} />
+        <div class="side" style:width="{sidebarWidth}px">
+          <Sidebar {library} onopen={openSaved} {newSessionSignal} />
+        </div>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="grip" onpointerdown={(e) => resizeSide(e, "sidebar")}></div>
       {/if}
       <main class="tabs">
         {#each workspace.tabs as tab (tab.id)}
@@ -206,7 +240,11 @@
         {/if}
       </main>
       {#if filesOpen}
-        <FilesPanel source={activeSession} onclose={() => (filesOpen = false)} />
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
+        <div class="side" style:width="{filesWidth}px">
+          <FilesPanel source={activeSession} onclose={() => (filesOpen = false)} />
+        </div>
       {/if}
     </div>
   </div>
@@ -225,6 +263,26 @@
     display: flex;
     flex: 1;
     min-height: 0;
+  }
+  .side {
+    display: flex;
+    flex: none;
+    min-width: 0;
+    min-height: 0;
+  }
+  /* A thin strip between a side panel and the terminals that can be dragged. */
+  .grip {
+    flex: none;
+    width: 7px;
+    margin: 0 -3px;
+    z-index: 6;
+    cursor: col-resize;
+    touch-action: none;
+    background: transparent;
+    transition: background 0.12s var(--ease);
+  }
+  .grip:hover {
+    background: var(--accent-soft);
   }
   .tabs {
     position: relative;

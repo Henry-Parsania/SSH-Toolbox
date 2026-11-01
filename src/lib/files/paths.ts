@@ -19,6 +19,17 @@ export function parentPath(path: string, sep: string): string {
   return /^[A-Za-z]:$/.test(parent) ? parent + sep : parent;
 }
 
+/** The top of the tree the path is in: "/" on a server, "C:\\" on a drive. */
+export function rootPath(path: string, sep: string): string {
+  let here = path;
+  for (let i = 0; i < 64; i++) {
+    const up = parentPath(here, sep);
+    if (up === here) break;
+    here = up;
+  }
+  return here;
+}
+
 /** The last part of a path. */
 export function baseName(path: string): string {
   const trimmed = path.replace(/[\\/]+$/, "");
