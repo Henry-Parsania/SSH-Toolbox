@@ -76,6 +76,8 @@ pub struct Accepts {
     pub sh: Option<String>,
     /// Lets clients open `direct-tcpip` channels, which is what a jump host does.
     pub allow_forwarding: bool,
+    /// Offers SFTP, serving this folder as its root.
+    pub sftp_root: Option<std::path::PathBuf>,
 }
 
 /// What happened on the server, for tests to look at.
@@ -90,6 +92,8 @@ pub struct Stats {
     pub shells: AtomicUsize,
     /// `direct-tcpip` channels that were opened (connections made through this server).
     pub forwarded: AtomicUsize,
+    /// SFTP sessions that were started.
+    pub sftp_sessions: AtomicUsize,
     /// Channels that carry a forwarded connection, in either direction: their data belongs to the
     /// stream, not to a shell.
     pub forwarding_channels: Mutex<std::collections::HashSet<ChannelId>>,
@@ -101,7 +105,12 @@ struct TestServer(Arc<Accepts>, Arc<Stats>);
 impl server::Server for TestServer {
     type Handler = TestHandler;
     fn new_client(&mut self, _peer: Option<std::net::SocketAddr>) -> TestHandler {
-        TestHandler(self.0.clone(), self.1.clone(), HashMap::new())
+        TestHandler(
+            self.0.clone(),
+            self.1.clone(),
+            HashMap::new(),
+            HashMap::new(),
+        )
     }
 }
 
@@ -109,6 +118,8 @@ pub struct TestHandler(
     Arc<Accepts>,
     Arc<Stats>,
     HashMap<ChannelId, (String, Vec<u8>)>,
+    /// Session channels the server was given, kept for a subsystem that wants one.
+    HashMap<ChannelId, Channel<Msg>>,
 );
 
 impl server::Handler for TestHandler {
@@ -116,11 +127,38 @@ impl server::Handler for TestHandler {
 
     async fn channel_open_session(
         &mut self,
-        _channel: Channel<Msg>,
+        channel: Channel<Msg>,
         reply: russh::server::ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
+        self.3.insert(channel.id(), channel);
         reply.accept().await;
+        Ok(())
+    }
+
+    /// SFTP, served from a folder, when the test asks for it.
+    async fn subsystem_request(
+        &mut self,
+        channel_id: ChannelId,
+        name: &str,
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        match (name, self.0.sftp_root.clone(), self.3.remove(&channel_id)) {
+            ("sftp", Some(root), Some(channel)) => {
+                session.channel_success(channel_id)?;
+                self.1.sftp_sessions.fetch_add(1, Ordering::SeqCst);
+                // The channel carries SFTP now, so the shell logic must leave its data alone.
+                self.1
+                    .forwarding_channels
+                    .lock()
+                    .unwrap()
+                    .insert(channel_id);
+                russh_sftp::server::run(channel.into_stream(), sftp_server::Files::new(root)).await;
+            }
+            _ => {
+                session.channel_failure(channel_id)?;
+            }
+        }
         Ok(())
     }
 
@@ -477,5 +515,276 @@ impl SecretStore for MemoryStore {
     fn delete(&self, account: &str) -> Result<(), String> {
         self.items.lock().unwrap().remove(account);
         Ok(())
+    }
+}
+
+/// A small SFTP server over a folder. Like OpenSSH, it refuses to rename onto a file that
+/// exists. Paths are kept inside the folder.
+pub mod sftp_server {
+    use std::collections::HashMap;
+    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::path::{Component, Path, PathBuf};
+
+    use russh_sftp::protocol::{
+        Attrs, Data, File, FileAttributes, Handle, Name, OpenFlags, Status, StatusCode,
+    };
+
+    enum Open {
+        File(std::fs::File),
+        Dir { entries: Vec<File>, sent: bool },
+    }
+
+    pub struct Files {
+        root: PathBuf,
+        handles: HashMap<String, Open>,
+        next: u32,
+    }
+
+    impl Files {
+        pub fn new(root: PathBuf) -> Self {
+            Self {
+                root,
+                handles: HashMap::new(),
+                next: 1,
+            }
+        }
+
+        /// Where a path from the client is on disk. ".." can't leave the folder.
+        fn resolve(&self, path: &str) -> PathBuf {
+            let mut real = self.root.clone();
+            for part in Path::new(path).components() {
+                if let Component::Normal(name) = part {
+                    real.push(name);
+                }
+            }
+            real
+        }
+
+        fn new_handle(&mut self, open: Open) -> String {
+            let id = format!("h{}", self.next);
+            self.next += 1;
+            self.handles.insert(id.clone(), open);
+            id
+        }
+    }
+
+    fn code(error: &std::io::Error) -> StatusCode {
+        match error.kind() {
+            std::io::ErrorKind::NotFound => StatusCode::NoSuchFile,
+            std::io::ErrorKind::PermissionDenied => StatusCode::PermissionDenied,
+            _ => StatusCode::Failure,
+        }
+    }
+
+    fn ok(id: u32) -> Status {
+        Status {
+            id,
+            status_code: StatusCode::Ok,
+            error_message: "Ok".into(),
+            language_tag: "en-US".into(),
+        }
+    }
+
+    fn attrs_of(path: &Path, follow: bool) -> Result<FileAttributes, StatusCode> {
+        let meta = if follow {
+            std::fs::metadata(path)
+        } else {
+            std::fs::symlink_metadata(path)
+        }
+        .map_err(|e| code(&e))?;
+        let mut attrs = FileAttributes::from(&meta);
+        if meta.is_symlink() {
+            attrs.set_regular(false);
+            attrs.set_symlink(true);
+        }
+        Ok(attrs)
+    }
+
+    impl russh_sftp::server::Handler for Files {
+        type Error = StatusCode;
+
+        fn unimplemented(&self) -> Self::Error {
+            StatusCode::OpUnsupported
+        }
+
+        async fn open(
+            &mut self,
+            id: u32,
+            filename: String,
+            pflags: OpenFlags,
+            _attrs: FileAttributes,
+        ) -> Result<Handle, Self::Error> {
+            let mut options = std::fs::OpenOptions::new();
+            options
+                .read(pflags.contains(OpenFlags::READ))
+                .write(pflags.contains(OpenFlags::WRITE))
+                .create(pflags.contains(OpenFlags::CREATE))
+                .truncate(pflags.contains(OpenFlags::TRUNCATE));
+            let file = options
+                .open(self.resolve(&filename))
+                .map_err(|e| code(&e))?;
+            Ok(Handle {
+                id,
+                handle: self.new_handle(Open::File(file)),
+            })
+        }
+
+        async fn close(&mut self, id: u32, handle: String) -> Result<Status, Self::Error> {
+            self.handles.remove(&handle);
+            Ok(ok(id))
+        }
+
+        async fn read(
+            &mut self,
+            id: u32,
+            handle: String,
+            offset: u64,
+            len: u32,
+        ) -> Result<Data, Self::Error> {
+            let Some(Open::File(file)) = self.handles.get_mut(&handle) else {
+                return Err(StatusCode::Failure);
+            };
+            file.seek(SeekFrom::Start(offset)).map_err(|e| code(&e))?;
+            let mut buffer = vec![0u8; len as usize];
+            let n = file.read(&mut buffer).map_err(|e| code(&e))?;
+            if n == 0 {
+                return Err(StatusCode::Eof);
+            }
+            buffer.truncate(n);
+            Ok(Data { id, data: buffer })
+        }
+
+        async fn write(
+            &mut self,
+            id: u32,
+            handle: String,
+            offset: u64,
+            data: Vec<u8>,
+        ) -> Result<Status, Self::Error> {
+            let Some(Open::File(file)) = self.handles.get_mut(&handle) else {
+                return Err(StatusCode::Failure);
+            };
+            file.seek(SeekFrom::Start(offset)).map_err(|e| code(&e))?;
+            file.write_all(&data).map_err(|e| code(&e))?;
+            Ok(ok(id))
+        }
+
+        async fn lstat(&mut self, id: u32, path: String) -> Result<Attrs, Self::Error> {
+            Ok(Attrs {
+                id,
+                attrs: attrs_of(&self.resolve(&path), false)?,
+            })
+        }
+
+        async fn stat(&mut self, id: u32, path: String) -> Result<Attrs, Self::Error> {
+            Ok(Attrs {
+                id,
+                attrs: attrs_of(&self.resolve(&path), true)?,
+            })
+        }
+
+        async fn setstat(
+            &mut self,
+            id: u32,
+            path: String,
+            attrs: FileAttributes,
+        ) -> Result<Status, Self::Error> {
+            let _ = &path;
+            #[cfg(unix)]
+            if let Some(mode) = attrs.permissions {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(
+                    self.resolve(&path),
+                    std::fs::Permissions::from_mode(mode & 0o7777),
+                )
+                .map_err(|e| code(&e))?;
+            }
+            let _ = attrs;
+            Ok(ok(id))
+        }
+
+        async fn opendir(&mut self, id: u32, path: String) -> Result<Handle, Self::Error> {
+            let dir = self.resolve(&path);
+            let mut entries = Vec::new();
+            for item in std::fs::read_dir(&dir).map_err(|e| code(&e))?.flatten() {
+                let name = item.file_name().to_string_lossy().into_owned();
+                if let Ok(attrs) = attrs_of(&item.path(), false) {
+                    entries.push(File::new(name, attrs));
+                }
+            }
+            Ok(Handle {
+                id,
+                handle: self.new_handle(Open::Dir {
+                    entries,
+                    sent: false,
+                }),
+            })
+        }
+
+        async fn readdir(&mut self, id: u32, handle: String) -> Result<Name, Self::Error> {
+            let Some(Open::Dir { entries, sent }) = self.handles.get_mut(&handle) else {
+                return Err(StatusCode::Failure);
+            };
+            if *sent {
+                return Err(StatusCode::Eof);
+            }
+            *sent = true;
+            Ok(Name {
+                id,
+                files: std::mem::take(entries),
+            })
+        }
+
+        async fn remove(&mut self, id: u32, filename: String) -> Result<Status, Self::Error> {
+            std::fs::remove_file(self.resolve(&filename)).map_err(|e| code(&e))?;
+            Ok(ok(id))
+        }
+
+        async fn mkdir(
+            &mut self,
+            id: u32,
+            path: String,
+            _attrs: FileAttributes,
+        ) -> Result<Status, Self::Error> {
+            std::fs::create_dir(self.resolve(&path)).map_err(|e| code(&e))?;
+            Ok(ok(id))
+        }
+
+        async fn rmdir(&mut self, id: u32, path: String) -> Result<Status, Self::Error> {
+            std::fs::remove_dir(self.resolve(&path)).map_err(|e| code(&e))?;
+            Ok(ok(id))
+        }
+
+        async fn realpath(&mut self, id: u32, path: String) -> Result<Name, Self::Error> {
+            // Everything is inside the folder, which the client sees as "/".
+            let mut clean = String::from("/");
+            let parts: Vec<String> = Path::new(&path)
+                .components()
+                .filter_map(|c| match c {
+                    Component::Normal(n) => Some(n.to_string_lossy().into_owned()),
+                    _ => None,
+                })
+                .collect();
+            clean.push_str(&parts.join("/"));
+            Ok(Name {
+                id,
+                files: vec![File::dummy(clean)],
+            })
+        }
+
+        async fn rename(
+            &mut self,
+            id: u32,
+            oldpath: String,
+            newpath: String,
+        ) -> Result<Status, Self::Error> {
+            let to = self.resolve(&newpath);
+            // As OpenSSH does: renaming onto something that exists is an error.
+            if std::fs::symlink_metadata(&to).is_ok() {
+                return Err(StatusCode::Failure);
+            }
+            std::fs::rename(self.resolve(&oldpath), to).map_err(|e| code(&e))?;
+            Ok(ok(id))
+        }
     }
 }

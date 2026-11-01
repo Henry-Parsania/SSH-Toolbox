@@ -169,7 +169,7 @@ impl FileBackend for LocalFiles {
         let mut file = tokio::fs::File::open(path)
             .await
             .map_err(|e| from_io(&e, path))?;
-        copy(&mut file, dest, progress, &cancel, path).await
+        copy_bytes(&mut file, dest, progress, &cancel, path).await
     }
 
     async fn write_from(
@@ -182,13 +182,13 @@ impl FileBackend for LocalFiles {
         let mut file = tokio::fs::File::create(path)
             .await
             .map_err(|e| from_io(&e, path))?;
-        copy(src, &mut file, progress, &cancel, path).await?;
+        copy_bytes(src, &mut file, progress, &cancel, path).await?;
         file.flush().await.map_err(|e| from_io(&e, path))
     }
 }
 
 /// Moves bytes from `src` to `dst`, reporting progress and stopping when cancelled.
-async fn copy(
+pub(super) async fn copy_bytes(
     src: &mut (dyn AsyncRead + Send + Unpin),
     dst: &mut (dyn AsyncWrite + Send + Unpin),
     progress: Progress<'_>,

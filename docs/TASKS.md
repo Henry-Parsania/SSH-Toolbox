@@ -82,8 +82,8 @@ Build and test against the local test container. This phase also adds SSH to `Se
 ## Phase 3: File transfer
 
 - [x] **3.1 File interface and local backend.** IF section 6. Test on a temporary folder. Include the remote name checks (SEC11).
-- [ ] **3.2 Transfer queue (F4).** Queue, progress, cancel, safe writes and overwrite prompts, tested with fake backends. Test that a cancelled transfer leaves the old file untouched.
-- [ ] **3.3 SFTP (F1, F2, F6).** On the existing connection. Integration-test against the container, including that no second login happens.
+- [x] **3.2 Transfer queue (F4).** Queue, progress, cancel, safe writes and overwrite prompts, tested with fake backends. Test that a cancelled transfer leaves the old file untouched.
+- [x] **3.3 SFTP (F1, F2, F6).** On the existing connection. Integration-test against the container, including that no second login happens.
 - [ ] **3.4 File browser (F2, F4).** Panel beside the session, with the transfer queue and delete confirmation.
 - [ ] **3.5 Drag and drop (F3).** Between the desktop and the panel. Use Tauri's drag-drop event for files coming in. Dragging out to the desktop may not be possible. If it isn't, leave that direction out and tell the owner.
 - [ ] **3.6 WSL files (W4).** Browse a distro using the local backend.
