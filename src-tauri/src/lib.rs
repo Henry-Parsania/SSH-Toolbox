@@ -50,10 +50,16 @@ pub fn run() {
         .manage(commands::keys::KeySetups::default())
         .manage(commands::files::Files::default())
         .manage(commands::status::StatsState::default())
+        .manage(commands::docker::Engines::default())
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::docker::docker_action,
+            commands::docker::docker_close,
+            commands::docker::docker_connect,
+            commands::docker::docker_inspect,
+            commands::docker::docker_list,
             commands::terminal::serial_list_ports,
             commands::terminal::serial_send_break,
             commands::terminal::serial_set_control,

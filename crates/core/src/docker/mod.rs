@@ -1,11 +1,20 @@
 //! Docker, on this computer and on a server reached over SSH (INTERFACES.md section 8).
 
+pub mod engine;
+pub mod pane;
 pub mod ssh;
+
+#[cfg(test)]
+mod engine_tests;
+#[cfg(test)]
+mod fake;
+#[cfg(test)]
+mod pane_tests;
 
 #[cfg(test)]
 mod ssh_tests;
 
-use bollard::Docker;
+pub use bollard::Docker;
 
 use crate::error::{AppError, ErrorCode};
 

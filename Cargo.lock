@@ -5753,6 +5753,7 @@ dependencies = [
  "bollard",
  "bytes",
  "directories",
+ "futures-util",
  "hyper",
  "hyper-util",
  "keyring-core",

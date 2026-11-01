@@ -196,6 +196,10 @@ export class Workspace {
 /** A saved pane leaves out `spec` when there is none. */
 function fromSaved(node: SavedPane): PaneNode {
   if (node.kind === "leaf") {
+    // A container's log or shell belonged to a Docker connection that ended with the last run.
+    if (node.spec?.type === "docker_logs" || node.spec?.type === "docker_shell") {
+      return { kind: "leaf", pane_id: node.pane_id, spec: null, title: "Terminal" };
+    }
     return { kind: "leaf", pane_id: node.pane_id, spec: node.spec ?? null, title: node.title };
   }
   return { ...node, children: node.children.map(fromSaved) };

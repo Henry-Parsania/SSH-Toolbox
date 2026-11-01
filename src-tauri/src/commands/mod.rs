@@ -1,4 +1,5 @@
 pub mod connect;
+pub mod docker;
 pub mod files;
 pub mod forward;
 pub mod keychain;

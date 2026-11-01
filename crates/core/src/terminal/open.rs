@@ -33,6 +33,16 @@ pub enum SessionSpec {
     Serial {
         saved_session_id: String,
     },
+    /// The log of a container. Opened with `docker::pane::open_logs`.
+    DockerLogs {
+        docker_id: String,
+        container_id: String,
+    },
+    /// A shell in a container. Opened with `docker::pane::open_shell`.
+    DockerShell {
+        docker_id: String,
+        container_id: String,
+    },
 }
 
 const MAX_DIMENSION: u16 = 1000;
@@ -82,6 +92,12 @@ pub async fn open_terminal(
             return Err(AppError::new(
                 ErrorCode::Unsupported,
                 "Serial sessions are opened through the serial module.",
+            ));
+        }
+        SessionSpec::DockerLogs { .. } | SessionSpec::DockerShell { .. } => {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "Container sessions are opened through the Docker connection.",
             ));
         }
         SessionSpec::Wsl { distro } => {

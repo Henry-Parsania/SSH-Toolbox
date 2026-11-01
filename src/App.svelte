@@ -18,6 +18,7 @@
   import { Workspace } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
   import { Library } from "./lib/sessions/library.svelte";
+  import DockerPanel from "./lib/docker/DockerPanel.svelte";
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
   import { Reachability } from "./lib/status/reach.svelte";
@@ -31,6 +32,8 @@
   let showSettings = $state(false);
   let sidebarOpen = $state(true);
   let filesOpen = $state(false);
+  // Docker takes the place of the file panel on the right while it is open.
+  let dockerOpen = $state(false);
   // Widths of the two side panels, which can be dragged. They are kept for next time.
   const saved = (key: string, fallback: number) => {
     const n = Number(localStorage.getItem(key));
@@ -130,12 +133,14 @@
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
       // The server's files appear beside the terminal.
       filesOpen = true;
+      dockerOpen = false;
       ftpOpened = null;
     } else if (session.type === "serial") {
       workspace.newTab({ type: "serial", saved_session_id: session.id }, session.name);
     } else if (session.type === "ftp") {
       ftpOpened = { kind: "ftp", id: session.id, name: session.name };
       filesOpen = true;
+      dockerOpen = false;
     }
   }
   // Choosing another tab or pane goes back to following the terminal.
@@ -259,7 +264,15 @@
       onsettings={() => (showSettings = true)}
       onsidebar={() => (sidebarOpen = !sidebarOpen)}
       {filesOpen}
-      onfiles={() => (filesOpen = !filesOpen)}
+      onfiles={() => {
+        filesOpen = !filesOpen;
+        if (filesOpen) dockerOpen = false;
+      }}
+      {dockerOpen}
+      ondocker={() => {
+        dockerOpen = !dockerOpen;
+        if (dockerOpen) filesOpen = false;
+      }}
     />
       <main class="tabs">
         {#each workspace.tabs as tab (tab.id)}
@@ -302,11 +315,15 @@
         <StatusBar target={footerTarget} />
       {/if}
       </div>
-      {#if filesOpen}
+      {#if filesOpen || dockerOpen}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
         <div class="side" style:width="{filesWidth}px">
-          <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
+          {#if dockerOpen}
+            <DockerPanel {library} onopen={(spec, title) => workspace.newTab(spec, title)} onclose={() => (dockerOpen = false)} />
+          {:else}
+            <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
+          {/if}
         </div>
       {/if}
     </div>

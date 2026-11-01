@@ -30,7 +30,11 @@
     | "ftp"
     | "home"
     | "file"
-    | "files";
+    | "files"
+    | "box"
+    | "stop"
+    | "info"
+    | "log";
 
   interface Props {
     name: IconName;
@@ -72,6 +76,10 @@
     home: "M4 11l8-7 8 7M6 10v9a1 1 0 001 1h3v-6h4v6h3a1 1 0 001-1v-9",
     file: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5",
     files: "M4 6a2 2 0 012-2h3l2 2h5a2 2 0 012 2v1M3 11h15a1 1 0 011 1l-1 6a2 2 0 01-2 2H5a2 2 0 01-2-2v-7zM21 11v-0",
+    box: "M12 3l8 4v10l-8 4-8-4V7l8-4zM4 7l8 4 8-4M12 11v10",
+    stop: "M7 7h10v10H7z",
+    info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5h.01",
+    log: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M9 13h6M9 17h6",
   };
 </script>
 

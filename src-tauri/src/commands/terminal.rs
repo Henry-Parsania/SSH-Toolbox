@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tauri::State;
 use tauri::ipc::{Channel, InvokeResponseBody};
+use toolbox_core::docker;
 use toolbox_core::serial::{self, PortInfo, SerialConfig};
 use toolbox_core::sessions::SessionStore;
 use toolbox_core::ssh::{self, backend::SshServices};
@@ -57,10 +58,13 @@ pub async fn list_wsl_distros() -> Result<Vec<String>, AppError> {
         .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't look for WSL."))
 }
 
+// Every piece of state and both channels are separate arguments, as Tauri commands require.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn terminal_open(
     terminals: State<'_, Terminals>,
     services: State<'_, Arc<SshServices>>,
+    engines: State<'_, super::docker::Engines>,
     spec: SessionSpec,
     cols: u16,
     rows: u16,
@@ -103,6 +107,32 @@ pub async fn terminal_open(
                 })?;
             let config = SerialConfig::from_saved(session)?;
             serial::open_serial_terminal(&terminals.sessions, config, sink).await
+        }
+        SessionSpec::DockerLogs {
+            docker_id,
+            container_id,
+        } => {
+            docker::pane::open_logs(
+                &terminals.sessions,
+                engines.get(&docker_id)?,
+                container_id,
+                true,
+                sink,
+            )
+            .await
+        }
+        SessionSpec::DockerShell {
+            docker_id,
+            container_id,
+        } => {
+            docker::pane::open_shell(
+                &terminals.sessions,
+                engines.get(&docker_id)?,
+                container_id,
+                size,
+                sink,
+            )
+            .await
         }
         other => terminal::open_terminal(&terminals.sessions, other, size, sink).await,
     }

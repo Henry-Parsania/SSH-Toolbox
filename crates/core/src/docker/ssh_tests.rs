@@ -9,15 +9,14 @@ use bollard::query_parameters::ListContainersOptionsBuilder;
 use tokio_util::sync::CancellationToken;
 
 use super::explain_failure;
+use super::fake::fake_docker_engine;
 use super::ssh::{Method, connect_ssh};
 use crate::error::ErrorCode;
 use crate::prompt::{PromptBroker, Prompter};
 use crate::ssh::connection::connect;
 use crate::ssh::hostkeys::learn;
 use crate::ssh::pool::SharedConnection;
-use crate::ssh::testing::{
-    Accepts, DockerCli, DockerFake, KEY_A, fake_docker_engine, key, public_of, spawn_server,
-};
+use crate::ssh::testing::{Accepts, DockerCli, DockerFake, KEY_A, key, public_of, spawn_server};
 use crate::terminal::testing::RecordingSink;
 
 const USER: &str = "tester";
@@ -28,7 +27,7 @@ async fn server_with_docker(
     cli: DockerCli,
     socket: bool,
 ) -> (Arc<SharedConnection>, tempfile::TempDir) {
-    let engine = fake_docker_engine().await;
+    let (engine, _) = fake_docker_engine().await;
     let host_key = key(KEY_A);
     let server = spawn_server(
         host_key.clone(),
@@ -81,7 +80,7 @@ async fn the_docker_command_is_used_first() {
         ))
         .await
         .unwrap();
-    assert_eq!(containers.len(), 1);
+    assert_eq!(containers.len(), 2);
     assert_eq!(
         containers[0].names.as_deref(),
         Some(&["/web".to_string()][..])
@@ -97,7 +96,7 @@ async fn the_socket_is_used_when_the_server_has_no_docker_command() {
         .list_containers(None::<bollard::query_parameters::ListContainersOptions>)
         .await
         .unwrap();
-    assert_eq!(containers.len(), 1);
+    assert_eq!(containers.len(), 2);
 }
 
 #[tokio::test]
@@ -147,4 +146,42 @@ fn what_the_server_printed_is_never_shown() {
     let error = explain_failure(Some(1), hostile);
     assert!(!error.message.contains("hunter2"));
     assert!(!error.message.contains('\u{1b}'));
+}
+
+#[tokio::test]
+async fn a_shell_in_a_container_works_over_the_ssh_connection() {
+    use crate::terminal::testing::{RecordingSink, Sent};
+    use crate::terminal::{SessionRegistry, TermSize};
+
+    let (shared, _dir) = server_with_docker(DockerCli::Works, false).await;
+    let (docker, _) = connect_ssh(shared).await.unwrap();
+    let registry = SessionRegistry::new();
+    let sink = Arc::new(RecordingSink::default());
+    let id = super::pane::open_shell(
+        &registry,
+        Arc::new(docker),
+        "abc123".into(),
+        TermSize { cols: 80, rows: 24 },
+        sink.clone(),
+    )
+    .await
+    .unwrap();
+    registry.get(&id).unwrap().write(b"pwd\r").await.unwrap();
+    for _ in 0..300 {
+        let text: Vec<u8> = sink
+            .all()
+            .into_iter()
+            .filter_map(|s| match s {
+                Sent::Data(d) => Some(d),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        if String::from_utf8_lossy(&text).contains("echo:pwd") {
+            registry.close(&id).await.unwrap();
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("the shell never answered");
 }

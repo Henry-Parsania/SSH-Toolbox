@@ -19,9 +19,11 @@
     sidebarOpen: boolean;
     filesOpen: boolean;
     onfiles: () => void;
+    dockerOpen: boolean;
+    ondocker: () => void;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -208,6 +210,15 @@
       onclick={onfiles}
     >
       <Icon name="folder" size={16} />
+    </button>
+    <button
+      class="icon-btn"
+      class:on={dockerOpen}
+      aria-label="Docker"
+      title="Docker: containers, logs and shells"
+      onclick={ondocker}
+    >
+      <Icon name="box" size={16} />
     </button>
     <span class="sep"></span>
     <button class="icon-btn" aria-label="Settings" title="Settings" onclick={onsettings}>
