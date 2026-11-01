@@ -1,6 +1,7 @@
 //! SSH Toolbox backend logic. This crate has no Tauri dependency.
 
 pub mod config;
+pub mod docker;
 pub mod error;
 pub mod files;
 pub mod keychain;

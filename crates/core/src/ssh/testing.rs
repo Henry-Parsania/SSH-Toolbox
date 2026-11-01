@@ -78,6 +78,26 @@ pub struct Accepts {
     pub allow_forwarding: bool,
     /// Offers SFTP, serving this folder as its root.
     pub sftp_root: Option<std::path::PathBuf>,
+    /// Pretends to be a server that has Docker.
+    pub docker: Option<DockerFake>,
+}
+
+/// What the `docker` command does on a server pretending to have Docker.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum DockerCli {
+    Works,
+    PermissionDenied,
+    Missing,
+    NotRunning,
+}
+
+/// A server with Docker: `docker system dial-stdio` leads to the fake engine on `daemon`, and
+/// `/var/run/docker.sock` does too when `socket` is set.
+#[derive(Clone)]
+pub struct DockerFake {
+    pub daemon: u16,
+    pub cli: DockerCli,
+    pub socket: bool,
 }
 
 /// What happened on the server, for tests to look at.
@@ -122,6 +142,51 @@ pub struct TestHandler(
     HashMap<ChannelId, Channel<Msg>>,
 );
 
+impl TestHandler {
+    /// `docker system dial-stdio`: joins the channel to the fake engine, or ends the way the real
+    /// command does when Docker can't be used.
+    async fn docker_command(
+        &mut self,
+        docker: DockerFake,
+        channel: ChannelId,
+        session: &mut Session,
+    ) -> Result<(), russh::Error> {
+        let failure = match docker.cli {
+            DockerCli::Works => None,
+            DockerCli::PermissionDenied => Some((
+                1,
+                "permission denied while trying to connect to the Docker daemon socket",
+            )),
+            DockerCli::Missing => Some((127, "sh: 1: docker: not found")),
+            DockerCli::NotRunning => Some((
+                1,
+                "Cannot connect to the Docker daemon. Is the docker daemon running?",
+            )),
+        };
+        session.channel_success(channel)?;
+        if let Some((code, text)) = failure {
+            session.extended_data(channel, 1, text.as_bytes().to_vec())?;
+            session.exit_status_request(channel, code)?;
+            session.eof(channel)?;
+            session.close(channel)?;
+            return Ok(());
+        }
+        let Some(opened) = self.3.remove(&channel) else {
+            return Ok(());
+        };
+        let Ok(mut engine) = tokio::net::TcpStream::connect(("127.0.0.1", docker.daemon)).await
+        else {
+            return Ok(());
+        };
+        self.1.forwarding_channels.lock().unwrap().insert(channel);
+        tokio::spawn(async move {
+            let mut through = opened.into_stream();
+            let _ = tokio::io::copy_bidirectional(&mut through, &mut engine).await;
+        });
+        Ok(())
+    }
+}
+
 impl server::Handler for TestHandler {
     type Error = russh::Error;
 
@@ -159,6 +224,36 @@ impl server::Handler for TestHandler {
                 session.channel_failure(channel_id)?;
             }
         }
+        Ok(())
+    }
+
+    async fn channel_open_direct_streamlocal(
+        &mut self,
+        channel: Channel<Msg>,
+        socket_path: &str,
+        reply: russh::server::ChannelOpenHandle,
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        let Some(docker) = self.0.docker.clone() else {
+            return Ok(());
+        };
+        if !docker.socket || socket_path != "/var/run/docker.sock" {
+            return Ok(());
+        }
+        let Ok(mut engine) = tokio::net::TcpStream::connect(("127.0.0.1", docker.daemon)).await
+        else {
+            return Ok(());
+        };
+        self.1
+            .forwarding_channels
+            .lock()
+            .unwrap()
+            .insert(channel.id());
+        reply.accept().await;
+        tokio::spawn(async move {
+            let mut through = channel.into_stream();
+            let _ = tokio::io::copy_bidirectional(&mut through, &mut engine).await;
+        });
         Ok(())
     }
 
@@ -287,6 +382,11 @@ impl server::Handler for TestHandler {
         data: &[u8],
         session: &mut Session,
     ) -> Result<(), Self::Error> {
+        if let Some(docker) = self.0.docker.clone()
+            && data == b"docker system dial-stdio"
+        {
+            return self.docker_command(docker, channel, session).await;
+        }
         if self.0.home.is_some() {
             self.2.insert(
                 channel,
@@ -481,6 +581,75 @@ pub async fn spawn_server(host_key: PrivateKey, accepts: Accepts) -> ServerHandl
         });
     }
     ServerHandle { port, stats, cut }
+}
+
+/// A tiny stand-in for the Docker engine's HTTP interface: enough for the tests, nothing more.
+/// Returns the port it listens on.
+pub async fn fake_docker_engine() -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                let mut pending = Vec::new();
+                let mut chunk = [0u8; 4096];
+                loop {
+                    while !pending.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match socket.read(&mut chunk).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => pending.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    let end = pending.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+                    let head = String::from_utf8_lossy(&pending[..end]).into_owned();
+                    pending.drain(..end);
+                    let path = head
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap_or("")
+                        .split('?')
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
+                    let (status, kind, body) = if path.ends_with("/_ping") {
+                        ("200 OK", "text/plain", "OK".to_string())
+                    } else if path.ends_with("/version") {
+                        (
+                            "200 OK",
+                            "application/json",
+                            r#"{"Version":"27.0.0","ApiVersion":"1.46","MinAPIVersion":"1.24"}"#
+                                .to_string(),
+                        )
+                    } else if path.ends_with("/containers/json") {
+                        (
+                            "200 OK",
+                            "application/json",
+                            r#"[{"Id":"abc123","Names":["/web"],"Image":"nginx","State":"running","Status":"Up 2 hours"}]"#
+                                .to_string(),
+                        )
+                    } else {
+                        (
+                            "404 Not Found",
+                            "application/json",
+                            r#"{"message":"page not found"}"#.to_string(),
+                        )
+                    };
+                    let reply = format!(
+                        "HTTP/1.1 {status}\r\nApi-Version: 1.46\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    );
+                    if socket.write_all(reply.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    port
 }
 
 /// A server for tests that only look at the host key.

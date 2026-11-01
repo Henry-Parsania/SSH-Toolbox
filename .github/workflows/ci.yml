@@ -79,7 +79,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/keys"
           ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/keys/id_test"
           cp "$RUNNER_TEMP/keys/id_test.pub" "$RUNNER_TEMP/keys/authorized_keys"
-          docker run -d --name sshd -p 127.0.0.1:2222:22 -v "$RUNNER_TEMP/keys:/keys:ro" toolbox-sshd
+          docker run -d --name sshd -p 127.0.0.1:2222:22 -v "$RUNNER_TEMP/keys:/keys:ro" -v /var/run/docker.sock:/var/run/docker.sock toolbox-sshd
           for i in $(seq 1 30); do
             (echo > /dev/tcp/127.0.0.1/2222) 2>/dev/null && break
             sleep 1
@@ -90,6 +90,8 @@ jobs:
           export SSH_TEST_PASSWORD=toolbox-test-only SSH_TEST_KEY="$RUNNER_TEMP/keys/id_test" SSH_TEST_AGENT=1
           cargo run -q -p toolbox-core --example check_ssh
           cargo run -q -p toolbox-core --example check_docker
+          ssh-keyscan -p 2222 127.0.0.1 > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          SSH_TEST_KNOWN_HOSTS="$RUNNER_TEMP/known_hosts" cargo run -q -p toolbox-core --example check_docker_ssh
           docker rm -f sshd
 
       - name: Interface checks (types and import boundary)
