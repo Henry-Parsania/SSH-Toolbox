@@ -1,13 +1,11 @@
 <script lang="ts">
   import type { PlatformInfo } from "../backend";
   import PaneView from "./PaneView.svelte";
-  import PaneTree from "./PaneTree.svelte";
-  import type { PaneNode, SplitPath } from "./panes";
+  import { placeAll, type DividerPlace, type PaneNode } from "./panes";
   import type { Workspace } from "./workspace.svelte";
 
   interface Props {
     node: PaneNode;
-    path?: SplitPath;
     tabId: string;
     activePane: string;
     visible: boolean;
@@ -16,23 +14,32 @@
     workspace: Workspace;
   }
 
-  let { node, path = [], tabId, activePane, visible, crowded, platform, workspace }: Props = $props();
+  let { node, tabId, activePane, visible, crowded, platform, workspace }: Props = $props();
+
+  // Every pane is drawn in one flat list, keyed by its id. Splitting then changes only where a
+  // pane sits, so the terminals already running are never rebuilt.
+  const placed = $derived(placeAll(node));
 
   let container: HTMLDivElement | undefined = $state();
-  let draggingDivider = $state<number | null>(null);
+  let draggingDivider = $state<DividerPlace | null>(null);
 
-  function startDrag(e: PointerEvent, divider: number) {
-    if (node.kind !== "split" || !container) return;
+  const pct = (share: number) => `${share * 100}%`;
+
+  function startDrag(e: PointerEvent, divider: DividerPlace) {
+    if (!container) return;
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture(e.pointerId);
-    const horizontal = node.direction === "row";
-    const total = horizontal ? container.clientWidth : container.clientHeight;
+    const horizontal = divider.direction === "row";
+    const { left, right, top, bottom } = divider.split;
+    const total = horizontal
+      ? (right - left) * container.clientWidth
+      : (bottom - top) * container.clientHeight;
     let last = horizontal ? e.clientX : e.clientY;
     draggingDivider = divider;
 
     const move = (ev: PointerEvent) => {
       const now = horizontal ? ev.clientX : ev.clientY;
-      if (total > 0) workspace.resizeDivider(tabId, path, divider, (now - last) / total);
+      if (total > 0) workspace.resizeDivider(tabId, divider.path, divider.index, (now - last) / total);
       last = now;
     };
     const stop = () => {
@@ -47,77 +54,71 @@
   }
 </script>
 
-{#if node.kind === "leaf"}
-  <PaneView
-    {node}
-    {tabId}
-    {platform}
-    {workspace}
-    {crowded}
-    active={node.pane_id === activePane}
-    {visible}
-  />
-{:else}
-  <div class="split {node.direction}" bind:this={container}>
-    {#each node.children as child, i (child.kind === "leaf" ? child.pane_id : `split-${i}`)}
-      <div class="child" style:flex="{node.sizes[i]} 1 0">
-        <PaneTree
-          node={child}
-          path={[...path, i]}
-          {tabId}
-          {activePane}
-          {visible}
-          {crowded}
-          {platform}
-          {workspace}
-        />
-      </div>
-      {#if i < node.children.length - 1}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class="divider {node.direction}"
-          class:dragging={draggingDivider === i}
-          onpointerdown={(e) => startDrag(e, i)}
-        >
-          <span class="line"></span>
-        </div>
-      {/if}
-    {/each}
-  </div>
-{/if}
+<div class="tree" bind:this={container}>
+  {#each placed.panes as { leaf, rect } (leaf.pane_id)}
+    <div
+      class="cell"
+      style:left={pct(rect.left)}
+      style:top={pct(rect.top)}
+      style:width={pct(rect.right - rect.left)}
+      style:height={pct(rect.bottom - rect.top)}
+    >
+      <PaneView
+        node={leaf}
+        {tabId}
+        {platform}
+        {workspace}
+        {crowded}
+        active={leaf.pane_id === activePane}
+        {visible}
+      />
+    </div>
+  {/each}
+
+  {#each placed.dividers as divider (divider.path.join(".") + ":" + divider.index)}
+    {@const row = divider.direction === "row"}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="divider {divider.direction}"
+      class:dragging={draggingDivider?.path.join(".") === divider.path.join(".") &&
+        draggingDivider?.index === divider.index}
+      style:left={row ? pct(divider.at) : pct(divider.split.left)}
+      style:top={row ? pct(divider.split.top) : pct(divider.at)}
+      style:width={row ? undefined : pct(divider.split.right - divider.split.left)}
+      style:height={row ? pct(divider.split.bottom - divider.split.top) : undefined}
+      onpointerdown={(e) => startDrag(e, divider)}
+    >
+      <span class="line"></span>
+    </div>
+  {/each}
+</div>
 
 <style>
-  .split {
-    display: flex;
+  .tree {
+    position: relative;
     width: 100%;
     height: 100%;
   }
-  .split.row {
-    flex-direction: row;
-  }
-  .split.column {
-    flex-direction: column;
-  }
-  .child {
+  .cell {
+    position: absolute;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
   }
   /* A thin line you can see, inside a wider area you can grab. */
   .divider {
-    position: relative;
-    flex: none;
+    position: absolute;
     z-index: 5;
     touch-action: none;
   }
   .divider.row {
     width: 7px;
-    margin: 0 -3px;
+    margin-left: -3px;
     cursor: col-resize;
   }
   .divider.column {
     height: 7px;
-    margin: -3px 0;
+    margin-top: -3px;
     cursor: row-resize;
   }
   .line {

@@ -52,6 +52,8 @@
   function openSaved(session: SavedSession) {
     if (session.type === "ssh") {
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
+      // The server's files appear beside the terminal.
+      filesOpen = true;
     }
   }
   let restored = false;

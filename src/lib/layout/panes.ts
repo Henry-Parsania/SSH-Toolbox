@@ -169,7 +169,7 @@ function replaceAt(node: PaneNode, path: SplitPath, replacement: PaneNode): Pane
   return { ...node, children };
 }
 
-interface Rect {
+export interface Rect {
   left: number;
   top: number;
   right: number;
@@ -201,6 +201,48 @@ function layout(node: PaneNode, rect: Rect, out: Map<string, Rect>): void {
     }
     offset += share;
   });
+}
+
+/** A divider between two children of a split, as a line across the split's rectangle. */
+export interface DividerPlace {
+  path: SplitPath;
+  index: number;
+  direction: Direction;
+  /** The split it belongs to, so a drag can turn pixels into a share of it. */
+  split: Rect;
+  /** Where the line sits along the split's axis, as a share of the whole window. */
+  at: number;
+}
+
+/**
+ * Where every pane and divider goes, as shares of the tab (0 to 1). Panes are drawn in one flat
+ * list, so splitting never moves a running terminal to a different place in the page.
+ */
+export function placeAll(root: PaneNode): { panes: { leaf: Leaf; rect: Rect }[]; dividers: DividerPlace[] } {
+  const panes: { leaf: Leaf; rect: Rect }[] = [];
+  const dividers: DividerPlace[] = [];
+  const walk = (node: PaneNode, rect: Rect, path: SplitPath) => {
+    if (node.kind === "leaf") {
+      panes.push({ leaf: node, rect });
+      return;
+    }
+    const row = node.direction === "row";
+    const size = row ? rect.right - rect.left : rect.bottom - rect.top;
+    const start = row ? rect.left : rect.top;
+    let offset = 0;
+    node.children.forEach((child, i) => {
+      const share = node.sizes[i];
+      const a = start + offset * size;
+      const b = start + (offset + share) * size;
+      walk(child, row ? { ...rect, left: a, right: b } : { ...rect, top: a, bottom: b }, [...path, i]);
+      if (i < node.children.length - 1) {
+        dividers.push({ path, index: i, direction: node.direction, split: rect, at: b });
+      }
+      offset += share;
+    });
+  };
+  walk(root, { left: 0, top: 0, right: 1, bottom: 1 }, []);
+  return { panes, dividers };
 }
 
 const EDGE = 1e-6;
