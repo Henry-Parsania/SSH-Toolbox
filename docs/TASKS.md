@@ -103,7 +103,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 
 ## Phase 5: Docker
 
-- [ ] **5.1 Prove Docker over SSH first (D2).** IF section 8. Before any Docker UI, build this and test it in Linux CI, using the SSH test container with the Docker command line installed and the host's Docker socket mounted. If neither method works, tell the owner the options.
+- [x] **5.1 Prove Docker over SSH first (D2).** IF section 8. Before any Docker UI, build this and test it in Linux CI, using the SSH test container with the Docker command line installed and the host's Docker socket mounted. If neither method works, tell the owner the options.
 - [x] **5.2 Local Docker (D1).** Add a connection screen with a clear message when Docker isn't running.
 - [x] **5.3 Containers (D3, D7).** List, group by Compose project, start, stop, restart, and remove with confirmation.
 - [x] **5.4 Logs (D4).** Live, with follow and search. Uses the same flow control as the terminal.
