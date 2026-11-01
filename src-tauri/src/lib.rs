@@ -1,4 +1,5 @@
 mod commands;
+mod window_state;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -43,6 +44,15 @@ pub fn run() {
     });
 
     let app = tauri::Builder::default()
+        .setup(|app| {
+            if let (Some(window), Some(dir)) = (
+                app.get_webview_window("main"),
+                toolbox_core::config::config_dir(),
+            ) {
+                window_state::install(window, dir.join("window.json"));
+            }
+            Ok(())
+        })
         .manage(commands::startup::Startup::now())
         .manage(keychain)
         .manage(broker)

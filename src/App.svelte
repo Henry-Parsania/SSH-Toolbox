@@ -39,10 +39,20 @@
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1 };
   }
-  let sidebarOpen = $state(true);
-  let filesOpen = $state(false);
-  // Docker takes the place of the file panel on the right while it is open.
-  let dockerOpen = $state(false);
+  // Which panels are showing is kept for next time, like their widths.
+  const savedOpen = (key: string, fallback: boolean) => {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === "1";
+  };
+  let sidebarOpen = $state(savedOpen("sidebar-open", true));
+  let filesOpen = $state(savedOpen("files-open", false));
+  // Docker lives under the sessions list.
+  let dockerOpen = $state(savedOpen("docker-open", false));
+  $effect(() => {
+    localStorage.setItem("sidebar-open", sidebarOpen ? "1" : "0");
+    localStorage.setItem("files-open", filesOpen ? "1" : "0");
+    localStorage.setItem("docker-open", dockerOpen ? "1" : "0");
+  });
   // Widths of the two side panels, which can be dragged. They are kept for next time.
   const saved = (key: string, fallback: number) => {
     const n = Number(localStorage.getItem(key));
