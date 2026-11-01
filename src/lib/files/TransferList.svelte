@@ -7,6 +7,7 @@
     type OverwriteChoice,
     type TransferJob,
   } from "../backend/files";
+  import { untrack } from "svelte";
   import Icon from "../ui/Icon.svelte";
   import { formatSize, percent } from "./paths";
 
@@ -23,6 +24,50 @@
   const finished = $derived(jobs.filter((j) => !["queued", "asking", "running"].includes(j.state.state)));
   const failures = $derived(jobs.filter((j) => j.state.state === "failed").length);
 
+  // Speed of each running file, from how much it moved since the last update (smoothed).
+  let rates = $state<Record<number, number>>({});
+  let last: Record<number, { t: number; done: number }> = {};
+  $effect(() => {
+    const now = performance.now();
+    const next: Record<number, number> = {};
+    for (const j of jobs) {
+      if (j.state.state !== "running") continue;
+      const before = last[j.id];
+      const old = untrack(() => rates[j.id]);
+      if (before && now - before.t >= 250) {
+        const instant = ((j.done - before.done) / (now - before.t)) * 1000;
+        next[j.id] = old === undefined ? instant : old * 0.7 + instant * 0.3;
+        last[j.id] = { t: now, done: j.done };
+      } else {
+        if (!before) last[j.id] = { t: now, done: j.done };
+        if (old !== undefined) next[j.id] = old;
+      }
+    }
+    for (const id of Object.keys(last)) if (!(id in next) && !jobs.some((j) => String(j.id) === id && j.state.state === "running")) delete last[Number(id)];
+    rates = next;
+  });
+
+  function speed(job: TransferJob): string {
+    const rate = rates[job.id];
+    if (!rate || rate < 1) return "";
+    const left = job.total && rate > 0 ? Math.max(0, job.total - job.done) / rate : null;
+    return ` · ${formatSize(Math.round(rate))}/s${left !== null ? ` · ${duration(left)} left` : ""}`;
+  }
+
+  function duration(seconds: number): string {
+    if (seconds < 90) return `${Math.max(1, Math.round(seconds))} s`;
+    if (seconds < 5400) return `${Math.round(seconds / 60)} min`;
+    return `${(seconds / 3600).toFixed(1)} h`;
+  }
+
+  // One bar for everything that is moving, for a folder or several files at once.
+  const overall = $derived.by(() => {
+    const live = shown.filter((j) => j.state.state !== "skipped" && j.state.state !== "cancelled");
+    const total = live.reduce((n, j) => n + (j.total ?? 0), 0);
+    const done = live.reduce((n, j) => n + (j.state.state === "done" ? (j.total ?? j.done) : j.done), 0);
+    return total > 0 ? Math.min(100, Math.floor((done / total) * 100)) : null;
+  });
+
   function label(job: TransferJob): string {
     switch (job.state.state) {
       case "queued":
@@ -31,7 +76,8 @@
         return "Needs your answer";
       case "running": {
         const p = percent(job.done, job.total);
-        return p === null ? formatSize(job.done) : `${p}%`;
+        const size = job.total ? `${formatSize(job.done)} of ${formatSize(job.total)}` : formatSize(job.done);
+        return `${p === null ? "" : `${p}% · `}${size}${speed(job)}`;
       }
       case "done":
         return "Done";
@@ -54,7 +100,7 @@
     <header>
       <span class="title">Transfers</span>
       <span class="summary">
-        {#if active.length}{active.length} in progress{:else if failures}{failures} failed{:else}All done{/if}
+        {#if active.length}{active.length} in progress{#if overall !== null} · {overall}%{/if}{:else if failures}{failures} failed{:else}All done{/if}
       </span>
       {#if active.length}
         <button class="btn small ghost" onclick={() => transferCancelAll().catch(() => {})}>Cancel all</button>
@@ -63,6 +109,12 @@
         <button class="btn small ghost" onclick={() => transferClear().catch(() => {})}>Clear</button>
       {/if}
     </header>
+
+    {#if active.length && overall !== null}
+      <div class="bar overall" role="progressbar" aria-label="All transfers" aria-valuenow={overall} aria-valuemin="0" aria-valuemax="100">
+        <span style:width="{overall}%"></span>
+      </div>
+    {/if}
 
     <ul>
       {#each shown as job (job.id)}
@@ -163,7 +215,7 @@
   }
   .status {
     flex: none;
-    max-width: 55%;
+    max-width: 70%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -178,11 +230,14 @@
     color: var(--success);
   }
   .bar {
-    height: 4px;
+    height: 8px;
     margin-top: 5px;
     overflow: hidden;
     background: var(--bg-3);
     border-radius: 4px;
+  }
+  .bar.overall {
+    margin: 0 12px 6px;
   }
   .bar span {
     display: block;

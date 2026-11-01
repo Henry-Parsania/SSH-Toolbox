@@ -433,3 +433,28 @@ async fn a_cancelled_delete_stops_where_it_is() {
     assert_eq!(a.get("/d/one").unwrap(), b"1");
     let _ = FileKind::File;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn several_folders_dropped_together_all_arrive() {
+    let (a, b) = (Arc::new(MemoryFiles::new()), Arc::new(MemoryFiles::new()));
+    a.put("/one/a.txt", b"1");
+    a.put("/one/sub/b.txt", b"2");
+    a.put("/two/c.txt", b"3");
+    a.put("/three/deep/d.txt", b"4");
+    let source: Arc<dyn FileBackend> = a.clone();
+    let target: Arc<dyn FileBackend> = b.clone();
+    b.put_dir("/out");
+    let q = queue(Scripted::new(vec![]));
+    for name in ["one", "two", "three"] {
+        let from = format!("/{name}");
+        let plan = plan_tree(&source, &from, &format!("/out/{name}"))
+            .await
+            .unwrap();
+        queue_tree(&q, &source, &target, &plan, &from);
+    }
+    let jobs = finished(&q).await;
+    assert!(jobs.iter().all(|j| j.state == JobState::Done), "{jobs:?}");
+    assert_eq!(b.get("/out/one/sub/b.txt").unwrap(), b"2");
+    assert_eq!(b.get("/out/two/c.txt").unwrap(), b"3");
+    assert_eq!(b.get("/out/three/deep/d.txt").unwrap(), b"4");
+}

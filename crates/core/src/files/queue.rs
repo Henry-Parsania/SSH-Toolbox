@@ -202,6 +202,22 @@ impl TransferQueue {
     }
 }
 
+/// How often the window hears about the bytes done while a file is moving.
+const PROGRESS_EVERY: std::time::Duration = std::time::Duration::from_millis(150);
+
+/// Records the bytes done without telling anyone.
+fn set_done(inner: &Inner, id: u64, done: u64) {
+    if let Some(job) = inner
+        .jobs
+        .lock()
+        .unwrap()
+        .iter_mut()
+        .find(|j| j.snapshot.id == id)
+    {
+        job.snapshot.done = done;
+    }
+}
+
 fn update(inner: &Inner, id: u64, change: impl FnOnce(&mut JobSnapshot)) {
     if let Some(job) = inner
         .jobs
@@ -331,9 +347,19 @@ async fn copy_file(
     // Read and write run side by side, joined by a pipe.
     let (mut writer, mut reader) = tokio::io::duplex(PIPE_SIZE);
     let stop = cancel.child_token();
+    // Progress arrives with every chunk, which can be thousands of times a second. The number is
+    // always kept, but the window is only told a few times a second.
     let progress = {
         let inner = inner.clone();
-        move |done: u64| update(&inner, id, |s| s.done = done)
+        let last_told = std::sync::Mutex::new(std::time::Instant::now());
+        move |done: u64| {
+            set_done(&inner, id, done);
+            let mut last = last_told.lock().unwrap();
+            if last.elapsed() >= PROGRESS_EVERY {
+                *last = std::time::Instant::now();
+                (inner.on_change)();
+            }
+        }
     };
     let read = {
         let (source, from, stop) = (source.clone(), snapshot.from.clone(), stop.clone());
