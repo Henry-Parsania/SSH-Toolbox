@@ -72,6 +72,16 @@
       <div class="connecting"><span class="spinner"></span> Connecting…</div>
     {/if}
   {/if}
+  {#if crowded}
+    <button
+      class="close-pane"
+      aria-label="Close this pane"
+      title="Close this pane (Ctrl+Shift+W)"
+      onclick={() => workspace.closePane(tabId, node.pane_id)}
+    >
+      <Icon name="close" size={12} />
+    </button>
+  {/if}
   {#if ended}
     <div class="ended" role="alert">
       <span class="text">{ended}</span>
@@ -105,6 +115,32 @@
     box-shadow: inset 0 0 0 1px var(--accent);
     opacity: 0.8;
     z-index: 3;
+  }
+  .close-pane {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: var(--text-muted);
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 0.12s;
+  }
+  .pane:hover .close-pane,
+  .close-pane:focus-visible {
+    opacity: 1;
+  }
+  .close-pane:hover {
+    color: var(--text);
+    background: var(--bg-active);
   }
   .waiting {
     display: flex;
