@@ -345,3 +345,70 @@ pub async fn inspect(docker: &Docker, id: &str) -> Result<Details, AppError> {
         raw,
     })
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ContainerStats {
+    pub id: String,
+    /// Share of the computer's processors in use, in percent (100 is one full core).
+    pub cpu_percent: f64,
+    pub memory_used: u64,
+    pub memory_limit: u64,
+}
+
+/// Reads one Docker stats sample. Returns none if it has no readings (a container that just
+/// stopped, say).
+pub fn read_stats(id: &str, sample: &Value) -> Option<ContainerStats> {
+    let number = |path: &str| sample.pointer(path).and_then(Value::as_f64);
+    let used = number("/memory_stats/usage")?;
+    // Like `docker stats`, file cache the system can take back doesn't count as used.
+    let cache = number("/memory_stats/stats/inactive_file")
+        .or_else(|| number("/memory_stats/stats/cache"))
+        .unwrap_or(0.0);
+    let cpu_delta = number("/cpu_stats/cpu_usage/total_usage")?
+        - number("/precpu_stats/cpu_usage/total_usage")?;
+    let system_delta =
+        number("/cpu_stats/system_cpu_usage")? - number("/precpu_stats/system_cpu_usage")?;
+    let cpus = number("/cpu_stats/online_cpus")
+        .filter(|c| *c > 0.0)
+        .unwrap_or(1.0);
+    let cpu_percent = if system_delta > 0.0 && cpu_delta >= 0.0 {
+        cpu_delta / system_delta * cpus * 100.0
+    } else {
+        0.0
+    };
+    Some(ContainerStats {
+        id: id.to_string(),
+        cpu_percent,
+        memory_used: (used - cache).max(0.0) as u64,
+        memory_limit: number("/memory_stats/limit").unwrap_or(0.0) as u64,
+    })
+}
+
+/// How many containers are read at once, and in total, so a busy server isn't flooded.
+const STATS_AT_ONCE: usize = 8;
+const STATS_MAX: usize = 40;
+
+/// Live readings for the running containers. A container that can't be read is left out.
+pub async fn stats(docker: &Docker) -> Result<Vec<ContainerStats>, AppError> {
+    use futures_util::StreamExt;
+    let running: Vec<String> = list_containers(docker)
+        .await?
+        .into_iter()
+        .filter(|c| c.state == "running")
+        .map(|c| c.id)
+        .take(STATS_MAX)
+        .collect();
+    let readings = futures_util::stream::iter(running.into_iter().map(|id| async move {
+        let options = bollard::query_parameters::StatsOptionsBuilder::default()
+            .stream(false)
+            .build();
+        let mut stream = Box::pin(docker.stats(&id, Some(options)));
+        let sample = stream.next().await?.ok()?;
+        let value = serde_json::to_value(&sample).ok()?;
+        read_stats(&id, &value)
+    }))
+    .buffer_unordered(STATS_AT_ONCE)
+    .collect::<Vec<_>>()
+    .await;
+    Ok(readings.into_iter().flatten().collect())
+}

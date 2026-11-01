@@ -111,3 +111,12 @@ pub async fn docker_inspect(
 ) -> Result<Details, AppError> {
     engine::inspect(&*engines.get(&docker_id)?, &container_id).await
 }
+
+/// Live processor and memory readings for the running containers.
+#[tauri::command]
+pub async fn docker_stats(
+    engines: State<'_, Engines>,
+    docker_id: String,
+) -> Result<Vec<engine::ContainerStats>, AppError> {
+    engine::stats(&*engines.get(&docker_id)?).await
+}

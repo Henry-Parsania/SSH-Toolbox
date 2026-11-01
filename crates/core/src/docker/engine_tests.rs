@@ -107,3 +107,16 @@ async fn details_list_environment_ports_mounts_and_networks() {
     assert_eq!(d.networks, vec!["shop_default (172.18.0.2)"]);
     assert!(d.raw.contains("\"Config\""));
 }
+
+#[test]
+fn stats_are_read_like_docker_does() {
+    let sample = serde_json::json!({
+        "cpu_stats": {"cpu_usage": {"total_usage": 300}, "system_cpu_usage": 2000, "online_cpus": 4},
+        "precpu_stats": {"cpu_usage": {"total_usage": 100}, "system_cpu_usage": 1000},
+        "memory_stats": {"usage": 1000, "limit": 4000, "stats": {"inactive_file": 200}}
+    });
+    let s = super::engine::read_stats("abc", &sample).unwrap();
+    assert!((s.cpu_percent - 80.0).abs() < 1e-9);
+    assert_eq!((s.memory_used, s.memory_limit), (800, 4000));
+    assert!(super::engine::read_stats("abc", &serde_json::json!({})).is_none());
+}

@@ -65,3 +65,15 @@ export function dockerAction(dockerId: string, containerId: string, action: Cont
 export function dockerInspect(dockerId: string, containerId: string): Promise<ContainerDetails> {
   return invoke<ContainerDetails>("docker_inspect", { dockerId, containerId });
 }
+
+export interface ContainerStats {
+  id: string;
+  /** 100 is one full processor core. */
+  cpu_percent: number;
+  memory_used: number;
+  memory_limit: number;
+}
+
+export function dockerStats(dockerId: string): Promise<ContainerStats[]> {
+  return invoke<ContainerStats[]>("docker_stats", { dockerId });
+}

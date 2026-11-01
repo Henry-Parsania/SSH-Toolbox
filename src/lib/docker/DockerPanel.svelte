@@ -7,6 +7,8 @@
     dockerConnect,
     dockerInspect,
     dockerList,
+    dockerStats,
+    type ContainerStats,
     type ContainerAction,
     type ContainerDetails,
     type ContainerInfo,
@@ -43,6 +45,7 @@
   let details = $state<{ name: string; data: ContainerDetails | null; error: string; tab: string } | null>(null);
   let removing = $state<ContainerInfo | null>(null);
   let filter = $state("");
+  let stats = $state<Record<string, ContainerStats>>({});
 
   async function connect() {
     await disconnect();
@@ -99,6 +102,48 @@
     }, REFRESH_MS);
     return () => clearInterval(timer);
   });
+
+  // Readings take a second or two per container, so they have their own, slower, loop.
+  $effect(() => {
+    const id = dockerId;
+    if (!id) {
+      stats = {};
+      return;
+    }
+    let stopped = false;
+    const read = async () => {
+      if (document.hidden) return;
+      try {
+        const list = await dockerStats(id);
+        if (!stopped) stats = Object.fromEntries(list.map((s) => [s.id, s]));
+      } catch {
+        // The list shows the connection problem; readings are only extra.
+      }
+    };
+    void read();
+    const timer = setInterval(read, 6000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  });
+
+  function size(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let n = bytes;
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) {
+      n /= 1024;
+      i++;
+    }
+    return `${n >= 10 || i === 0 ? Math.round(n) : n.toFixed(1)} ${units[i]}`;
+  }
+
+  function usage(s: ContainerStats | undefined): string {
+    if (!s) return "";
+    const memory = s.memory_limit > 0 ? `${size(s.memory_used)} of ${size(s.memory_limit)}` : size(s.memory_used);
+    return `CPU ${s.cpu_percent.toFixed(1)}% · ${memory}`;
+  }
 
   onDestroy(() => void disconnect());
 
@@ -264,6 +309,7 @@
             <div class="what">
               <span class="name">{c.name}</span>
               <span class="sub">{c.image} · {c.status}</span>
+              {#if stats[c.id]}<span class="sub">{usage(stats[c.id])}</span>{/if}
               {#if c.ports.length}<span class="sub">{c.ports.join(", ")}</span>{/if}
             </div>
             <div class="actions">

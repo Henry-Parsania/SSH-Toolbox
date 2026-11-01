@@ -60,6 +60,7 @@ pub fn run() {
             commands::docker::docker_connect,
             commands::docker::docker_inspect,
             commands::docker::docker_list,
+            commands::docker::docker_stats,
             commands::terminal::serial_list_ports,
             commands::terminal::serial_send_break,
             commands::terminal::serial_set_control,
