@@ -140,6 +140,17 @@
     }
   }
 
+  /** Ticks or unticks one row, leaving the others as they are. */
+  function toggle(entry: FileEntry) {
+    selected = selected.includes(entry.name) ? selected.filter((n) => n !== entry.name) : [...selected, entry.name];
+    anchor = entry.name;
+  }
+
+  const allChosen = $derived(visible.length > 0 && visible.every((v) => selected.includes(v.name)));
+  function toggleAll() {
+    selected = allChosen ? [] : visible.map((v) => v.name);
+  }
+
   function pathOf(entry: FileEntry): string {
     return joinPath(path, entry.name, sep);
   }
@@ -412,6 +423,16 @@
           onclick={(e) => pick(entry, e)}
           ondblclick={() => open(entry)}
         >
+          <input
+            type="checkbox"
+            class="pick"
+            aria-label="Select {entry.name}"
+            checked={selected.includes(entry.name)}
+            onpointerdown={(e) => e.stopPropagation()}
+            onclick={(e) => e.stopPropagation()}
+            ondblclick={(e) => e.stopPropagation()}
+            onchange={() => toggle(entry)}
+          />
           <span class="icon" class:dir={entry.kind === "dir"}><Icon name={icon(entry)} size={14} /></span>
           <span class="name" title={entry.name}>{entry.name}</span>
           <span class="meta size">{formatSize(entry.size)}</span>
@@ -430,6 +451,9 @@
     </div>
 
     <footer>
+      <label class="check small-check">
+        <input type="checkbox" checked={allChosen} disabled={visible.length === 0} onchange={toggleAll} /> All
+      </label>
       <label class="check small-check">
         <input type="checkbox" bind:checked={showHidden} /> Hidden files
       </label>
@@ -669,6 +693,11 @@
   .row.selected {
     background: var(--accent-soft);
     box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .pick {
+    flex: none;
+    margin: 0;
+    cursor: pointer;
   }
   .icon {
     display: grid;
