@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
+  import { wslPath } from "../terminal/cwd";
   import { promptRespond, type Prompt, type PromptResponse } from "../backend";
   import {
     filesClose,
@@ -25,10 +26,12 @@
       | { kind: "ftp"; id: string; name: string }
       | { kind: "wsl"; distro: string; name: string }
       | null;
+    /** The folder the active terminal reported, if any. */
+    follow?: string;
     onclose: () => void;
   }
 
-  let { source, onclose }: Props = $props();
+  let { source, follow = "", onclose }: Props = $props();
 
   let local = $state<OpenedFiles | null>(null);
   let remote = $state<OpenedFiles | null>(null);
@@ -165,6 +168,19 @@
   // Both lists can be refreshed from outside by changing their path to the same value, but a
   // finished transfer is shown by the next refresh, so the lists reload when the queue empties.
   let wasBusy = false;
+  // The server list can follow the terminal's folder. Only the list changes: nothing is
+  // changed on the server, and the terminal is not touched.
+  let following = $state(localStorage.getItem("files-follow") !== "off");
+  function toggleFollow() {
+    following = !following;
+    localStorage.setItem("files-follow", following ? "on" : "off");
+  }
+  $effect(() => {
+    if (!following || !follow || !remote || !source || source.kind === "ftp") return;
+    const target = source.kind === "wsl" ? wslPath(source.distro, follow) : follow;
+    if (target !== untrack(() => remotePath)) remotePath = target;
+  });
+
   let refresh = $state(0);
   $effect(() => {
     const busy = jobs.some((j) => ["queued", "asking", "running"].includes(j.state.state));
@@ -176,7 +192,18 @@
 <aside class="panel" aria-label="Files">
   <header>
     <span class="heading"><Icon name="folder" size={15} /> Files</span>
+    <span class="head-tools">
+    <button
+      class="icon-btn"
+      class:on={following}
+      title={following ? "Following the terminal's folder (click to stop)" : "Follow the terminal's folder"}
+      aria-pressed={following}
+      onclick={toggleFollow}
+    >
+      <Icon name="route" size={15} />
+    </button>
     <button class="icon-btn" title="Close the file panel" onclick={onclose}><Icon name="close" size={15} /></button>
+    </span>
   </header>
 
   {#if message}<p class="message warn top">{message}</p>{/if}
@@ -237,6 +264,13 @@
     min-height: 0;
     background: var(--bg-1);
     border-left: 1px solid var(--border);
+  }
+  .head-tools {
+    display: flex;
+    gap: 2px;
+  }
+  .head-tools .on {
+    color: var(--accent);
   }
   header {
     display: flex;

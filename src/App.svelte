@@ -113,6 +113,12 @@
     return null;
   });
 
+  // The folder the active pane's shell reported, for the file panel to follow.
+  const followedFolder = $derived.by(() => {
+    const tab = workspace.activeTab;
+    return tab ? (workspace.cwd[tab.active] ?? "") : "";
+  });
+
   // The colour theme applies to the whole window, not only to the terminal.
   $effect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -298,7 +304,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
         <div class="side" style:width="{filesWidth}px">
-          <FilesPanel source={activeSession} onclose={() => (filesOpen = false)} />
+          <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
         </div>
       {/if}
     </div>

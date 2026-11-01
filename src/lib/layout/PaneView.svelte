@@ -65,6 +65,7 @@
         {tabId}
         paneId={node.pane_id}
         broadcasting={workspace.broadcast}
+        oncwd={(path) => (workspace.cwd[node.pane_id] = path)}
         {onstatus}
       />
     {/key}

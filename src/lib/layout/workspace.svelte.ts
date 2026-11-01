@@ -43,6 +43,9 @@ export class Workspace {
     delete this.waiting[paneId];
   }
 
+  /** The folder each pane's shell last reported (OSC 7). Not saved: it is only a hint. */
+  cwd = $state<Record<string, string>>({});
+
   /** When on, what is typed in one pane goes to every pane in the tab (P5). */
   broadcast = $state(false);
 

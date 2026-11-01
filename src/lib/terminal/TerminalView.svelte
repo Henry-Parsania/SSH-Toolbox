@@ -29,6 +29,7 @@
   import { settings } from "../settings.svelte";
   import { broadcastInput, registerReceiver } from "./broadcast";
   import { chooseRenderer, webglFailureNotice } from "./renderer";
+  import { parseCwd } from "./cwd";
   import { terminalTheme } from "./themes";
 
   interface Props {
@@ -43,6 +44,8 @@
     tabId?: string;
     paneId?: string;
     broadcasting?: boolean;
+    /** Called with the folder the shell says it is in (OSC 7). */
+    oncwd?: (path: string) => void;
   }
 
   let {
@@ -54,6 +57,7 @@
     tabId = "",
     paneId = "",
     broadcasting = false,
+    oncwd,
   }: Props = $props();
 
   let searching = $state(false);
@@ -170,6 +174,13 @@
         : {}),
     });
     const fit = new FitAddon();
+    // The shell may report its folder. The value is untrusted text: it is cleaned first, and
+    // only changes which folder the file panel shows.
+    term.parser.registerOscHandler(7, (data) => {
+      const path = parseCwd(data);
+      if (path) oncwd?.(path);
+      return true;
+    });
     term.loadAddon(fit);
     term.loadAddon(new Unicode11Addon());
     term.unicode.activeVersion = "11";
