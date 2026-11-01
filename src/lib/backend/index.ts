@@ -139,6 +139,11 @@ export interface Settings {
   webkit_workaround: "off" | "disable_dmabuf" | "disable_compositing";
   default_shell: string;
   restore_layout: boolean;
+  reachability_enabled: boolean;
+  /** 0 means only at start and when the list changes. */
+  reachability_interval_secs: number;
+  stats_enabled: boolean;
+  stats_interval_secs: number;
 }
 
 export function settingsGet(): Promise<Settings> {

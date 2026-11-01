@@ -49,10 +49,14 @@ pub fn run() {
         .manage(services)
         .manage(commands::keys::KeySetups::default())
         .manage(commands::files::Files::default())
+        .manage(commands::status::StatsState::default())
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::status::reach_check,
+            commands::status::stats_local,
+            commands::status::stats_remote,
             commands::files::files_chmod,
             commands::files::files_close,
             commands::files::files_delete,

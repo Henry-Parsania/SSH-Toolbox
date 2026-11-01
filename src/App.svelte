@@ -20,6 +20,8 @@
   import { Library } from "./lib/sessions/library.svelte";
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
+  import { Reachability } from "./lib/status/reach.svelte";
+  import StatusBar from "./lib/status/StatusBar.svelte";
   import { loadSettings, settings } from "./lib/settings.svelte";
   import Icon from "./lib/ui/Icon.svelte";
 
@@ -62,6 +64,39 @@
   // Counts up each time something asks the sidebar to start a new session.
   let newSessionSignal = $state(0);
   const library = new Library();
+  const reach = new Reachability();
+
+  // Check which saved servers answer: at start, whenever the list changes, and then on the
+  // interval from the settings (0 means only at start and on changes).
+  const listKey = $derived(
+    library.file.session
+      .map((s) => (s.type === "ssh" ? `${s.id}@${s.host}:${s.port}:${s.jump}` : s.type === "ftp" ? `${s.id}@${s.host}:${s.port}` : ""))
+      .join("|"),
+  );
+  $effect(() => {
+    if (!settings.reachability_enabled) {
+      reach.clear();
+      return;
+    }
+    void listKey;
+    const every = settings.reachability_interval_secs;
+    const sessions = $state.snapshot(library.file.session);
+    const soon = setTimeout(() => void reach.run(sessions), 300);
+    const timer = every > 0 ? setInterval(() => void reach.run(sessions), every * 1000) : undefined;
+    return () => {
+      clearTimeout(soon);
+      if (timer) clearInterval(timer);
+    };
+  });
+
+  // The footer shows the server of the active SSH pane, and this computer for anything else.
+  const footerTarget = $derived.by(() => {
+    const tab = workspace.activeTab;
+    const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
+    return leaf?.spec?.type === "ssh"
+      ? { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title }
+      : { kind: "local" as const };
+  });
 
   // An FTP session has no terminal. Opening one shows its files until another pane is chosen.
   let ftpOpened = $state<{ kind: "ftp"; id: string; name: string } | null>(null);
@@ -199,7 +234,16 @@
   </div>
 {:else if platform}
   <div class="app">
-    <TabBar
+    <div class="body">
+      {#if sidebarOpen}
+        <div class="side" style:width="{sidebarWidth}px">
+          <Sidebar {library} onopen={openSaved} {newSessionSignal} {reach} />
+        </div>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="grip" onpointerdown={(e) => resizeSide(e, "sidebar")}></div>
+      {/if}
+      <div class="center">
+      <TabBar
       {workspace}
       {options}
       {sidebarOpen}
@@ -209,14 +253,6 @@
       {filesOpen}
       onfiles={() => (filesOpen = !filesOpen)}
     />
-    <div class="body">
-      {#if sidebarOpen}
-        <div class="side" style:width="{sidebarWidth}px">
-          <Sidebar {library} onopen={openSaved} {newSessionSignal} />
-        </div>
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="grip" onpointerdown={(e) => resizeSide(e, "sidebar")}></div>
-      {/if}
       <main class="tabs">
         {#each workspace.tabs as tab (tab.id)}
           <!-- Hidden tabs stay mounted, so their terminals keep running. -->
@@ -254,6 +290,10 @@
           </div>
         {/if}
       </main>
+      {#if settings.stats_enabled}
+        <StatusBar target={footerTarget} />
+      {/if}
+      </div>
       {#if filesOpen}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
@@ -298,6 +338,13 @@
   }
   .grip:hover {
     background: var(--accent-soft);
+  }
+  .center {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
   }
   .tabs {
     position: relative;

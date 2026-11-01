@@ -12,6 +12,10 @@ export const DEFAULT_SETTINGS: Settings = {
   webkit_workaround: "off",
   default_shell: "",
   restore_layout: true,
+  reachability_enabled: true,
+  reachability_interval_secs: 60,
+  stats_enabled: true,
+  stats_interval_secs: 5,
 };
 
 /** Always has a value, so terminals can start before the file has been read. */

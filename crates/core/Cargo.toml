@@ -30,6 +30,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 rustls-native-certs = "0.8"
 sha2 = "0.10"
 x509-parser = "0.18.1"
+sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
 
 [dev-dependencies]
 serde_json = "1"

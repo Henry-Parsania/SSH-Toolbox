@@ -8,10 +8,12 @@ pub mod layout;
 pub mod link;
 pub mod platform;
 pub mod prompt;
+pub mod reach;
 pub mod secret;
 pub mod sessions;
 pub mod settings;
 pub mod ssh;
+pub mod stats;
 pub mod terminal;
 
 pub use error::{AppError, ErrorCode};

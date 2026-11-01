@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { SavedSession } from "../backend";
+  import { settings } from "../settings.svelte";
+  import type { Reachability } from "../status/reach.svelte";
   import Icon from "../ui/Icon.svelte";
   import ForwardsDialog from "./ForwardsDialog.svelte";
   import FtpEditor from "./FtpEditor.svelte";
@@ -15,9 +17,11 @@
     onopen: (session: SavedSession) => void;
     /** Each time this goes up, the editor for a new session opens. */
     newSessionSignal?: number;
+    /** Which servers answer, shown as a dot beside each one. */
+    reach?: Reachability;
   }
 
-  let { library, onopen, newSessionSignal = 0 }: Props = $props();
+  let { library, onopen, newSessionSignal = 0, reach }: Props = $props();
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
@@ -40,6 +44,17 @@
     if (session.type === "ssh") return `${session.user}@${session.host}`;
     if (session.type === "serial") return session.port;
     return session.host;
+  }
+
+  /** The dot beside a session: how it answered the last check, if it is checked at all. */
+  function dot(session: SavedSession): { state: "up" | "down" | "unknown"; tip: string } | null {
+    if (!reach || !settings.reachability_enabled) return null;
+    if (session.type === "serial" || (session.type === "ssh" && session.jump)) return null;
+    const answer = reach.results[session.id];
+    if (!answer) return { state: "unknown", tip: reach.checking ? "Checking..." : "Not checked yet" };
+    return answer.reachable
+      ? { state: "up", tip: `Reachable${answer.millis === null ? "" : ` (${answer.millis} ms)`}` }
+      : { state: "down", tip: "Not reachable" };
   }
 
   function iconOf(session: SavedSession) {
@@ -149,6 +164,10 @@
     <div class="item" style:padding-left="{6 + depth * 14 + 13}px">
       <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
         <span class="glyph"><Icon name={iconOf(item.session)} size={15} /></span>
+        {#if dot(item.session)}
+          {@const d = dot(item.session)!}
+          <span class="dot {d.state}" title={d.tip} aria-label={d.tip}></span>
+        {/if}
         <span class="name">{item.session.name}</span>
         <span class="where">{describe(item.session)}</span>
       </button>
@@ -360,6 +379,24 @@
     background: none;
     border: none;
     cursor: default;
+  }
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-right: -2px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    opacity: 0.55;
+  }
+  .dot.up {
+    background: #3fb97a;
+    opacity: 1;
+    box-shadow: 0 0 0 3px #3fb97a26;
+  }
+  .dot.down {
+    background: var(--danger);
+    opacity: 0.9;
   }
   .glyph {
     display: grid;

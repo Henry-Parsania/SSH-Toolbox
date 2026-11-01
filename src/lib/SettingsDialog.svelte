@@ -18,7 +18,13 @@
     saving = true;
     error = "";
     try {
-      await saveSettings({ ...draft, font_size: Number(draft.font_size), scrollback: Number(draft.scrollback) });
+      await saveSettings({
+        ...draft,
+        font_size: Number(draft.font_size),
+        scrollback: Number(draft.scrollback),
+        reachability_interval_secs: Number(draft.reachability_interval_secs),
+        stats_interval_secs: Number(draft.stats_interval_secs),
+      });
       onclose();
     } catch (err) {
       error = (err as { message?: string }).message ?? "Couldn't save the settings.";
@@ -94,6 +100,28 @@
       Bring back tabs and splits when the app starts
     </label>
 
+    <h3 class="group">Server status</h3>
+    <label class="check">
+      <input type="checkbox" bind:checked={draft.reachability_enabled} />
+      Show which saved servers can be reached (a quick connection test)
+    </label>
+    {#if draft.reachability_enabled}
+      <label class="field">
+        Check again every (seconds, 0 = only at start and when the list changes)
+        <input type="number" min="0" max="3600" bind:value={draft.reachability_interval_secs} />
+      </label>
+    {/if}
+    <label class="check">
+      <input type="checkbox" bind:checked={draft.stats_enabled} />
+      Show CPU, memory and disk use in the footer
+    </label>
+    {#if draft.stats_enabled}
+      <label class="field">
+        Refresh the footer every (seconds)
+        <input type="number" min="2" max="300" bind:value={draft.stats_interval_secs} />
+      </label>
+    {/if}
+
     {#if error}<p class="message error">{error}</p>{/if}
     <div class="modal-actions">
       <button class="btn" onclick={onclose}>Cancel</button>
@@ -101,3 +129,14 @@
     </div>
   </div>
 </div>
+
+<style>
+  .group {
+    margin: 14px 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+</style>

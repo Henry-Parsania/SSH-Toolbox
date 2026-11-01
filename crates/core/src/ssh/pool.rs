@@ -41,6 +41,17 @@ impl ConnectionPool {
         Self::default()
     }
 
+    /// The live connection for `key`, if there is one. Never connects. Used for things that only
+    /// make sense while a session is open, such as the footer's readings.
+    pub async fn existing(&self, key: &str) -> Option<Arc<SharedConnection>> {
+        let slot = self.slots.lock().unwrap().get(key)?.clone();
+        // A session that is still connecting holds the lock; it has nothing to read yet.
+        let current = slot.try_lock().ok()?;
+        current
+            .upgrade()
+            .filter(|shared| !shared.handle.is_closed())
+    }
+
     /// The live connection for `key`, or a new one made by `connect`. Panes that ask while a
     /// connection is being made wait for it instead of logging in again. A connection that has
     /// dropped is never handed out: asking again makes a fresh one.

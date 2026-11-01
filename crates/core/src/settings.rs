@@ -11,6 +11,11 @@ pub const MIN_SCROLLBACK: u32 = 10_000;
 pub const MAX_SCROLLBACK: u32 = 1_000_000;
 pub const MIN_FONT_SIZE: u16 = 8;
 pub const MAX_FONT_SIZE: u16 = 48;
+/// Seconds between reachability checks. 0 means only at start and when the list changes.
+pub const MIN_CHECK_INTERVAL: u32 = 5;
+pub const MAX_CHECK_INTERVAL: u32 = 3600;
+pub const MIN_STATS_INTERVAL: u32 = 2;
+pub const MAX_STATS_INTERVAL: u32 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +53,13 @@ pub struct Settings {
     pub webkit_workaround: WebkitWorkaround,
     pub default_shell: String,
     pub restore_layout: bool,
+    /// Whether the saved sessions are checked for being reachable (a quick TCP connect).
+    pub reachability_enabled: bool,
+    /// Seconds between checks, or 0 to check only at start and when the list changes.
+    pub reachability_interval_secs: u32,
+    /// Whether the footer shows the load of the computer the active tab is on.
+    pub stats_enabled: bool,
+    pub stats_interval_secs: u32,
 }
 
 impl Default for Settings {
@@ -62,6 +74,10 @@ impl Default for Settings {
             webkit_workaround: WebkitWorkaround::Off,
             default_shell: String::new(),
             restore_layout: true,
+            reachability_enabled: true,
+            reachability_interval_secs: 60,
+            stats_enabled: true,
+            stats_interval_secs: 5,
         }
     }
 }
@@ -81,6 +97,15 @@ impl Settings {
                 "Scrollback must be between 10,000 and 1,000,000 lines.",
             ));
         }
+        let interval = self.reachability_interval_secs;
+        if interval != 0 && !(MIN_CHECK_INTERVAL..=MAX_CHECK_INTERVAL).contains(&interval) {
+            return Err(invalid(
+                "Check for reachable servers every 5 to 3600 seconds, or 0 to check only at start.",
+            ));
+        }
+        if !(MIN_STATS_INTERVAL..=MAX_STATS_INTERVAL).contains(&self.stats_interval_secs) {
+            return Err(invalid("Refresh the footer every 2 to 300 seconds."));
+        }
         if self.font_family.len() > 200 || self.font_family.chars().any(|c| c.is_control()) {
             return Err(invalid("That font name isn't valid."));
         }
@@ -91,6 +116,14 @@ impl Settings {
     fn clamped(mut self) -> Self {
         self.font_size = self.font_size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
         self.scrollback = self.scrollback.clamp(MIN_SCROLLBACK, MAX_SCROLLBACK);
+        if self.reachability_interval_secs != 0 {
+            self.reachability_interval_secs = self
+                .reachability_interval_secs
+                .clamp(MIN_CHECK_INTERVAL, MAX_CHECK_INTERVAL);
+        }
+        self.stats_interval_secs = self
+            .stats_interval_secs
+            .clamp(MIN_STATS_INTERVAL, MAX_STATS_INTERVAL);
         if self.font_family.trim().is_empty() || self.font_family.chars().any(|c| c.is_control()) {
             self.font_family = Settings::default().font_family;
         }
@@ -138,6 +171,31 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
         (dir, path)
+    }
+
+    #[test]
+    fn check_intervals_are_kept_in_range() {
+        let mut s = Settings::default();
+        assert!(s.validate().is_ok());
+        s.reachability_interval_secs = 0;
+        assert!(s.validate().is_ok(), "0 means only at start");
+        s.reachability_interval_secs = 2;
+        assert!(s.validate().is_err());
+        s.reachability_interval_secs = 60;
+        s.stats_interval_secs = 1;
+        assert!(s.validate().is_err());
+
+        let (_dir, path) = path();
+        std::fs::write(
+            &path,
+            "reachability_interval_secs = 1
+stats_interval_secs = 9999
+",
+        )
+        .unwrap();
+        let loaded = load(&path);
+        assert_eq!(loaded.reachability_interval_secs, MIN_CHECK_INTERVAL);
+        assert_eq!(loaded.stats_interval_secs, MAX_STATS_INTERVAL);
     }
 
     #[test]

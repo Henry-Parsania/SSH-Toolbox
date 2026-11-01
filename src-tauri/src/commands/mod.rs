@@ -10,4 +10,5 @@ pub mod prompt;
 pub mod sessions;
 pub mod settings;
 pub mod startup;
+pub mod status;
 pub mod terminal;
