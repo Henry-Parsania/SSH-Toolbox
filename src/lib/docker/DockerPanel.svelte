@@ -46,6 +46,11 @@
   const wanted = $derived(chosen === AUTO ? (active?.id ?? null) : chosen);
 
   let dockerId = $state<string | null>(null);
+  let showSource = $state(false);
+  // What the panel is showing, for its heading.
+  const shownName = $derived(
+    wanted === null ? "" : wanted === LOCAL ? "This computer" : (servers.find((s) => s.id === wanted)?.name ?? active?.name ?? ""),
+  );
   let connecting = $state(false);
   let error = $state("");
   let containers = $state<ContainerInfo[]>([]);
@@ -137,8 +142,8 @@
     if (chosen !== AUTO) return;
     void active?.id;
     untrack(() => {
+      // Moving to a tab that isn't an SSH server leaves the last one showing.
       if (active) void connect();
-      else void disconnect();
     });
   });
 
@@ -325,8 +330,11 @@
 
 <aside class="panel" aria-label="Docker">
   <header>
-    <span class="heading"><Icon name="box" size={16} /> Docker</span>
+    <span class="heading"><Icon name="box" size={16} /> Docker{#if shownName}<span class="where">{shownName}</span>{/if}</span>
     <div class="head-tools">
+      <button class="icon-btn" class:on={showSource} aria-label="Choose where Docker runs" title="Choose where Docker runs" onclick={() => (showSource = !showSource)}>
+        <Icon name="settings" size={14} />
+      </button>
       {#if dockerId}
         <button class="icon-btn" aria-label="Refresh" title="Refresh" onclick={refresh}>
           <Icon name="refresh" size={15} />
@@ -338,6 +346,7 @@
     </div>
   </header>
 
+  {#if showSource || (chosen !== AUTO && !dockerId)}
   <div class="source">
     <select
       aria-label="Where Docker runs"
@@ -358,8 +367,12 @@
       <button class="btn small primary" disabled={!wanted} onclick={connect}>Connect</button>
     {/if}
   </div>
+  {/if}
 
-  {#if error}<p class="message error">{error}</p>{/if}
+  {#if error}
+    <p class="message error">{error}</p>
+    {#if wanted && !connecting && !dockerId}<p class="message"><button class="btn small" onclick={connect}>Try again</button></p>{/if}
+  {/if}
 
   {#if connecting}
     <p class="hint">Connecting…</p>
@@ -543,6 +556,18 @@
   .head-tools {
     display: flex;
     gap: 2px;
+  }
+  .where {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .head-tools .on {
+    color: var(--accent);
   }
   .source {
     display: flex;

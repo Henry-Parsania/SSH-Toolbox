@@ -48,10 +48,10 @@
 
 <nav class="menubar" bind:this={bar} aria-label="Menu">
   {#each menus as menu, i (menu.label)}
-    <div class="menu">
+    <div class="mb-menu">
       <button
-        class="top"
-        class:on={open === i}
+        class="mb-top"
+        class:mb-on={open === i}
         aria-haspopup="menu"
         aria-expanded={open === i}
         onclick={() => (open = open === i ? null : i)}
@@ -60,20 +60,20 @@
         }}>{menu.label}</button
       >
       {#if open === i}
-        <div class="drop" role="menu">
+        <div class="mb-drop" role="menu">
           {#each menu.items as item, j (j)}
             {#if item === "separator"}
-              <div class="rule" role="separator"></div>
+              <div class="mb-rule" role="separator"></div>
             {:else}
               <button
-                class="item"
+                class="mb-item"
                 role="menuitem"
                 disabled={item.disabled}
                 onclick={() => choose(item)}
               >
-                <span class="tick">{item.checked ? "✓" : ""}</span>
-                <span class="text">{item.label}</span>
-                {#if item.hint}<span class="hint">{item.hint}</span>{/if}
+                <span class="mb-tick">{item.checked ? "✓" : ""}</span>
+                <span class="mb-text">{item.label}</span>
+                {#if item.hint}<span class="mb-hint">{item.hint}</span>{/if}
               </button>
             {/if}
           {/each}
@@ -95,23 +95,26 @@
     font-size: 12.5px;
     user-select: none;
   }
-  .menu {
+  .mb-menu {
     position: relative;
   }
-  .top {
+  .mb-top {
     height: 24px;
     padding: 0 10px;
     color: var(--text);
     background: transparent;
     border: 0;
     border-radius: 5px;
+    box-shadow: none;
+    min-height: 0;
+    font: inherit;
     cursor: pointer;
   }
-  .top:hover,
-  .top.on {
+  .mb-top:hover,
+  .mb-top.mb-on {
     background: var(--bg-2);
   }
-  .drop {
+  .mb-drop {
     position: absolute;
     top: 26px;
     left: 0;
@@ -123,7 +126,7 @@
     border-radius: 8px;
     box-shadow: var(--shadow-small, 0 6px 20px rgba(0, 0, 0, 0.35));
   }
-  .item {
+  .mb-item {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -137,29 +140,29 @@
     text-align: left;
     cursor: pointer;
   }
-  .item:hover:not(:disabled) {
+  .mb-item:hover:not(:disabled) {
     background: var(--bg-2);
   }
-  .item:disabled {
+  .mb-item:disabled {
     color: var(--text-muted);
     cursor: default;
     opacity: 0.6;
   }
-  .tick {
+  .mb-tick {
     width: 14px;
     color: var(--accent);
     text-align: center;
   }
-  .text {
+  .mb-text {
     flex: 1;
     white-space: nowrap;
   }
-  .hint {
+  .mb-hint {
     margin-left: 24px;
     color: var(--text-muted);
     font-size: 11.5px;
   }
-  .rule {
+  .mb-rule {
     height: 1px;
     margin: 4px 6px;
     background: var(--border);

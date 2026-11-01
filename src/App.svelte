@@ -83,6 +83,34 @@
     handle.addEventListener("pointerup", stop);
     handle.addEventListener("pointercancel", stop);
   }
+  // The Docker section's height can be dragged, and is kept for next time.
+  let dockHeight = $state(
+    (() => {
+      const n = Number(localStorage.getItem("docker-height"));
+      return n >= 140 && n <= 2000 ? n : 320;
+    })(),
+  );
+  function resizeDock(e: PointerEvent) {
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const startY = e.clientY;
+    const start = dockHeight;
+    const move = (ev: PointerEvent) => {
+      // Dragging up makes it taller. The sessions list keeps at least 120 px.
+      const most = Math.max(140, window.innerHeight - 28 - 120 - 60);
+      dockHeight = Math.min(most, Math.max(140, start + (startY - ev.clientY)));
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", stop);
+      handle.removeEventListener("pointercancel", stop);
+      localStorage.setItem("docker-height", String(Math.round(dockHeight)));
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+  }
   // Counts up each time something asks the sidebar to start a new session.
   let newSessionSignal = $state(0);
   const library = new Library();
@@ -139,7 +167,8 @@
   const activeSshSession = $derived.by(() => {
     const tab = workspace.activeTab;
     const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
-    return leaf?.spec?.type === "ssh" ? { id: leaf.spec.saved_session_id, name: leaf.title } : null;
+    if (leaf?.spec?.type !== "ssh" || workspace.waiting[leaf.pane_id]) return null;
+    return { id: leaf.spec.saved_session_id, name: leaf.title };
   });
 
   // The folder the active pane's shell reported, for the file panel to follow.
@@ -343,7 +372,9 @@
         <div class="side column" style:width="{sidebarWidth}px">
           <div class="top-part"><Sidebar {library} onopen={openSaved} {newSessionSignal} command={sidebarCommand} {reach} /></div>
           {#if dockerOpen}
-            <div class="dock">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="grip-h" onpointerdown={resizeDock}></div>
+            <div class="dock" style:height="{dockHeight}px">
               <DockerPanel
                 {library}
                 active={activeSshSession}
@@ -454,9 +485,21 @@
   }
   .dock {
     display: flex;
-    flex: 1;
+    flex: none;
     min-height: 140px;
     min-width: 0;
+  }
+  /* A thin strip between the sessions and Docker that can be dragged up and down. */
+  .grip-h {
+    flex: none;
+    height: 7px;
+    margin: -3px 0;
+    z-index: 6;
+    cursor: row-resize;
+  }
+  .grip-h:hover {
+    background: var(--accent);
+    opacity: 0.4;
   }
   .side {
     display: flex;
