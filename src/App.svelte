@@ -116,6 +116,13 @@
     return null;
   });
 
+  // The SSH server in the active pane, whose Docker the left panel shows.
+  const activeSshSession = $derived.by(() => {
+    const tab = workspace.activeTab;
+    const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
+    return leaf?.spec?.type === "ssh" ? { id: leaf.spec.saved_session_id, name: leaf.title } : null;
+  });
+
   // The folder the active pane's shell reported, for the file panel to follow.
   const followedFolder = $derived.by(() => {
     const tab = workspace.activeTab;
@@ -133,14 +140,12 @@
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
       // The server's files appear beside the terminal.
       filesOpen = true;
-      dockerOpen = false;
       ftpOpened = null;
     } else if (session.type === "serial") {
       workspace.newTab({ type: "serial", saved_session_id: session.id }, session.name);
     } else if (session.type === "ftp") {
       ftpOpened = { kind: "ftp", id: session.id, name: session.name };
       filesOpen = true;
-      dockerOpen = false;
     }
   }
   // Choosing another tab or pane goes back to following the terminal.
@@ -249,8 +254,18 @@
   <div class="app">
     <div class="body">
       {#if sidebarOpen}
-        <div class="side" style:width="{sidebarWidth}px">
-          <Sidebar {library} onopen={openSaved} {newSessionSignal} {reach} />
+        <div class="side column" style:width="{sidebarWidth}px">
+          <div class="top-part"><Sidebar {library} onopen={openSaved} {newSessionSignal} {reach} /></div>
+          {#if dockerOpen}
+            <div class="dock">
+              <DockerPanel
+                {library}
+                active={activeSshSession}
+                onopen={(spec, title) => workspace.newTab(spec, title)}
+                onclose={() => (dockerOpen = false)}
+              />
+            </div>
+          {/if}
         </div>
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "sidebar")}></div>
@@ -264,14 +279,12 @@
       onsettings={() => (showSettings = true)}
       onsidebar={() => (sidebarOpen = !sidebarOpen)}
       {filesOpen}
-      onfiles={() => {
-        filesOpen = !filesOpen;
-        if (filesOpen) dockerOpen = false;
-      }}
+      onfiles={() => (filesOpen = !filesOpen)}
       {dockerOpen}
       ondocker={() => {
         dockerOpen = !dockerOpen;
-        if (dockerOpen) filesOpen = false;
+        // Docker lives under the sessions list, so that has to be showing.
+        if (dockerOpen) sidebarOpen = true;
       }}
     />
       <main class="tabs">
@@ -307,6 +320,7 @@
               <div><dt><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">T</span></dt><dd>New tab</dd></div>
               <div><dt><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">E</span></dt><dd>Split side by side</dd></div>
               <div><dt><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">F</span></dt><dd>Search the output</dd></div>
+              <div><dt><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">S</span></dt><dd>Save the output to Downloads</dd></div>
             </dl>
           </div>
         {/if}
@@ -315,15 +329,11 @@
         <StatusBar target={footerTarget} />
       {/if}
       </div>
-      {#if filesOpen || dockerOpen}
+      {#if filesOpen}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
         <div class="side" style:width="{filesWidth}px">
-          {#if dockerOpen}
-            <DockerPanel {library} onopen={(spec, title) => workspace.newTab(spec, title)} onclose={() => (dockerOpen = false)} />
-          {:else}
-            <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
-          {/if}
+          <FilesPanel source={activeSession} follow={followedFolder} onclose={() => (filesOpen = false)} />
         </div>
       {/if}
     </div>
@@ -343,6 +353,21 @@
     display: flex;
     flex: 1;
     min-height: 0;
+  }
+  .side.column {
+    flex-direction: column;
+  }
+  .top-part {
+    display: flex;
+    flex: 1;
+    min-height: 120px;
+    min-width: 0;
+  }
+  .dock {
+    display: flex;
+    flex: 1;
+    min-height: 140px;
+    min-width: 0;
   }
   .side {
     display: flex;

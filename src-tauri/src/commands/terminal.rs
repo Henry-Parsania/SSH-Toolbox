@@ -212,3 +212,65 @@ pub async fn serial_send_break(
         .control(PortControl::Break)
         .await
 }
+
+/// Largest output that can be saved, in bytes.
+const MAX_SAVED_OUTPUT: usize = 50 * 1024 * 1024;
+
+/// Saves a terminal's text to a new file in the Downloads folder (or the home folder). The name
+/// is made here and never reuses an existing file, so nothing can be overwritten. Returns the path.
+#[tauri::command]
+pub async fn terminal_save_output(text: String) -> Result<String, AppError> {
+    if text.len() > MAX_SAVED_OUTPUT {
+        return Err(AppError::new(
+            ErrorCode::InvalidInput,
+            "That's too much output to save.",
+        ));
+    }
+    tokio::task::spawn_blocking(move || {
+        use std::io::Write;
+        let dirs = directories::UserDirs::new().ok_or_else(|| {
+            AppError::new(ErrorCode::NotFound, "Couldn't find your Downloads folder.")
+        })?;
+        let folder = dirs
+            .download_dir()
+            .map(|d| d.to_path_buf())
+            .unwrap_or_else(|| dirs.home_dir().to_path_buf());
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        for attempt in 0..100u32 {
+            let suffix = if attempt == 0 {
+                String::new()
+            } else {
+                format!("-{attempt}")
+            };
+            let path = folder.join(format!("ssh-toolbox-output-{stamp}{suffix}.txt"));
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(mut file) => {
+                    file.write_all(text.as_bytes()).map_err(|_| {
+                        AppError::new(ErrorCode::Internal, "Couldn't write the file.")
+                    })?;
+                    return Ok(path.display().to_string());
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(_) => {
+                    return Err(AppError::new(
+                        ErrorCode::PermissionDenied,
+                        "Couldn't save into the Downloads folder.",
+                    ));
+                }
+            }
+        }
+        Err(AppError::new(
+            ErrorCode::Internal,
+            "Couldn't pick a file name.",
+        ))
+    })
+    .await
+    .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't save the output."))?
+}

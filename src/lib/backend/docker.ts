@@ -77,3 +77,22 @@ export interface ContainerStats {
 export function dockerStats(dockerId: string): Promise<ContainerStats[]> {
   return invoke<ContainerStats[]>("docker_stats", { dockerId });
 }
+
+export type ResourceKind = "images" | "volumes" | "networks";
+
+export interface DockerResource {
+  /** What is passed back to remove it. */
+  id: string;
+  name: string;
+  detail: string;
+  /** Docker's own networks can't be removed. */
+  protected: boolean;
+}
+
+export function dockerResources(dockerId: string, kind: ResourceKind): Promise<DockerResource[]> {
+  return invoke<DockerResource[]>("docker_resources", { dockerId, kind });
+}
+
+export function dockerRemoveResource(dockerId: string, kind: ResourceKind, id: string): Promise<void> {
+  return invoke<void>("docker_remove_resource", { dockerId, kind, id });
+}

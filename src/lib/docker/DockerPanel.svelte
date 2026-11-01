@@ -7,6 +7,10 @@
     dockerConnect,
     dockerInspect,
     dockerList,
+    dockerRemoveResource,
+    dockerResources,
+    type DockerResource,
+    type ResourceKind,
     dockerStats,
     type ContainerStats,
     type ContainerAction,
@@ -19,20 +23,27 @@
 
   interface Props {
     library: Library;
+    /** The SSH server in the active tab, if any. The panel follows it. */
+    active: { id: string; name: string } | null;
     /** Opens a container's log or shell in a new tab. */
     onopen: (spec: SessionSpec, title: string) => void;
     onclose: () => void;
   }
 
-  let { library, onopen, onclose }: Props = $props();
+  let { library, active, onopen, onclose }: Props = $props();
 
   const REFRESH_MS = 4000;
   const LOCAL = "local";
+  const AUTO = "auto";
 
   const servers = $derived(library.file.session.filter((s) => s.type === "ssh"));
-  let source = $state(localStorage.getItem("docker-source") ?? LOCAL);
-  // A server that was deleted since last time falls back to this computer.
-  const chosen = $derived(source === LOCAL || servers.some((s) => s.id === source) ? source : LOCAL);
+  let source = $state(localStorage.getItem("docker-source") ?? AUTO);
+  // A server that was deleted since last time falls back to following the active tab.
+  const chosen = $derived(
+    source === LOCAL || source === AUTO || servers.some((s) => s.id === source) ? source : AUTO,
+  );
+  // What Docker is wanted from right now: the active tab's server, this computer, or a pinned server.
+  const wanted = $derived(chosen === AUTO ? (active?.id ?? null) : chosen);
 
   let dockerId = $state<string | null>(null);
   let connecting = $state(false);
@@ -45,6 +56,46 @@
   let details = $state<{ name: string; data: ContainerDetails | null; error: string; tab: string } | null>(null);
   let removing = $state<ContainerInfo | null>(null);
   let filter = $state("");
+  let view = $state<"containers" | ResourceKind>("containers");
+  let resources = $state<DockerResource[]>([]);
+  let removingResource = $state<DockerResource | null>(null);
+
+  async function loadResources() {
+    const id = dockerId;
+    if (!id || view === "containers") return;
+    try {
+      const list = await dockerResources(id, view);
+      if (dockerId === id) resources = list;
+    } catch (err) {
+      if (dockerId === id) error = (err as { message?: string }).message ?? "Couldn't read the list.";
+    }
+  }
+
+  function show(next: "containers" | ResourceKind) {
+    view = next;
+    resources = [];
+    filter = "";
+    void loadResources();
+  }
+
+  async function confirmRemoveResource() {
+    const target = removingResource;
+    removingResource = null;
+    const id = dockerId;
+    if (!target || !id || view === "containers") return;
+    try {
+      await dockerRemoveResource(id, view, target.id);
+      error = "";
+    } catch (err) {
+      error = (err as { message?: string }).message ?? "That did not work.";
+    }
+    await loadResources();
+  }
+
+  const shownResources = $derived.by(() => {
+    const word = filter.trim().toLowerCase();
+    return word ? resources.filter((r) => `${r.name} ${r.detail}`.toLowerCase().includes(word)) : resources;
+  });
   let stats = $state<Record<string, ContainerStats>>({});
 
   async function connect() {
@@ -52,8 +103,12 @@
     connecting = true;
     error = "";
     operation = crypto.randomUUID();
+    if (!wanted) {
+      connecting = false;
+      return;
+    }
     const target =
-      chosen === LOCAL ? ({ type: "local" } as const) : ({ type: "ssh", saved_session_id: chosen } as const);
+      wanted === LOCAL ? ({ type: "local" } as const) : ({ type: "ssh", saved_session_id: wanted } as const);
     try {
       const id = await dockerConnect(target, operation, (status) => {
         if (status.type === "prompt") question = { id: status.prompt_id, prompt: status.prompt };
@@ -72,9 +127,20 @@
     const id = dockerId;
     dockerId = null;
     containers = [];
+    resources = [];
     details = null;
     if (id) await dockerClose(id).catch(() => {});
   }
+
+  // Following the active tab: a different server means a different connection.
+  $effect(() => {
+    if (chosen !== AUTO) return;
+    void active?.id;
+    untrack(() => {
+      if (active) void connect();
+      else void disconnect();
+    });
+  });
 
   function cancelConnecting() {
     if (operation) void keySetupCancel(operation).catch(() => {});
@@ -89,6 +155,7 @@
         containers = list;
         error = "";
       }
+      if (view !== "containers") await loadResources();
     } catch (err) {
       if (dockerId === id) error = (err as { message?: string }).message ?? "Couldn't read the containers.";
     }
@@ -277,6 +344,7 @@
       value={chosen}
       onchange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}
     >
+      <option value={AUTO}>{active ? `Active tab: ${active.name}` : "Active SSH tab (none)"}</option>
       <option value={LOCAL}>This computer</option>
       {#each servers as s (s.id)}
         <option value={s.id}>{s.name}</option>
@@ -287,7 +355,7 @@
     {:else if connecting}
       <button class="btn small" onclick={cancelConnecting}>Cancel</button>
     {:else}
-      <button class="btn small primary" onclick={connect}>Connect</button>
+      <button class="btn small primary" disabled={!wanted} onclick={connect}>Connect</button>
     {/if}
   </div>
 
@@ -296,10 +364,42 @@
   {#if connecting}
     <p class="hint">Connecting…</p>
   {:else if dockerId}
-    <div class="bar">
-      <input type="search" placeholder="Filter containers" bind:value={filter} aria-label="Filter containers" />
-      <span class="count">{running} of {containers.length} running</span>
+    <div class="views" role="tablist">
+      {#each [["containers", "Containers"], ["images", "Images"], ["volumes", "Volumes"], ["networks", "Networks"]] as [id, label] (id)}
+        <button
+          role="tab"
+          class="tab"
+          class:on={view === id}
+          aria-selected={view === id}
+          onclick={() => show(id as "containers" | ResourceKind)}>{label}</button
+        >
+      {/each}
     </div>
+    <div class="bar">
+      <input type="search" placeholder="Filter" bind:value={filter} aria-label="Filter" />
+      {#if view === "containers"}<span class="count">{running} of {containers.length} running</span>{/if}
+    </div>
+    {#if view !== "containers"}
+      <div class="list">
+        {#each shownResources as r (r.id)}
+          <div class="row">
+            <div class="what">
+              <span class="name">{r.name}</span>
+              <span class="sub">{r.detail}</span>
+            </div>
+            <div class="actions">
+              {#if !r.protected}
+                <button class="icon-btn small" title="Remove" onclick={() => (removingResource = r)}>
+                  <Icon name="trash" size={13} />
+                </button>
+              {/if}
+            </div>
+          </div>
+        {:else}
+          <p class="hint">Nothing here.</p>
+        {/each}
+      </div>
+    {:else}
     <div class="list">
       {#each groups as group (group.name)}
         {#if group.name}<h3>{group.name}</h3>{/if}
@@ -344,8 +444,13 @@
         <p class="hint">{containers.length ? "No container matches." : "There are no containers."}</p>
       {/each}
     </div>
+    {/if}
   {:else if !error}
-    <p class="hint">Choose where Docker runs and press Connect. For a server, nothing is installed there; its user needs access to Docker.</p>
+    <p class="hint">
+      {chosen === AUTO && !active
+        ? "Open an SSH tab and its Docker appears here. Nothing is installed on the server; its user needs access to Docker."
+        : "Press Connect. Nothing is installed on a server; its user needs access to Docker."}
+    </p>
   {/if}
 
   {#if question}
@@ -363,6 +468,19 @@
         <div class="modal-actions">
           <button class="btn" onclick={() => (removing = null)}>Cancel</button>
           <button class="btn danger" onclick={confirmRemove}>Remove</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if removingResource}
+    <div class="modal-backdrop">
+      <div class="modal" role="alertdialog" aria-label="Remove" tabindex="-1">
+        <h2>Remove “{removingResource.name}”?</h2>
+        <p>Docker refuses if anything still uses it.</p>
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (removingResource = null)}>Cancel</button>
+          <button class="btn danger" onclick={confirmRemoveResource}>Remove</button>
         </div>
       </div>
     </div>
@@ -407,7 +525,7 @@
     flex: none;
     min-height: 0;
     background: var(--bg-1);
-    border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border);
   }
   header {
     display: flex;
@@ -434,6 +552,12 @@
   .source select {
     flex: 1;
     min-width: 0;
+  }
+  .views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 2px 12px 6px;
   }
   .bar {
     display: flex;

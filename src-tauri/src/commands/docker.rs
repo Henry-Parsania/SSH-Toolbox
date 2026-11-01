@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::ipc::Channel;
 use toolbox_core::docker::engine::{self, Action, ContainerInfo, Details};
+use toolbox_core::docker::resources;
 use toolbox_core::docker::{Docker, connect_local, ssh::connect_ssh};
 use toolbox_core::ssh::backend::SshServices;
 use toolbox_core::terminal::TerminalStatus;
@@ -119,4 +120,23 @@ pub async fn docker_stats(
     docker_id: String,
 ) -> Result<Vec<engine::ContainerStats>, AppError> {
     engine::stats(&*engines.get(&docker_id)?).await
+}
+
+#[tauri::command]
+pub async fn docker_resources(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    kind: resources::Kind,
+) -> Result<Vec<resources::Resource>, AppError> {
+    resources::list(&*engines.get(&docker_id)?, kind).await
+}
+
+#[tauri::command]
+pub async fn docker_remove_resource(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    kind: resources::Kind,
+    id: String,
+) -> Result<(), AppError> {
+    resources::remove(&*engines.get(&docker_id)?, kind, &id).await
 }

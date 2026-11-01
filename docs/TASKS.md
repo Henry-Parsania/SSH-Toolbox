@@ -109,7 +109,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **5.4 Logs (D4).** Live, with follow and search. Uses the same flow control as the terminal.
 - [x] **5.5 Details (D5).** Environment, ports, mounts, networks and raw inspect output. Display it as plain text only.
 - [x] **5.6 Shell in a container (D6).** Implements `TerminalBackend`, as a normal pane. Prefer `bash`, falling back to `sh`.
-- [ ] **5.7 Should and Could items (D8, D9).** Live stats. Images, volumes and networks only if cheap. Add the "permission denied" explanation for remote Docker.
+- [x] **5.7 Should and Could items (D8, D9).** Live stats. Images, volumes and networks only if cheap. Add the "permission denied" explanation for remote Docker.
 - [ ] **5.9 Owner tries it.**
 
 ## Phase 6: Polish

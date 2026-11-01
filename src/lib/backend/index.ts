@@ -88,6 +88,11 @@ export function promptRespond(promptId: string, response: PromptResponse): Promi
   return invoke<void>("prompt_respond", { promptId, response });
 }
 
+/** Saves terminal text to a new file in Downloads. Returns where it went. */
+export function terminalSaveOutput(text: string): Promise<string> {
+  return invoke<string>("terminal_save_output", { text });
+}
+
 export function listShells(): Promise<Shell[]> {
   return invoke<Shell[]>("list_shells");
 }

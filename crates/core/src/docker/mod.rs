@@ -2,6 +2,7 @@
 
 pub mod engine;
 pub mod pane;
+pub mod resources;
 pub mod ssh;
 
 #[cfg(test)]
@@ -10,6 +11,8 @@ mod engine_tests;
 mod fake;
 #[cfg(test)]
 mod pane_tests;
+#[cfg(test)]
+mod resources_tests;
 
 #[cfg(test)]
 mod ssh_tests;

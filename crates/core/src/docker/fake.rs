@@ -146,6 +146,29 @@ async fn serve(mut socket: TcpStream, record: Requests) {
                 "application/json",
                 r#"{"ExitCode":3,"Running":false}"#,
             )
+        } else if path.ends_with("/images/json") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"[{"Id":"sha256:aabbccddeeff00112233","ParentId":"","RepoTags":["nginx:latest"],"RepoDigests":[],"Created":1,"Size":142000000,"SharedSize":-1,"Labels":{},"Containers":-1},{"Id":"sha256:0123456789ab","ParentId":"","RepoTags":[],"RepoDigests":[],"Created":1,"Size":5000000,"SharedSize":-1,"Labels":{},"Containers":-1}]"#,
+            )
+        } else if path.ends_with("/volumes") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"Volumes":[{"Name":"data","Driver":"local","Mountpoint":"/var/lib/docker/volumes/data/_data","Labels":{},"Scope":"local","Options":{}}],"Warnings":null}"#,
+            )
+        } else if path.ends_with("/networks") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"[{"Id":"aa11","Name":"bridge","Driver":"bridge","Scope":"local"},{"Id":"bb22","Name":"shop_default","Driver":"bridge","Scope":"local"}]"#,
+            )
+        } else if method == "DELETE" && (path.contains("/volumes/") || path.contains("/networks/"))
+        {
+            reply("204 No Content", "text/plain", "")
+        } else if method == "DELETE" && path.contains("/images/") {
+            reply("200 OK", "application/json", "[]")
         } else if path.contains("/fade") {
             reply(
                 "404 Not Found",

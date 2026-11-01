@@ -13,6 +13,7 @@
     startupReady,
     terminalAck,
     terminalClose,
+    terminalSaveOutput,
     terminalOpen,
     terminalResize,
     terminalWrite,
@@ -269,11 +270,29 @@
     // Capture phase, so it runs before xterm's own paste handler.
     host.addEventListener("paste", onPasteEvent, true);
 
+    // Save the whole scrollback as a text file in Downloads (T9).
+    function saveOutput() {
+      const buffer = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = 0; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
+      while (lines.length && lines[lines.length - 1] === "") lines.pop();
+      void terminalSaveOutput(lines.join("\n") + "\n").then(
+        (path) => (notice = `Saved to ${path}`),
+        (err: { message?: string }) => (notice = err.message ?? "Couldn't save the output."),
+      );
+      setTimeout(() => (notice = ""), 6000);
+    }
+
     term.attachCustomKeyEventHandler((e) => {
       if (isCopyKey(e)) {
         e.preventDefault();
         const selection = term.getSelection();
         if (selection) void navigator.clipboard.writeText(selection).catch(() => {});
+        return false;
+      }
+      if (e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === "KeyS") {
+        e.preventDefault();
+        saveOutput();
         return false;
       }
       if (isPasteKey(e)) {
