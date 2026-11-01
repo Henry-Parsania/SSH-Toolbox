@@ -304,9 +304,18 @@ async fn agent_login(connection: &mut Connection, user: &str) -> Result<(), AppE
             Err(e) => return Err(e),
         }
     }
+    // Pageant is only tried when the Windows agent didn't get the user in. Connecting to it
+    // "works" even when it isn't running and then fails on the first request, so that failure
+    // must not hide what the Windows agent said.
     if !accepted && let Ok(agent) = AgentClient::connect_pageant().await {
-        reached = true;
-        accepted = try_agent(connection, user, agent).await?;
+        match try_agent(connection, user, agent).await {
+            Ok(done) => {
+                reached = true;
+                accepted = done;
+            }
+            Err(e) if e.message.starts_with("The SSH agent didn't answer") => {}
+            Err(e) => return Err(e),
+        }
     }
     if accepted {
         Ok(())
