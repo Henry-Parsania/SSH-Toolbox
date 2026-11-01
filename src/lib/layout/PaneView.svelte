@@ -80,6 +80,7 @@
         {platform}
         focused={active && visible}
         searchSignal={workspace.searchTarget === node.pane_id ? workspace.searchCount : 0}
+        saveSignal={workspace.saveTarget === node.pane_id ? workspace.saveCount : 0}
         {tabId}
         paneId={node.pane_id}
         broadcasting={workspace.broadcast}

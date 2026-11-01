@@ -32,6 +32,8 @@ export class Workspace {
   /** Which pane should show its search box, and how many times it has been asked. */
   searchTarget = $state("");
   searchCount = $state(0);
+  saveTarget = $state("");
+  saveCount = $state(0);
   /**
    * Panes brought back from the saved layout that must not connect by themselves (P6): SSH
    * panes wait for a click on Connect. Local and WSL panes just start fresh.
@@ -57,6 +59,14 @@ export class Workspace {
     if (!tab) return;
     this.searchTarget = tab.active;
     this.searchCount++;
+  }
+
+  /** Asks the active pane to save its output to a file. */
+  requestSave() {
+    const tab = this.activeTab;
+    if (!tab) return;
+    this.saveTarget = tab.active;
+    this.saveCount++;
   }
 
   get activeTab(): Tab | undefined {

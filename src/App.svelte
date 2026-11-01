@@ -18,18 +18,27 @@
   import { Workspace } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
   import { Library } from "./lib/sessions/library.svelte";
+  import HelpDialog from "./lib/ui/HelpDialog.svelte";
+  import MenuBar, { type Menu } from "./lib/ui/MenuBar.svelte";
   import DockerPanel from "./lib/docker/DockerPanel.svelte";
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
   import { Reachability } from "./lib/status/reach.svelte";
   import StatusBar from "./lib/status/StatusBar.svelte";
-  import { loadSettings, settings } from "./lib/settings.svelte";
+  import { loadSettings, settings, saveSettings } from "./lib/settings.svelte";
   import Icon from "./lib/ui/Icon.svelte";
 
   let platform = $state<PlatformInfo | null>(null);
   let shells = $state<Shell[]>([]);
   let distros = $state<string[]>([]);
   let showSettings = $state(false);
+  let help = $state<"features" | "shortcuts" | "about" | null>(null);
+  // Menu commands the sessions list carries out. The number makes a repeated command count.
+  let sidebarCommand = $state<{ name: "ssh" | "ftp" | "serial" | "import"; n: number } | null>(null);
+  function sessionCommand(name: "ssh" | "ftp" | "serial" | "import") {
+    sidebarOpen = true;
+    sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1 };
+  }
   let sidebarOpen = $state(true);
   let filesOpen = $state(false);
   // Docker takes the place of the file panel on the right while it is open.
@@ -162,7 +171,73 @@
     ...distros.map((d) => ({ label: `WSL: ${d}`, spec: { type: "wsl" as const, distro: d } })),
   ]);
   let failure = $state<string | null>(null);
+
   const workspace = new Workspace();
+
+  const menus = $derived<Menu[]>([
+    {
+      label: "File",
+      items: [
+        { label: "New terminal tab", hint: "Ctrl+Shift+T", onselect: () => newTab() },
+        "separator",
+        { label: "New SSH session…", onselect: () => sessionCommand("ssh") },
+        { label: "New FTP session…", onselect: () => sessionCommand("ftp") },
+        { label: "New serial session…", onselect: () => sessionCommand("serial") },
+        { label: "Import from ~/.ssh/config…", onselect: () => sessionCommand("import") },
+        "separator",
+        { label: "Settings…", onselect: () => (showSettings = true) },
+      ],
+    },
+    {
+      label: "View",
+      items: [
+        { label: "Sessions list", checked: sidebarOpen, onselect: () => (sidebarOpen = !sidebarOpen) },
+        { label: "Files panel", checked: filesOpen, onselect: () => (filesOpen = !filesOpen) },
+        {
+          label: "Docker panel",
+          checked: dockerOpen,
+          onselect: () => {
+            dockerOpen = !dockerOpen;
+            if (dockerOpen) sidebarOpen = true;
+          },
+        },
+        {
+          label: "Footer (CPU, memory, disk)",
+          checked: settings.stats_enabled,
+          onselect: () => void saveSettings({ ...settings, stats_enabled: !settings.stats_enabled }).catch(() => {}),
+        },
+        "separator",
+        { label: "Next tab", hint: "Ctrl+Tab", onselect: () => workspace.stepTab(1) },
+        { label: "Previous tab", hint: "Ctrl+Shift+Tab", onselect: () => workspace.stepTab(-1) },
+      ],
+    },
+    {
+      label: "Terminal",
+      items: [
+        { label: "Split side by side", hint: "Ctrl+Shift+E", onselect: () => workspace.split("row") },
+        { label: "Split top and bottom", hint: "Ctrl+Shift+O", onselect: () => workspace.split("column") },
+        { label: "Close pane", hint: "Ctrl+Shift+W", onselect: () => workspace.closeActivePane() },
+        "separator",
+        { label: "Search the output", hint: "Ctrl+Shift+F", onselect: () => workspace.requestSearch() },
+        { label: "Save the output to Downloads", hint: "Ctrl+Shift+S", onselect: () => workspace.requestSave() },
+        {
+          label: "Type into all panes of the tab",
+          hint: "Ctrl+Shift+B",
+          checked: workspace.broadcast,
+          onselect: () => (workspace.broadcast = !workspace.broadcast),
+        },
+      ],
+    },
+    {
+      label: "Help",
+      items: [
+        { label: "What it can do", onselect: () => (help = "features") },
+        { label: "Keyboard shortcuts", onselect: () => (help = "shortcuts") },
+        "separator",
+        { label: "About SSH Toolbox", onselect: () => (help = "about") },
+      ],
+    },
+  ]);
 
   $effect(() => {
     Promise.all([platformInfo(), listShells(), loadSettings().catch(() => {})]).then(
@@ -252,10 +327,11 @@
   </div>
 {:else if platform}
   <div class="app">
+    <MenuBar {menus} />
     <div class="body">
       {#if sidebarOpen}
         <div class="side column" style:width="{sidebarWidth}px">
-          <div class="top-part"><Sidebar {library} onopen={openSaved} {newSessionSignal} {reach} /></div>
+          <div class="top-part"><Sidebar {library} onopen={openSaved} {newSessionSignal} command={sidebarCommand} {reach} /></div>
           {#if dockerOpen}
             <div class="dock">
               <DockerPanel
@@ -338,6 +414,9 @@
       {/if}
     </div>
   </div>
+  {#if help}
+    <HelpDialog page={help} onclose={() => (help = null)} />
+  {/if}
   {#if showSettings}
     <SettingsDialog {platform} {shells} onclose={() => (showSettings = false)} />
   {/if}

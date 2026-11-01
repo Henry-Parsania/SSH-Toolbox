@@ -41,6 +41,8 @@
     focused?: boolean;
     /** Opens the search box each time this number goes up. */
     searchSignal?: number;
+    /** Saves the output to a file each time this number goes up. */
+    saveSignal?: number;
     /** Identify this pane, so typing can be copied to the others in the tab. */
     tabId?: string;
     paneId?: string;
@@ -57,6 +59,7 @@
     onstatus,
     focused = true,
     searchSignal = 0,
+    saveSignal = 0,
     tabId = "",
     paneId = "",
     broadcasting = false,
@@ -70,6 +73,11 @@
   let searchInput: HTMLInputElement | undefined = $state();
   let findNext: (backwards: boolean) => void = () => {};
   let clearSearch: () => void = () => {};
+  let saveHook: () => void = () => {};
+
+  $effect(() => {
+    if (saveSignal > 0) untrack(() => saveHook());
+  });
 
   $effect(() => {
     if (searchSignal > 0) {
@@ -271,6 +279,7 @@
     host.addEventListener("paste", onPasteEvent, true);
 
     // Save the whole scrollback as a text file in Downloads (T9).
+    saveHook = saveOutput;
     function saveOutput() {
       const buffer = term.buffer.active;
       const lines: string[] = [];

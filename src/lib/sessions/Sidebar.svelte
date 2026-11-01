@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { SavedSession } from "../backend";
   import { settings } from "../settings.svelte";
   import type { Reachability } from "../status/reach.svelte";
@@ -18,11 +19,13 @@
     onopen: (session: SavedSession) => void;
     /** Each time this goes up, the editor for a new session opens. */
     newSessionSignal?: number;
+    /** A request from the menu bar. Each one has its own number, so the same command can repeat. */
+    command?: { name: "ssh" | "ftp" | "serial" | "import"; n: number } | null;
     /** Which servers answer, shown as a dot beside each one. */
     reach?: Reachability;
   }
 
-  let { library, onopen, newSessionSignal = 0, reach }: Props = $props();
+  let { library, onopen, newSessionSignal = 0, command = null, reach }: Props = $props();
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
@@ -40,6 +43,17 @@
 
   $effect(() => {
     if (newSessionSignal > 0) editor = {};
+  });
+
+  $effect(() => {
+    if (!command) return;
+    const name = command.name;
+    untrack(() => {
+      if (name === "ssh") editor = {};
+      else if (name === "ftp") ftpEditor = {};
+      else if (name === "serial") serialEditor = {};
+      else importing = true;
+    });
   });
 
   function describe(session: SavedSession): string {
