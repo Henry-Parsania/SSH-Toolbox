@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { SessionSpec } from "../backend";
-  import type { Workspace } from "./workspace.svelte";
+  import Icon, { type IconName } from "../ui/Icon.svelte";
+  import { leaves } from "./panes";
+  import type { Tab, Workspace } from "./workspace.svelte";
 
   export interface NewTabOption {
     label: string;
@@ -14,9 +16,10 @@
     onnew: (option?: NewTabOption) => void;
     onsettings: () => void;
     onsidebar: () => void;
+    sidebarOpen: boolean;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -32,6 +35,12 @@
   function finishRename(save: boolean) {
     if (editing && save) workspace.renameTab(editing, draft);
     editing = null;
+  }
+
+  /** The icon says what kind of session the tab holds. */
+  function iconFor(tab: Tab): IconName {
+    const spec = leaves(tab.root)[0]?.spec;
+    return spec?.type === "ssh" ? "server" : "terminal";
   }
 
   // Reordering uses pointer events. HTML drag and drop is switched off by Tauri's file drop.
@@ -67,8 +76,17 @@
 </script>
 
 <div class="bar">
-  <button class="new" aria-label="Show or hide saved sessions" title="Saved sessions" onclick={onsidebar}>☰</button>
-  <div class="tabs" bind:this={strip}>
+  <button
+    class="icon-btn lead"
+    class:on={sidebarOpen}
+    aria-label="Show or hide saved sessions"
+    title="Saved sessions"
+    onclick={onsidebar}
+  >
+    <Icon name="sidebar" size={17} />
+  </button>
+
+  <div class="tabs" bind:this={strip} role="tablist">
     {#each workspace.tabs as tab (tab.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -88,9 +106,11 @@
           if (e.button === 1) workspace.closeTab(tab.id);
         }}
       >
+        <span class="kind"><Icon name={iconFor(tab)} size={14} /></span>
         {#if editing === tab.id}
           <!-- svelte-ignore a11y_autofocus -->
           <input
+            class="rename"
             autofocus
             bind:value={draft}
             onfocus={(e) => e.currentTarget.select()}
@@ -108,112 +128,225 @@
         <button
           class="close"
           aria-label="Close tab"
+          title="Close tab"
           onpointerdown={(e) => e.stopPropagation()}
-          onclick={() => workspace.closeTab(tab.id)}>×</button
+          onclick={() => workspace.closeTab(tab.id)}
         >
+          <Icon name="close" size={12} />
+        </button>
       </div>
     {/each}
   </div>
-  <button class="new" aria-label="New tab" title="New tab (Ctrl+Shift+T)" onclick={() => onnew()}>+</button>
-  <div class="menu-wrap">
-    <button class="new" aria-label="Choose a shell" onclick={() => (menuOpen = !menuOpen)}>▾</button>
-    {#if menuOpen}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="backdrop" onpointerdown={() => (menuOpen = false)}></div>
-      <ul class="menu">
-        {#each options as option (option.label)}
-          <li>
-            <button
-              onclick={() => {
-                menuOpen = false;
-                onnew(option);
-              }}>{option.label}</button
-            >
-          </li>
-        {/each}
-      </ul>
-    {/if}
+
+  <div class="adders">
+    <button class="icon-btn" aria-label="New tab" title="New tab (Ctrl+Shift+T)" onclick={() => onnew()}>
+      <Icon name="plus" size={16} />
+    </button>
+    <div class="menu-wrap">
+      <button
+        class="icon-btn small"
+        aria-label="Choose a shell"
+        title="Choose a shell"
+        onclick={() => (menuOpen = !menuOpen)}
+      >
+        <Icon name="chevron-down" size={14} />
+      </button>
+      {#if menuOpen}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="backdrop" onpointerdown={() => (menuOpen = false)}></div>
+        <ul class="menu drop">
+          {#each options as option (option.label)}
+            <li>
+              <button
+                onclick={() => {
+                  menuOpen = false;
+                  onnew(option);
+                }}
+              >
+                <Icon name="terminal" size={14} />
+                {option.label}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </div>
+
   <div class="spacer">
     {#if workspace.broadcast}
-      <span class="broadcast">Typing into all panes (Ctrl+Shift+B to stop)</span>
+      <span class="badge" title="Ctrl+Shift+B to stop">
+        <Icon name="broadcast" size={13} /> Typing into all panes
+      </span>
     {/if}
   </div>
-  <button class="new" aria-label="Settings" title="Settings" onclick={onsettings}>⚙</button>
+
+  <div class="tools">
+    <button
+      class="icon-btn"
+      aria-label="Split side by side"
+      title="Split side by side (Ctrl+Shift+E)"
+      onclick={() => workspace.split("row")}
+    >
+      <Icon name="split-h" size={16} />
+    </button>
+    <button
+      class="icon-btn"
+      aria-label="Split top and bottom"
+      title="Split top and bottom (Ctrl+Shift+O)"
+      onclick={() => workspace.split("column")}
+    >
+      <Icon name="split-v" size={16} />
+    </button>
+    <span class="sep"></span>
+    <button class="icon-btn" aria-label="Settings" title="Settings" onclick={onsettings}>
+      <Icon name="settings" size={17} />
+    </button>
+  </div>
 </div>
 
 <style>
   .bar {
     display: flex;
-    align-items: stretch;
-    background: #252526;
-    font: 13px system-ui, sans-serif;
+    align-items: center;
+    gap: 4px;
+    height: 42px;
+    padding: 0 8px 0 6px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
     user-select: none;
+  }
+  .lead.on {
+    color: var(--accent);
   }
   .tabs {
     display: flex;
+    align-items: flex-end;
+    align-self: stretch;
+    gap: 2px;
     min-width: 0;
     overflow-x: auto;
+    overflow-y: hidden;
+    padding-top: 6px;
+    margin-left: 4px;
+  }
+  .tabs::-webkit-scrollbar {
+    height: 0;
   }
   .tab {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 8px 6px 12px;
-    color: #9d9d9d;
-    background: #2d2d2d;
-    border-right: 1px solid #1e1e1e;
+    gap: 7px;
+    max-width: 220px;
+    height: 100%;
+    padding: 0 6px 0 11px;
+    color: var(--text-muted);
+    border-radius: var(--radius) var(--radius) 0 0;
     white-space: nowrap;
+    cursor: default;
+    transition:
+      background 0.12s var(--ease),
+      color 0.12s var(--ease);
+  }
+  .tab:hover {
+    color: var(--text);
+    background: var(--bg-hover);
   }
   .tab.active {
-    color: #fff;
-    background: #1e1e1e;
+    color: var(--text);
+    background: var(--bg-0);
+    box-shadow:
+      inset 0 2px 0 var(--accent),
+      -1px 0 0 var(--border),
+      1px 0 0 var(--border);
+  }
+  /* Joins the active tab to the terminal below it. */
+  .tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--bg-0);
   }
   .tab.dragging {
-    opacity: 0.7;
+    opacity: 0.65;
+  }
+  .kind {
+    display: grid;
+    color: var(--text-faint);
+  }
+  .tab.active .kind {
+    color: var(--accent);
   }
   .title {
-    max-width: 16em;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-weight: 500;
   }
-  input {
-    width: 10em;
-    font: inherit;
-    background: #3c3c3c;
-    color: #fff;
-    border: 1px solid #007acc;
+  .rename {
+    width: 9em;
+    padding: 2px 6px;
   }
-  button {
+  .close {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    color: var(--text-faint);
     background: none;
     border: none;
-    color: inherit;
+    border-radius: 5px;
+    opacity: 0;
     cursor: pointer;
-    font-size: 15px;
-    line-height: 1;
-    padding: 2px 6px;
-    border-radius: 3px;
+    transition: opacity 0.1s;
   }
-  button:hover {
-    background: #4448;
+  .tab:hover .close,
+  .tab.active .close {
+    opacity: 1;
   }
-  .new {
-    color: #ccc;
-    padding: 0 12px;
+  .close:hover {
+    color: var(--text);
+    background: var(--bg-active);
+  }
+  .adders {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-left: 2px;
   }
   .spacer {
     flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding-right: 8px;
+    justify-content: center;
+    min-width: 0;
   }
-  .broadcast {
-    padding: 2px 8px;
-    color: #fff;
-    background: #a1260d;
-    border-radius: 3px;
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    color: var(--warning);
+    background: var(--warning-soft);
+    border: 1px solid #f0b45a44;
+    border-radius: 999px;
     font-size: 12px;
+    font-weight: 500;
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .sep {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background: var(--border-strong);
   }
   .menu-wrap {
     position: relative;
@@ -223,26 +356,10 @@
     inset: 0;
     z-index: 10;
   }
-  .menu {
+  .drop {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 6px);
     left: 0;
     z-index: 11;
-    margin: 0;
-    padding: 4px 0;
-    list-style: none;
-    min-width: 12em;
-    background: #252526;
-    border: 1px solid #555;
-    box-shadow: 0 4px 12px #0008;
-  }
-  .menu button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 6px 14px;
-    font-size: 13px;
-    border-radius: 0;
-    color: #d4d4d4;
   }
 </style>

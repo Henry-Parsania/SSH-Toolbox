@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { SavedSession } from "../backend";
-  import type { Library } from "./library.svelte";
+  import Icon from "../ui/Icon.svelte";
   import ForwardsDialog from "./ForwardsDialog.svelte";
   import ImportDialog from "./ImportDialog.svelte";
   import KeySetupDialog from "./KeySetupDialog.svelte";
+  import type { Library } from "./library.svelte";
   import SessionEditor from "./SessionEditor.svelte";
   import { buildTree, newId, type SshSession, type TreeItem } from "./tree";
 
@@ -11,9 +12,11 @@
     library: Library;
     /** Open a saved session in a new tab. */
     onopen: (session: SavedSession) => void;
+    /** Each time this goes up, the editor for a new session opens. */
+    newSessionSignal?: number;
   }
 
-  let { library, onopen }: Props = $props();
+  let { library, onopen, newSessionSignal = 0 }: Props = $props();
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
@@ -27,10 +30,18 @@
 
   const tree = $derived(buildTree(library.file, search));
 
+  $effect(() => {
+    if (newSessionSignal > 0) editor = {};
+  });
+
   function describe(session: SavedSession): string {
     if (session.type === "ssh") return `${session.user}@${session.host}`;
     if (session.type === "serial") return session.port;
     return session.host;
+  }
+
+  function iconOf(session: SavedSession) {
+    return session.type === "serial" ? "serial" : session.type === "ftp" ? "ftp" : "server";
   }
 
   async function run(action: () => Promise<void>) {
@@ -67,64 +78,19 @@
     const target = confirm;
     confirm = null;
     if (!target) return;
-    await run(() => (target.kind === "session" ? library.deleteSession(target.id) : library.deleteFolder(target.id)));
+    await run(() =>
+      target.kind === "session" ? library.deleteSession(target.id) : library.deleteFolder(target.id),
+    );
   }
 </script>
 
-{#snippet row(item: TreeItem, depth: number)}
-  {#if item.kind === "folder"}
-    <div class="item folder" style:padding-left="{8 + depth * 14}px">
-      <button
-        class="label"
-        onclick={() => (collapsed[item.folder.id] = !collapsed[item.folder.id])}
-        ondblclick={() => (renaming = { id: item.folder.id, name: item.folder.name })}
-      >
-        {collapsed[item.folder.id] && !search ? "▸" : "▾"} {item.folder.name}
-      </button>
-      <span class="tools">
-        <button title="New session here" onclick={() => (editor = { folder: item.folder.id })}>+</button>
-        <button title="New folder inside" onclick={() => addFolder(item.folder.id)}>▤</button>
-        <button
-          title="Delete folder"
-          onclick={() => (confirm = { kind: "folder", id: item.folder.id, name: item.folder.name })}>×</button
-        >
-      </span>
-    </div>
-    {#if renaming?.id === item.folder.id}
-      {@render renameBox(depth + 1)}
-    {/if}
-    {#if !collapsed[item.folder.id] || search}
-      {#each item.children as child (child.kind === "folder" ? child.folder.id : child.session.id)}
-        {@render row(child, depth + 1)}
-      {/each}
-    {/if}
-  {:else}
-    <div class="item" style:padding-left="{8 + depth * 14}px">
-      <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
-        {item.session.name}
-        <small>{describe(item.session)}</small>
-      </button>
-      <span class="tools">
-        <button title="Connect in a new tab" onclick={() => onopen(item.session)}>▶</button>
-        {#if item.session.type === "ssh"}
-          <button title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>⇄</button>
-          <button title="Set up key login" onclick={() => (keySetupFor = item.session as SshSession)}>🔑</button>
-          <button title="Edit" onclick={() => (editor = { editing: item.session as SshSession })}>✎</button>
-        {/if}
-        <button
-          title="Delete"
-          onclick={() => (confirm = { kind: "session", id: item.session.id, name: item.session.name })}>×</button
-        >
-      </span>
-    </div>
-  {/if}
-{/snippet}
-
 {#snippet renameBox(depth: number)}
-  <div class="item" style:padding-left="{8 + depth * 14}px">
+  <div class="item" style:padding-left="{10 + depth * 14}px">
+    <span class="glyph folder-glyph"><Icon name="folder" size={15} /></span>
     <!-- svelte-ignore a11y_autofocus -->
     <input
       class="rename"
+      type="text"
       autofocus
       placeholder="Folder name"
       bind:value={renaming!.name}
@@ -138,33 +104,140 @@
   </div>
 {/snippet}
 
+{#snippet row(item: TreeItem, depth: number)}
+  {#if item.kind === "folder"}
+    <div class="item folder" style:padding-left="{6 + depth * 14}px">
+      <button
+        class="label"
+        onclick={() => (collapsed[item.folder.id] = !collapsed[item.folder.id])}
+        ondblclick={() => (renaming = { id: item.folder.id, name: item.folder.name })}
+      >
+        <span class="chev" class:open={!collapsed[item.folder.id] || !!search}>
+          <Icon name="chevron-right" size={13} />
+        </span>
+        <span class="glyph folder-glyph"><Icon name="folder" size={15} /></span>
+        <span class="name">{item.folder.name}</span>
+        <span class="count">{item.children.length}</span>
+      </button>
+      <span class="tools">
+        <button class="icon-btn small" title="New session here" onclick={() => (editor = { folder: item.folder.id })}>
+          <Icon name="plus" size={13} />
+        </button>
+        <button class="icon-btn small" title="New folder inside" onclick={() => addFolder(item.folder.id)}>
+          <Icon name="folder-plus" size={13} />
+        </button>
+        <button
+          class="icon-btn small"
+          title="Delete folder"
+          onclick={() => (confirm = { kind: "folder", id: item.folder.id, name: item.folder.name })}
+        >
+          <Icon name="trash" size={13} />
+        </button>
+      </span>
+    </div>
+    {#if renaming?.id === item.folder.id}
+      {@render renameBox(depth + 1)}
+    {/if}
+    {#if !collapsed[item.folder.id] || search}
+      {#each item.children as child (child.kind === "folder" ? child.folder.id : child.session.id)}
+        {@render row(child, depth + 1)}
+      {/each}
+    {/if}
+  {:else}
+    <div class="item" style:padding-left="{6 + depth * 14 + 13}px">
+      <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
+        <span class="glyph"><Icon name={iconOf(item.session)} size={15} /></span>
+        <span class="name">{item.session.name}</span>
+        <span class="where">{describe(item.session)}</span>
+      </button>
+      <span class="tools">
+        <button class="icon-btn small accent" title="Connect in a new tab" onclick={() => onopen(item.session)}>
+          <Icon name="play" size={13} />
+        </button>
+        {#if item.session.type === "ssh"}
+          <button class="icon-btn small" title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>
+            <Icon name="route" size={13} />
+          </button>
+          <button class="icon-btn small" title="Set up key login" onclick={() => (keySetupFor = item.session as SshSession)}>
+            <Icon name="key" size={13} />
+          </button>
+          <button class="icon-btn small" title="Edit" onclick={() => (editor = { editing: item.session as SshSession })}>
+            <Icon name="edit" size={13} />
+          </button>
+        {/if}
+        <button
+          class="icon-btn small"
+          title="Delete"
+          onclick={() => (confirm = { kind: "session", id: item.session.id, name: item.session.name })}
+        >
+          <Icon name="trash" size={13} />
+        </button>
+      </span>
+    </div>
+  {/if}
+{/snippet}
+
 <aside class="sidebar">
-  <div class="head">
+  <header>
+    <span class="heading">Sessions</span>
+    <span class="head-tools">
+      <button class="icon-btn" title="New SSH session" onclick={() => (editor = {})}>
+        <Icon name="plus" size={16} />
+      </button>
+      <button class="icon-btn" title="New folder" onclick={() => addFolder("")}>
+        <Icon name="folder-plus" size={16} />
+      </button>
+      <button class="icon-btn" title="Import from ~/.ssh/config" onclick={() => (importing = true)}>
+        <Icon name="import" size={16} />
+      </button>
+    </span>
+  </header>
+
+  <div class="search-wrap">
+    <span class="search-icon"><Icon name="search" size={14} /></span>
     <input class="search" type="search" placeholder="Search sessions" bind:value={search} />
-    <button title="New SSH session" onclick={() => (editor = {})}>+</button>
-    <button title="New folder" onclick={() => addFolder("")}>▤</button>
-    <button title="Import from ~/.ssh/config" onclick={() => (importing = true)}>⇩</button>
   </div>
 
   {#if library.problem}
     <div class="problem">
+      <strong>The saved sessions can't be read</strong>
       <p>{library.problem}</p>
-      <p>The file hasn't been changed. You can fix it by hand, or start again (the old file is kept as sessions.toml.bad).</p>
-      <button onclick={() => run(() => library.startAgain())}>Start again</button>
+      <p>
+        The file hasn't been changed. Fix it by hand, or start again (the old file is kept as
+        sessions.toml.bad).
+      </p>
+      <button class="btn small danger" onclick={() => run(() => library.startAgain())}>Start again</button>
     </div>
   {/if}
 
-  {#if message}<p class="message">{message}</p>{/if}
+  {#if message}<p class="message error side-message">{message}</p>{/if}
 
   <div class="list">
-    {#if renaming?.id.startsWith("new:") && renaming.id === "new:"}
+    {#if renaming?.id === "new:"}
       {@render renameBox(0)}
     {/if}
     {#each tree as item (item.kind === "folder" ? item.folder.id : item.session.id)}
       {@render row(item, 0)}
     {/each}
+
     {#if tree.length === 0 && !library.problem}
-      <p class="empty">{search ? "Nothing matches." : "No saved sessions yet. Use + to add one."}</p>
+      <div class="empty">
+        {#if search}
+          <p>Nothing matches "{search}".</p>
+        {:else}
+          <div class="empty-icon"><Icon name="server" size={24} /></div>
+          <p><strong>No saved sessions yet</strong></p>
+          <p class="hint">Save the servers you use, then open them with a double-click.</p>
+          <div class="empty-actions">
+            <button class="btn small primary" onclick={() => (editor = {})}>
+              <Icon name="plus" size={13} /> New session
+            </button>
+            <button class="btn small" onclick={() => (importing = true)}>
+              <Icon name="import" size={13} /> Import
+            </button>
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 </aside>
@@ -186,16 +259,17 @@
 {/if}
 
 {#if confirm}
-  <div class="backdrop">
-    <div class="dialog" role="alertdialog" aria-label="Delete">
-      <p>
-        Delete {confirm.kind === "folder" ? "the folder" : "the session"} <b>{confirm.name}</b>?
-        {#if confirm.kind === "folder"}What's inside moves up one level.{:else}Its saved password is removed too.{/if}
+  <div class="modal-backdrop">
+    <div class="modal" role="alertdialog" aria-label="Delete">
+      <h2>Delete {confirm.kind === "folder" ? "folder" : "session"}?</h2>
+      <p class="lead">
+        <b>{confirm.name}</b>
+        {#if confirm.kind === "folder"}will be removed. What's inside moves up one level.{:else}will be removed, along with its saved password.{/if}
       </p>
-      <div class="buttons">
+      <div class="modal-actions">
         <!-- svelte-ignore a11y_autofocus -->
-        <button autofocus onclick={() => (confirm = null)}>Cancel</button>
-        <button class="danger" onclick={doDelete}>Delete</button>
+        <button class="btn" autofocus onclick={() => (confirm = null)}>Cancel</button>
+        <button class="btn danger" onclick={doDelete}>Delete</button>
       </div>
     </div>
   </div>
@@ -205,127 +279,177 @@
   .sidebar {
     display: flex;
     flex-direction: column;
-    width: 250px;
+    width: 264px;
     flex: none;
-    background: #252526;
-    color: #d4d4d4;
-    font: 13px system-ui, sans-serif;
-    border-right: 1px solid #1a1a1a;
     min-height: 0;
+    background: var(--bg-1);
+    border-right: 1px solid var(--border);
   }
-  .head {
+  header {
     display: flex;
-    gap: 4px;
-    padding: 6px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 8px 6px 14px;
+  }
+  .heading {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .head-tools {
+    display: flex;
+    gap: 1px;
+  }
+  .search-wrap {
+    position: relative;
+    padding: 4px 10px 8px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-62%);
+    color: var(--text-faint);
+    pointer-events: none;
   }
   .search {
-    flex: 1;
-    min-width: 0;
-    padding: 3px 6px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
+    padding-left: 30px;
+    border-radius: var(--radius);
   }
   .list {
     flex: 1;
     overflow: auto;
-    padding-bottom: 8px;
+    padding: 2px 6px 12px;
   }
   .item {
     display: flex;
     align-items: center;
+    min-height: 30px;
     padding-right: 4px;
+    border-radius: var(--radius-s);
   }
   .item:hover {
-    background: #2a2d2e;
+    background: var(--bg-hover);
   }
   .label {
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 4px;
+    font: inherit;
+    color: var(--text);
     text-align: left;
+    background: none;
+    border: none;
+    cursor: default;
+  }
+  .glyph {
+    display: grid;
+    color: var(--text-faint);
+  }
+  .item:hover .glyph {
+    color: var(--accent);
+  }
+  .glyph.folder-glyph,
+  .item:hover .glyph.folder-glyph {
+    color: var(--warning);
+  }
+  .chev {
+    display: grid;
+    margin-right: -2px;
+    color: var(--text-faint);
+    transition: transform 0.12s var(--ease);
+  }
+  .chev.open {
+    transform: rotate(90deg);
+  }
+  .name {
+    flex: none;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
   }
-  .label small {
-    margin-left: 6px;
-    color: #8a8a8a;
+  .where {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+  .count {
+    margin-left: auto;
+    padding: 0 6px;
+    color: var(--text-faint);
+    font-size: 11px;
   }
   .tools {
     display: none;
-    gap: 2px;
+    flex: none;
   }
   .item:hover .tools {
     display: flex;
   }
-  button {
-    background: none;
-    border: none;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    padding: 3px 6px;
-    border-radius: 3px;
+  .item:hover .count {
+    display: none;
   }
-  button:hover {
-    background: #4448;
+  .icon-btn.accent:hover {
+    color: var(--accent);
   }
   .rename {
-    width: 100%;
-    padding: 2px 4px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #007acc;
+    padding: 3px 8px;
   }
-  .empty,
-  .message {
-    margin: 8px;
-    color: #9d9d9d;
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 28px 10px 0;
+    padding: 18px 12px;
+    text-align: center;
+    color: var(--text-muted);
   }
-  .message {
-    color: #f48771;
-  }
-  .problem {
-    margin: 6px;
-    padding: 8px;
-    background: #5a1d1d;
-    border-radius: 4px;
-  }
-  .problem p {
+  .empty p {
     margin: 0 0 6px;
   }
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
+  .empty .hint {
+    margin-bottom: 14px;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+  .empty-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 10px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 14px;
+  }
+  .empty-actions {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0008;
+    gap: 6px;
   }
-  .dialog {
-    width: min(380px, 90vw);
-    padding: 14px 18px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
+  .problem {
+    margin: 4px 10px 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    background: var(--danger-soft);
+    border: 1px solid #f2706b44;
+    border-radius: var(--radius);
   }
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+  .problem p {
+    margin: 4px 0 8px;
+    color: var(--text-muted);
+    font-size: 12px;
   }
-  .buttons button {
-    padding: 5px 14px;
-    background: #3c3c3c;
-    border: 1px solid #555;
-  }
-  .buttons .danger {
-    background: #a1260d;
-    border-color: #a1260d;
+  .side-message {
+    margin: 0 10px 8px;
   }
 </style>

@@ -6,7 +6,13 @@ use std::path::{Path, PathBuf};
 use crate::error::{AppError, ErrorCode};
 
 /// The config folder, for example under `%APPDATA%` on Windows.
+///
+/// Setting `SSH_TOOLBOX_CONFIG_DIR` uses another folder instead. That is for trying the app
+/// out, or taking screenshots, without touching real saved sessions and settings.
 pub fn config_dir() -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os("SSH_TOOLBOX_CONFIG_DIR").filter(|d| !d.is_empty()) {
+        return Some(PathBuf::from(dir));
+    }
     directories::ProjectDirs::from("dev", "sshtoolbox", "SSHToolbox")
         .map(|dirs| dirs.config_dir().to_path_buf())
 }

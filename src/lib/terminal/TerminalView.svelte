@@ -22,6 +22,7 @@
     type SessionSpec,
     type TerminalStatus,
   } from "../backend";
+  import Icon from "../ui/Icon.svelte";
   import PromptDialog from "./PromptDialog.svelte";
   import { checkPaste, isCopyKey, isPasteKey, sanitizePaste, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
@@ -366,6 +367,7 @@
   {/if}
   {#if searching}
     <div class="search">
+      <span class="s-icon"><Icon name="search" size={14} /></span>
       <input
         bind:this={searchInput}
         bind:value={query}
@@ -378,9 +380,9 @@
         }}
         class:nomatch={noMatch}
       />
-      <button aria-label="Previous match" onclick={() => findNext(true)}>↑</button>
-      <button aria-label="Next match" onclick={() => findNext(false)}>↓</button>
-      <button aria-label="Close search" onclick={closeSearch}>×</button>
+      <button class="icon-btn small" aria-label="Previous match" title="Previous (Shift+Enter)" onclick={() => findNext(true)}><Icon name="up" size={14} /></button>
+      <button class="icon-btn small" aria-label="Next match" title="Next (Enter)" onclick={() => findNext(false)}><Icon name="down" size={14} /></button>
+      <button class="icon-btn small" aria-label="Close search" title="Close (Esc)" onclick={closeSearch}><Icon name="close" size={14} /></button>
     </div>
   {/if}
   {#if pending}
@@ -397,9 +399,9 @@
       <p class="title">Paste {pending.check.lineCount} lines?</p>
       <pre>{pending.check.preview.join("\n")}{pending.check.truncated ? "\n…" : ""}</pre>
       <div class="buttons">
-        <button onclick={cancelPaste}>Cancel</button>
+        <button class="btn small" onclick={cancelPaste}>Cancel</button>
         <!-- svelte-ignore a11y_autofocus -->
-        <button autofocus onclick={confirmPaste}>Paste</button>
+        <button class="btn small primary" autofocus onclick={confirmPaste}>Paste</button>
       </div>
     </div>
   {/if}
@@ -410,83 +412,98 @@
     position: relative;
     width: 100%;
     height: 100%;
-    background: #1e1e1e;
   }
   .terminal {
     width: 100%;
     height: 100%;
-    padding: 4px;
-    box-sizing: border-box;
+    padding: 6px 4px 4px 10px;
   }
+  .notice {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 4;
+    margin: 0;
+    padding: 6px 12px;
+    color: var(--warning);
+    background: var(--bg-2);
+    border: 1px solid #f0b45a55;
+    border-radius: var(--radius);
+    font-size: 12px;
+    box-shadow: var(--shadow-small);
+  }
+
+  /* Search box, in the top right corner. */
   .search {
     position: absolute;
-    top: 6px;
-    right: 14px;
+    top: 10px;
+    right: 18px;
+    z-index: 4;
     display: flex;
-    gap: 4px;
-    padding: 4px;
-    background: #252526;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font: 13px system-ui, sans-serif;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 4px 4px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-small);
+    animation: pop-in 0.12s var(--ease);
+  }
+  .s-icon {
+    display: grid;
+    margin-right: 6px;
+    color: var(--text-faint);
   }
   .search input {
-    width: 14em;
-    padding: 2px 6px;
-    font: inherit;
-    color: #d4d4d4;
-    background: #3c3c3c;
-    border: 1px solid #555;
+    width: 15em;
+    padding: 3px 6px;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .search input:focus {
+    box-shadow: none;
+    border-color: transparent;
   }
   .search input.nomatch {
-    border-color: #f48771;
+    color: var(--danger);
   }
-  .search button {
-    color: #d4d4d4;
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
+
+  /* The warning before pasting several lines. */
   .confirm {
     position: absolute;
     top: 50%;
     left: 50%;
+    z-index: 5;
+    width: min(520px, 86%);
     transform: translate(-50%, -50%);
-    max-width: 80%;
-    padding: 12px 16px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-    box-shadow: 0 4px 16px #0008;
+    padding: 16px 18px;
+    color: var(--text);
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow);
+    animation: pop-in 0.16s var(--ease);
   }
   .confirm .title {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
+    font-size: 14px;
     font-weight: 600;
   }
   .confirm pre {
-    margin: 0 0 12px;
-    padding: 6px 8px;
-    background: #1e1e1e;
+    max-height: 11em;
+    margin: 0 0 14px;
+    padding: 9px 11px;
     overflow: auto;
-    max-height: 10em;
-    font: 12px Consolas, monospace;
+    color: var(--text);
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-s);
+    font: 12px/1.5 var(--mono);
   }
   .buttons {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-  }
-  .notice {
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    margin: 0;
-    padding: 4px 8px;
-    background: #5a4b00;
-    color: #fff;
-    font: 12px system-ui, sans-serif;
-    border-radius: 4px;
   }
 </style>

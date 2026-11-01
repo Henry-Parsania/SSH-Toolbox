@@ -120,9 +120,9 @@
   }
 </script>
 
-<div class="backdrop">
+<div class="modal-backdrop">
   <div
-    class="dialog"
+    class="modal wide"
     role="dialog"
     aria-label="Port forwarding"
     tabindex="-1"
@@ -138,16 +138,16 @@
         {#each forwards as f (f.id)}
           <li>
             <span>{describe(f)}</span>
-            <button onclick={() => stop(f.id)}>Stop</button>
+            <button class="btn small" onclick={() => stop(f.id)}>Stop</button>
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="hint">Nothing is being forwarded. Forwards last until you stop them or the connection ends.</p>
+      <p class="lead">Nothing is being forwarded. Forwards last until you stop them or the connection ends.</p>
     {/if}
 
     <h3>Add one</h3>
-    <label>
+    <label class="field">
       Kind
       <select bind:value={kind}>
         <option value="local">Local: a port here reaches something through the server</option>
@@ -156,22 +156,22 @@
       </select>
     </label>
     <div class="row">
-      <label class="grow">
+      <label class="field grow">
         {kind === "remote" ? "Listen on (server)" : "Listen on (this computer)"}
         <input type="text" bind:value={bindHost} />
       </label>
-      <label class="port">
+      <label class="field port">
         Port
         <input type="number" min="0" max="65535" bind:value={bindPort} placeholder="any" />
       </label>
     </div>
     {#if kind !== "socks"}
       <div class="row">
-        <label class="grow">
+        <label class="field grow">
           {kind === "remote" ? "Send to (this computer)" : "Send to (as the server sees it)"}
           <input type="text" bind:value={destHost} />
         </label>
-        <label class="port">
+        <label class="field port">
           Port
           <input type="number" min="1" max="65535" bind:value={destPort} />
         </label>
@@ -184,17 +184,17 @@
           <b>{bindHost}</b> is open to your network: other computers could use this connection.
           Only continue if you want that.
         </p>
-        <div class="buttons">
-          <button onclick={() => (warnExternal = false)}>Cancel</button>
-          <button class="danger" onclick={() => start(true)}>Listen on the network</button>
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (warnExternal = false)}>Cancel</button>
+          <button class="btn danger" onclick={() => start(true)}>Listen on the network</button>
         </div>
       </div>
     {/if}
 
-    {#if error}<p class="error">{error}</p>{/if}
-    <div class="buttons">
-      <button onclick={close}>Close</button>
-      <button class="primary" disabled={busy} onclick={() => start()}>
+    {#if error}<p class="message error">{error}</p>{/if}
+    <div class="modal-actions">
+      <button class="btn" onclick={close}>Close</button>
+      <button class="btn primary" disabled={busy} onclick={() => start()}>
         {busy ? "Connecting…" : "Start"}
       </button>
     </div>
@@ -206,117 +206,41 @@
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0008;
-  }
-  .dialog {
-    position: relative;
-    width: min(540px, 94vw);
-    max-height: 92vh;
-    overflow: auto;
-    padding: 16px 20px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-  }
-  h2 {
-    margin: 0 0 10px;
-    font-size: 16px;
-  }
-  h3 {
-    margin: 14px 0 6px;
-    font-size: 13px;
-  }
-  .hint {
-    color: #9d9d9d;
-    margin: 0;
-  }
   .running {
     list-style: none;
     margin: 0;
     padding: 0;
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
   .running li {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    padding: 4px 0;
-    border-bottom: 1px solid #333;
-    font: 12px Consolas, monospace;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    font: 12px var(--mono);
   }
-  label {
-    display: block;
-    margin-bottom: 8px;
-  }
-  .row {
-    display: flex;
-    gap: 10px;
-  }
-  .grow {
-    flex: 1;
+  .running li:last-child {
+    border-bottom: none;
   }
   .port {
-    width: 7em;
-  }
-  input,
-  select {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 3px;
-    padding: 4px 6px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
+    flex: none;
+    width: 7.5em;
   }
   .warn {
-    margin: 8px 0;
-    padding: 8px 10px;
-    background: #4d2d00;
-    border: 1px solid #d18616;
-    border-radius: 4px;
+    margin: 4px 0 12px;
+    padding: 10px 12px;
+    background: var(--warning-soft);
+    border: 1px solid #f0b45a55;
+    border-radius: var(--radius);
   }
   .warn p {
     margin: 0 0 8px;
   }
-  .error {
-    color: #f48771;
-  }
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 10px;
-  }
-  button {
-    padding: 5px 14px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  button.primary {
-    background: #0e639c;
-    border-color: #0e639c;
-  }
-  button.danger {
-    background: #a1260d;
-    border-color: #a1260d;
-  }
-  button:disabled {
-    opacity: 0.6;
-    cursor: default;
+  .warn .modal-actions {
+    margin-top: 6px;
   }
 </style>

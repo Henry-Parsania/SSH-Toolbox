@@ -28,9 +28,9 @@
   }
 </script>
 
-<div class="backdrop">
+<div class="modal-backdrop">
   <div
-    class="dialog"
+    class="modal"
     role="dialog"
     aria-label="Settings"
     tabindex="-1"
@@ -41,26 +41,26 @@
   >
     <h2>Settings</h2>
 
-    <label>
+    <label class="field">
       Font
       <input type="text" bind:value={draft.font_family} />
     </label>
-    <label>
+    <label class="field">
       Font size
       <input type="number" min="8" max="48" bind:value={draft.font_size} />
     </label>
-    <label>
+    <label class="field">
       Colour theme
       <select bind:value={draft.theme}>
         <option value="dark">Dark</option>
         <option value="light">Light</option>
       </select>
     </label>
-    <label>
+    <label class="field">
       Scrollback (lines, at least 10,000)
       <input type="number" min="10000" max="1000000" step="1000" bind:value={draft.scrollback} />
     </label>
-    <label>
+    <label class="field">
       Terminal drawing
       <select bind:value={draft.renderer}>
         <option value="auto">Automatic (WebGL on Windows, basic on Linux)</option>
@@ -70,7 +70,7 @@
       <small>Applies to terminals opened after saving.</small>
     </label>
     {#if platform.os === "linux"}
-      <label>
+      <label class="field">
         Display workaround
         <select bind:value={draft.webkit_workaround}>
           <option value="off">Off</option>
@@ -80,7 +80,7 @@
         <small>Only if the window shows blank or garbled. Takes effect after a restart.</small>
       </label>
     {/if}
-    <label>
+    <label class="field">
       Shell for new tabs
       <select bind:value={draft.default_shell}>
         <option value="">First one found</option>
@@ -94,86 +94,10 @@
       Bring back tabs and splits when the app starts
     </label>
 
-    {#if error}<p class="error">{error}</p>{/if}
-    <div class="buttons">
-      <button onclick={onclose}>Cancel</button>
-      <button class="primary" disabled={saving} onclick={save}>Save</button>
+    {#if error}<p class="message error">{error}</p>{/if}
+    <div class="modal-actions">
+      <button class="btn" onclick={onclose}>Cancel</button>
+      <button class="btn primary" disabled={saving} onclick={save}>Save</button>
     </div>
   </div>
 </div>
-
-<style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0008;
-  }
-  .dialog {
-    width: min(460px, 92vw);
-    max-height: 90vh;
-    overflow: auto;
-    padding: 16px 20px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-  }
-  h2 {
-    margin: 0 0 12px;
-    font-size: 16px;
-  }
-  label {
-    display: block;
-    margin-bottom: 10px;
-  }
-  input[type="text"],
-  input[type="number"],
-  select {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 3px;
-    padding: 4px 6px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-  }
-  small {
-    display: block;
-    margin-top: 2px;
-    color: #9d9d9d;
-  }
-  .check {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .error {
-    color: #f48771;
-  }
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  button {
-    padding: 5px 14px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  button.primary {
-    background: #0e639c;
-    border-color: #0e639c;
-  }
-</style>

@@ -102,9 +102,9 @@
   }
 </script>
 
-<div class="backdrop">
+<div class="modal-backdrop">
   <div
-    class="dialog"
+    class="modal"
     role="dialog"
     aria-label="Session"
     tabindex="-1"
@@ -115,13 +115,13 @@
   >
     <h2>{editing ? "Edit session" : "New SSH session"}</h2>
 
-    <label>Name <input type="text" bind:value={name} /></label>
+    <label class="field">Name <input type="text" bind:value={name} /></label>
     <div class="row">
-      <label class="grow">Host <input type="text" bind:value={host} /></label>
-      <label class="port">Port <input type="number" min="1" max="65535" bind:value={port} /></label>
+      <label class="field grow">Host <input type="text" bind:value={host} /></label>
+      <label class="field port">Port <input type="number" min="1" max="65535" bind:value={port} /></label>
     </div>
-    <label>User <input type="text" bind:value={user} autocomplete="off" /></label>
-    <label>
+    <label class="field">User <input type="text" bind:value={user} autocomplete="off" /></label>
+    <label class="field">
       Folder
       <select bind:value={inFolder}>
         <option value="">(none)</option>
@@ -130,7 +130,7 @@
         {/each}
       </select>
     </label>
-    <label>
+    <label class="field">
       Login
       <select bind:value={auth}>
         <option value="password">Password</option>
@@ -139,13 +139,13 @@
       </select>
     </label>
     {#if auth === "key"}
-      <label>
+      <label class="field">
         Private key file
         <input type="text" bind:value={keyPath} placeholder="~/.ssh/id_ed25519" />
         <small>The app reads this file when connecting and never copies it.</small>
       </label>
     {/if}
-    <label>
+    <label class="field">
       Go through a jump host
       <select bind:value={jump}>
         <option value="">(connect directly)</option>
@@ -156,103 +156,30 @@
       <small>Connects to that session first, then on to this one. Up to 3 hops.</small>
     </label>
     {#if library.keychain && auth === "password"}
-      <label>
+      <label class="field">
         Save password in the keychain (optional)
         <input type="password" bind:value={password} autocomplete="new-password" />
         <small>Leave empty to be asked each time.</small>
       </label>
     {/if}
     {#if library.keychain && auth === "key"}
-      <label>
+      <label class="field">
         Save the key's passphrase in the keychain (optional)
         <input type="password" bind:value={passphrase} autocomplete="new-password" />
       </label>
     {/if}
 
-    {#if error}<p class="error">{error}</p>{/if}
-    <div class="buttons">
-      <button onclick={onclose}>Cancel</button>
-      <button class="primary" disabled={saving} onclick={save}>Save</button>
+    {#if error}<p class="message error">{error}</p>{/if}
+    <div class="modal-actions">
+      <button class="btn" onclick={onclose}>Cancel</button>
+      <button class="btn primary" disabled={saving} onclick={save}>Save</button>
     </div>
   </div>
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0008;
-  }
-  .dialog {
-    width: min(440px, 92vw);
-    max-height: 92vh;
-    overflow: auto;
-    padding: 16px 20px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-  }
-  h2 {
-    margin: 0 0 12px;
-    font-size: 16px;
-  }
-  label {
-    display: block;
-    margin-bottom: 10px;
-  }
-  .row {
-    display: flex;
-    gap: 10px;
-  }
-  .grow {
-    flex: 1;
-  }
   .port {
-    width: 6em;
-  }
-  input,
-  select {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 3px;
-    padding: 4px 6px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-  }
-  small {
-    display: block;
-    margin-top: 2px;
-    color: #9d9d9d;
-  }
-  .error {
-    color: #f48771;
-  }
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  button {
-    padding: 5px 14px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  button.primary {
-    background: #0e639c;
-    border-color: #0e639c;
+    flex: none;
+    width: 7em;
   }
 </style>

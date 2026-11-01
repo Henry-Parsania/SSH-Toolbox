@@ -108,9 +108,9 @@
   }
 </script>
 
-<div class="backdrop">
+<div class="modal-backdrop">
   <div
-    class="dialog"
+    class="modal"
     role="dialog"
     aria-label="Set up key login"
     tabindex="-1"
@@ -126,49 +126,49 @@
         This logs in to {session.user}@{session.host} once with your password, adds a key to the
         server, and checks that the key works before saying it's done.
       </p>
-      <label class="choice">
+      <label class="check">
         <input type="radio" bind:group={pick} value="new" /> Make a new key
       </label>
       {#if pick === "new"}
-        <label class="indent">
+        <label class="field indent">
           Passphrase (optional, but recommended)
           <input type="password" bind:value={passphrase} autocomplete="new-password" />
         </label>
       {/if}
       {#each existing as key (key.private_path)}
-        <label class="choice">
+        <label class="check">
           <input type="radio" bind:group={pick} value={key.private_path} />
           <span class="path">{key.private_path}</span>
         </label>
       {/each}
-      <div class="buttons">
-        <button onclick={cancel}>Cancel</button>
-        <button class="primary" onclick={run}>Set up</button>
+      <div class="modal-actions">
+        <button class="btn" onclick={cancel}>Cancel</button>
+        <button class="btn primary" onclick={run}>Set up</button>
       </div>
     {:else if stage === "running"}
       <p>{step}</p>
-      <div class="buttons"><button onclick={cancel}>Cancel</button></div>
+      <div class="modal-actions"><button class="btn" onclick={cancel}>Cancel</button></div>
     {:else if stage === "done"}
-      <p class="ok">
+      <p class="message ok">
         {result?.already ? "That key was already on the server." : "The key was added to the server."}
         Logging in with it worked.
       </p>
-      <label class="choice">
+      <label class="check">
         <input type="checkbox" bind:checked={switchToKey} /> Use this key for {session.name} from now on
       </label>
       {#if library.keychain && session.auth === "password"}
-        <label class="choice">
+        <label class="check">
           <input type="checkbox" bind:checked={deletePassword} /> Delete the saved password
         </label>
       {/if}
-      {#if error}<p class="error">{error}</p>{/if}
-      <div class="buttons"><button class="primary" onclick={finish}>Finish</button></div>
+      {#if error}<p class="message error">{error}</p>{/if}
+      <div class="modal-actions"><button class="btn primary" onclick={finish}>Finish</button></div>
     {:else}
-      <p class="error">{error}</p>
+      <p class="message error">{error}</p>
       {#if usedKey}<p class="small">The key file is {usedKey.path}</p>{/if}
-      <div class="buttons">
-        <button onclick={onclose}>Close</button>
-        <button class="primary" onclick={() => (stage = "choose")}>Try again</button>
+      <div class="modal-actions">
+        <button class="btn" onclick={onclose}>Close</button>
+        <button class="btn primary" onclick={() => (stage = "choose")}>Try again</button>
       </div>
     {/if}
 
@@ -179,87 +179,16 @@
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0008;
-  }
-  .dialog {
-    position: relative;
-    width: min(480px, 92vw);
-    max-height: 92vh;
-    overflow: auto;
-    padding: 16px 20px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-  }
-  h2 {
-    margin: 0 0 10px;
-    font-size: 16px;
-  }
-  p {
-    margin: 0 0 10px;
-  }
-  .choice {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-  }
   .path {
     word-break: break-all;
-    font: 12px Consolas, monospace;
+    font: 12px var(--mono);
   }
   .indent {
-    display: block;
-    margin: 0 0 10px 24px;
-  }
-  input[type="password"] {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 3px;
-    padding: 4px 6px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-  }
-  .ok {
-    color: #89d185;
-  }
-  .error {
-    color: #f48771;
+    margin-left: 24px;
   }
   .small {
-    color: #9d9d9d;
+    color: var(--text-faint);
     font-size: 12px;
     word-break: break-all;
-  }
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  button {
-    padding: 5px 14px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  button.primary {
-    background: #0e639c;
-    border-color: #0e639c;
   }
 </style>

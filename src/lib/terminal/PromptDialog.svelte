@@ -80,8 +80,8 @@
   <div class="buttons">
     <!-- Cancel is the default button when a key has changed type. -->
     <!-- svelte-ignore a11y_autofocus -->
-    <button autofocus={warning} onclick={() => answer(false)}>Cancel</button>
-    <button class="primary" onclick={() => answer(true)}>
+    <button class="btn" autofocus={warning} onclick={() => answer(false)}>Cancel</button>
+    <button class="btn primary" onclick={() => answer(true)}>
       {#if prompt.kind === "host_key_unknown" || prompt.kind === "host_key_new_type"}
         Trust and connect
       {:else if prompt.kind === "plain_ftp"}
@@ -98,67 +98,64 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
     z-index: 5;
-    width: min(460px, 90%);
-    padding: 12px 16px;
-    background: #252526;
-    color: #d4d4d4;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font: 13px system-ui, sans-serif;
-    box-shadow: 0 4px 16px #0008;
+    width: min(480px, 92%);
+    padding: 18px 20px 16px;
+    color: var(--text);
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow);
+    transform: translate(-50%, -50%);
+    animation: pop-in 0.16s var(--ease);
   }
   .box.warning {
-    background: #4d2d00;
-    border-color: #d18616;
+    background: var(--bg-1);
+    border-color: var(--warning);
+    box-shadow:
+      0 0 0 1px var(--warning),
+      var(--shadow);
   }
   .title {
     margin: 0 0 8px;
+    font-size: 15px;
     font-weight: 600;
   }
+  .warning .title {
+    color: var(--warning);
+  }
   p {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
+    color: var(--text-muted);
+  }
+  .title {
+    color: var(--text);
+  }
+  .warning .title {
+    color: var(--warning);
   }
   .mono {
-    font: 12px Consolas, monospace;
+    padding: 9px 11px;
+    color: var(--text);
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-s);
+    font: 12px/1.5 var(--mono);
     word-break: break-all;
-    padding: 6px 8px;
-    background: #1e1e1e;
   }
   input[type="password"] {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 4px 6px;
-    margin-bottom: 8px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
+    margin-bottom: 10px;
   }
   .save {
     display: flex;
-    gap: 6px;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-bottom: 10px;
   }
   .buttons {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-  }
-  button {
-    padding: 4px 14px;
-    font: inherit;
-    color: inherit;
-    background: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  button.primary {
-    background: #0e639c;
-    border-color: #0e639c;
+    margin-top: 6px;
   }
 </style>
