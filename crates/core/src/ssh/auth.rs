@@ -226,10 +226,13 @@ where
             "The connection closed while logging in.",
         )
     };
-    let identities = agent
-        .request_identities()
-        .await
-        .map_err(|_| AppError::new(ErrorCode::ConnectionFailed, "The SSH agent didn't answer."))?;
+    // The agent's own wording is a plain library error: no key or secret is in it.
+    let identities = agent.request_identities().await.map_err(|e| {
+        AppError::new(
+            ErrorCode::ConnectionFailed,
+            format!("The SSH agent didn't answer ({e})."),
+        )
+    })?;
     if identities.is_empty() {
         return Err(auth_failed(
             "The SSH agent has no keys. Add one with ssh-add.",
@@ -283,9 +286,24 @@ async fn agent_login(connection: &mut Connection, user: &str) -> Result<(), AppE
 async fn agent_login(connection: &mut Connection, user: &str) -> Result<(), AppError> {
     let mut accepted = false;
     let mut reached = false;
-    if let Ok(agent) = AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await {
+    // The Windows agent sometimes drops the first request on a fresh pipe, so one more try
+    // is made on a new connection before giving up.
+    for attempt in 0..2 {
+        let Ok(agent) = AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await
+        else {
+            break;
+        };
         reached = true;
-        accepted = try_agent(connection, user, agent).await?;
+        match try_agent(connection, user, agent).await {
+            Ok(done) => {
+                accepted = done;
+                break;
+            }
+            Err(e) if attempt == 0 && e.message.starts_with("The SSH agent didn't answer") => {
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+            Err(e) => return Err(e),
+        }
     }
     if !accepted && let Ok(agent) = AgentClient::connect_pageant().await {
         reached = true;
