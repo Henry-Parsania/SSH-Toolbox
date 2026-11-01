@@ -4,10 +4,12 @@ use super::local::ShellSpec;
 use crate::error::{AppError, ErrorCode};
 
 /// Distributions that Docker Desktop adds for itself. They are not for people to open.
+#[cfg_attr(not(windows), allow(dead_code))]
 const HIDDEN: [&str; 2] = ["docker-desktop", "docker-desktop-data"];
 
 /// Reads the output of `wsl.exe --list --quiet`, which is UTF-16LE. A byte order mark and stray
 /// NUL characters are dropped, and so are blank lines and Docker's own distributions.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn parse_distro_list(output: &[u8]) -> Vec<String> {
     let units: Vec<u16> = output
         .as_chunks::<2>()
