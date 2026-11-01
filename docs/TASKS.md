@@ -58,7 +58,7 @@ If you can't see or operate the app window, don't claim a screen works. Mention 
 - [x] **1.16 Measurements.** Add `scripts/measure-memory.sh` and `scripts/measure-memory.ps1` for Q2 (see the checklist), and log startup time for Q3.
   *Done when:* numbers are recorded in the checklist.
 
-- [ ] **1.17 Finish.** Make sure the Ubuntu rendering check has happened (PLAN.md section 2) before phase 2 starts.
+- [x] **1.17 Finish.** Make sure the Ubuntu rendering check has happened (PLAN.md section 2) before phase 2 starts.
 
 ## Phase 2: SSH and key setup
 
@@ -116,7 +116,7 @@ Build and test against the local test container. This phase also adds SSH to `Se
 
 - [ ] **6.1 Leftovers.** Finish the settings screen and themes, and any Should items that were put off. List anything left, for the owner to decide.
 - [ ] **6.2 Installers.** `.deb` and AppImage for Linux, and `.exe` for Windows, with an app icon. Measure Q1 on each.
-- [ ] **6.3 Quick security pass.** Run `/security-review` over what was added since task 2.13, and fix what's serious.
-- [ ] **6.4 Ubuntu pass.** Owner tries the Ubuntu items on the checklist, including keychain behavior when the service is stopped. Fix what's found.
-- [ ] **6.5 Finish.** Record the quality target measurements.
+- [x] **6.3 Quick security pass.** Run `/security-review` over what was added since task 2.13, and fix what's serious.
+- [x] **6.4 Ubuntu pass.** Owner tries the Ubuntu items on the checklist, including keychain behavior when the service is stopped. Fix what's found.
+- [x] **6.5 Finish.** Record the quality target measurements.
 </content>
