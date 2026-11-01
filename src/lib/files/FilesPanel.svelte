@@ -33,6 +33,36 @@
 
   let { source, follow = "", onclose }: Props = $props();
 
+  // Where the divider between the server's files and this computer's sits, as the top list's
+  // share of the height. It can be dragged, and is kept for next time.
+  let split = $state(
+    (() => {
+      const n = Number(localStorage.getItem("files-split"));
+      return n >= 0.15 && n <= 0.85 ? n : 0.5;
+    })(),
+  );
+  let browsersBox: HTMLElement | undefined = $state();
+
+  function resizeSplit(e: PointerEvent) {
+    if (!browsersBox) return;
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const box = browsersBox.getBoundingClientRect();
+    const move = (ev: PointerEvent) => {
+      split = Math.min(0.85, Math.max(0.15, (ev.clientY - box.top) / box.height));
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", stop);
+      handle.removeEventListener("pointercancel", stop);
+      localStorage.setItem("files-split", split.toFixed(3));
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+  }
+
   let local = $state<OpenedFiles | null>(null);
   let remote = $state<OpenedFiles | null>(null);
   let localPath = $state("");
@@ -208,7 +238,8 @@
 
   {#if message}<p class="message warn top">{message}</p>{/if}
 
-  <div class="browsers">
+  <div class="browsers" bind:this={browsersBox}>
+    <div class="half" style:flex="{split} 1 0">
     <FileBrowser
         title={source ? source.name : "Server"}
         side="remote"
@@ -223,7 +254,10 @@
         transferIcon="down"
         ontransfer={(paths) => local && remote && queue(remote.id, paths, local.id, localPath)}
       />
-    <div class="divider"></div>
+    </div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="divider" onpointerdown={resizeSplit} title="Drag to change the sizes"></div>
+    <div class="half" style:flex="{1 - split} 1 0">
     <FileBrowser
         title="This computer"
         side="local"
@@ -238,6 +272,7 @@
         transferIcon="up"
         ontransfer={(paths) => local && remote && queue(local.id, paths, remote.id, remotePath)}
       />
+    </div>
   </div>
 
   <TransferList {jobs} />
@@ -309,9 +344,26 @@
     pointer-events: none;
     box-shadow: var(--shadow-small);
   }
+  .half {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* A thin line with a taller strip around it, so it is easy to grab. */
   .divider {
+    flex: none;
+    position: relative;
     height: 1px;
     margin: 2px 0;
     background: var(--border-strong);
+    cursor: row-resize;
+  }
+  .divider::before {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
+  }
+  .divider:hover {
+    background: var(--accent);
   }
 </style>
