@@ -3,7 +3,8 @@
 
 use bollard::Docker;
 use bollard::query_parameters::{
-    ListImagesOptionsBuilder, ListNetworksOptions, ListVolumesOptionsBuilder,
+    ListContainersOptionsBuilder, ListImagesOptionsBuilder, ListNetworksOptions,
+    ListVolumesOptionsBuilder,
     RemoveImageOptionsBuilder, RemoveVolumeOptionsBuilder,
 };
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,12 @@ pub struct Resource {
     pub protected: bool,
     /// Seconds since 1970 when it was made, if Docker says (images).
     pub created: Option<i64>,
+    /// How much room it takes, if known (images, and volumes when Docker can say).
+    pub size: Option<u64>,
+    /// The containers that use it, by name. Empty means nothing uses it.
+    pub used_by: Vec<String>,
+    /// The Compose project it belongs to, if any.
+    pub project: Option<String>,
 }
 
 fn failed(error: bollard::errors::Error) -> AppError {
@@ -121,7 +128,132 @@ pub async fn list(docker: &Docker, kind: Kind) -> Result<Vec<Resource>, AppError
         .map(|items| items.iter().filter_map(|v| describe(kind, v)).collect())
         .unwrap_or_default();
     out.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Which containers use what. If this can't be read the lists are still shown, just without it.
+    if let Ok(containers) = docker
+        .list_containers(Some(ListContainersOptionsBuilder::default().all(true).build()))
+        .await
+        .map(|c| serde_json::to_value(c).unwrap_or(Value::Null))
+    {
+        for resource in &mut out {
+            resource.used_by = users_of(kind, resource, &containers);
+        }
+    }
+    if kind == Kind::Volumes {
+        let sizes = volume_sizes(docker).await;
+        for resource in &mut out {
+            resource.size = sizes.get(&resource.id).copied();
+        }
+    }
     Ok(out)
+}
+
+const COMPOSE_PROJECT: &str = "com.docker.compose.project";
+
+fn label(v: &Value, key: &str) -> Option<String> {
+    v.get("Labels")
+        .and_then(|l| l.get(key))
+        .and_then(Value::as_str)
+        .map(clean)
+        .filter(|s| !s.is_empty())
+}
+
+/// The names of the containers that use a resource, from Docker's list of containers.
+fn users_of(kind: Kind, resource: &Resource, containers: &Value) -> Vec<String> {
+    let mut names: Vec<String> = containers
+        .as_array()
+        .map(|all| {
+            all.iter()
+                .filter(|c| match kind {
+                    Kind::Images => c.get("ImageID").and_then(Value::as_str) == Some(&resource.id),
+                    Kind::Volumes => c
+                        .get("Mounts")
+                        .and_then(Value::as_array)
+                        .is_some_and(|m| {
+                            m.iter().any(|m| {
+                                m.get("Name").and_then(Value::as_str) == Some(&resource.id)
+                            })
+                        }),
+                    Kind::Networks => c
+                        .pointer("/NetworkSettings/Networks")
+                        .and_then(Value::as_object)
+                        .is_some_and(|n| n.contains_key(&resource.name)),
+                })
+                .filter_map(|c| {
+                    c.get("Names")
+                        .and_then(Value::as_array)
+                        .and_then(|n| n.first())
+                        .and_then(Value::as_str)
+                        .map(|n| clean(n.trim_start_matches('/')))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+/// How much room each volume takes, by name. Docker works this out by walking the volumes, which
+/// can take a while on a busy server, so it is given a few seconds and may come back empty.
+async fn volume_sizes(docker: &Docker) -> std::collections::HashMap<String, u64> {
+    let options = bollard::query_parameters::DataUsageOptionsBuilder::new()
+        .verbose(true)
+        .build();
+    let answer = tokio::time::timeout(
+        std::time::Duration::from_secs(8),
+        docker.df(Some(options)),
+    )
+    .await;
+    let mut sizes = std::collections::HashMap::new();
+    if let Ok(Ok(answer)) = answer
+        && let Ok(value) = serde_json::to_value(&answer)
+    {
+        let items = value
+            .pointer("/VolumeUsage/Items")
+            .or_else(|| value.pointer("/volume_usage/Items"))
+            .and_then(Value::as_array);
+        for item in items.into_iter().flatten() {
+            let size = item.pointer("/UsageData/Size").and_then(Value::as_i64);
+            if let (Some(name), Some(size)) = (item.get("Name").and_then(Value::as_str), size)
+                && size >= 0
+            {
+                sizes.insert(clean(name), size as u64);
+            }
+        }
+    }
+    sizes
+}
+
+/// Makes an empty volume or network. Networks use Docker's default (bridge) driver.
+pub async fn create(docker: &Docker, kind: Kind, name: &str) -> Result<(), AppError> {
+    match kind {
+        Kind::Volumes => {
+            check_volume_name(name)?;
+            docker
+                .create_volume(bollard::models::VolumeCreateRequest {
+                    name: Some(name.to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map(|_| ())
+                .map_err(failed)
+        }
+        Kind::Networks => {
+            check_volume_name(name)?;
+            docker
+                .create_network(bollard::models::NetworkCreateRequest {
+                    name: name.to_string(),
+                    ..Default::default()
+                })
+                .await
+                .map(|_| ())
+                .map_err(failed)
+        }
+        Kind::Images => Err(AppError::new(
+            ErrorCode::InvalidInput,
+            "Images are downloaded or built, not created here.",
+        )),
+    }
 }
 
 fn describe(kind: Kind, v: &Value) -> Option<Resource> {
@@ -147,6 +279,9 @@ fn describe(kind: Kind, v: &Value) -> Option<Resource> {
                 detail: format!("{short} · {}", megabytes(size)),
                 protected: false,
                 created: v.get("Created").and_then(Value::as_i64).filter(|c| *c > 0),
+                size: v.get("Size").and_then(Value::as_u64),
+                used_by: Vec::new(),
+                project: None,
             })
         }
         Kind::Volumes => {
@@ -160,6 +295,9 @@ fn describe(kind: Kind, v: &Value) -> Option<Resource> {
                 name,
                 protected: false,
                 created: None,
+                size: None,
+                used_by: Vec::new(),
+                project: label(v, COMPOSE_PROJECT),
             })
         }
         Kind::Networks => {
@@ -174,6 +312,9 @@ fn describe(kind: Kind, v: &Value) -> Option<Resource> {
                 id,
                 name,
                 created: None,
+                size: None,
+                used_by: Vec::new(),
+                project: label(v, COMPOSE_PROJECT),
             })
         }
     }
@@ -322,6 +463,20 @@ pub async fn inspect(docker: &Docker, kind: Kind, id: &str) -> Result<ResourceDe
             }
             labels(&value, "/Labels", &mut lines);
         }
+    }
+    // What the lists know: who uses it, and how big it is.
+    if let Ok(all) = list(docker, kind).await
+        && let Some(me) = all.iter().find(|r| r.id == id || r.id.trim_start_matches("sha256:") == id.trim_start_matches("sha256:"))
+    {
+        if kind == Kind::Volumes {
+            add(&mut lines, "Size", me.size.map(megabytes));
+        }
+        add(&mut lines, "Compose project", me.project.clone());
+        lines.push(if me.used_by.is_empty() {
+            "In use: no container uses it".to_string()
+        } else {
+            format!("In use by: {}", me.used_by.join(", "))
+        });
     }
     let mut raw = serde_json::to_string_pretty(&value).unwrap_or_default();
     if raw.len() > 256 * 1024 {

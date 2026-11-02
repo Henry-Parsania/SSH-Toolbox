@@ -91,6 +91,12 @@ export interface DockerResource {
   protected: boolean;
   /** Seconds since 1970, for images. */
   created: number | null;
+  /** Bytes it takes, if known. */
+  size: number | null;
+  /** The containers that use it. Empty: nothing does. */
+  used_by: string[];
+  /** The Compose project it belongs to. */
+  project: string | null;
 }
 
 export function dockerResources(dockerId: string, kind: ResourceKind): Promise<DockerResource[]> {
@@ -150,4 +156,9 @@ export interface RunSpec {
 /** Starts a new container from an image (downloading it first if needed). Returns its ID. */
 export function dockerRun(dockerId: string, spec: RunSpec): Promise<string> {
   return invoke<string>("docker_run", { dockerId, spec });
+}
+
+/** Makes an empty volume or network. */
+export function dockerCreateResource(dockerId: string, kind: "volumes" | "networks", name: string): Promise<void> {
+  return invoke<void>("docker_create_resource", { dockerId, kind, name });
 }

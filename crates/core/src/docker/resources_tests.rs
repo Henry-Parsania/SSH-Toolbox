@@ -141,3 +141,48 @@ async fn pulling_reports_how_far_it_has_got_and_ends_complete() {
     let last = seen.last().expect("at least the final report");
     assert_eq!((last.done, last.total), (100, 100));
 }
+
+#[tokio::test]
+async fn lists_say_which_containers_use_what_and_how_big_volumes_are() {
+    let (docker, _) = engine().await;
+    let images = list(&docker, Kind::Images).await.unwrap();
+    let nginx = images.iter().find(|i| i.name == "nginx:latest").unwrap();
+    assert_eq!(nginx.used_by, vec!["web"]);
+    assert_eq!(nginx.size, Some(142_000_000));
+    let other = images.iter().find(|i| i.name == "(untagged)").unwrap();
+    assert!(other.used_by.is_empty());
+
+    let volumes = list(&docker, Kind::Volumes).await.unwrap();
+    assert_eq!(volumes[0].used_by, vec!["web"]);
+    assert_eq!(volumes[0].size, Some(2_048_000));
+    assert_eq!(volumes[0].project.as_deref(), Some("shop"));
+
+    let networks = list(&docker, Kind::Networks).await.unwrap();
+    let shop = networks.iter().find(|n| n.name == "shop_default").unwrap();
+    assert_eq!(shop.used_by, vec!["web"]);
+    assert!(networks.iter().find(|n| n.name == "bridge").unwrap().used_by.is_empty());
+}
+
+#[tokio::test]
+async fn a_volume_s_details_include_who_uses_it() {
+    let (docker, _) = engine().await;
+    let d = super::resources::inspect(&docker, Kind::Volumes, "data").await.unwrap();
+    let text = d.lines.join("\n");
+    assert!(text.contains("In use by: web"), "{text}");
+    assert!(text.contains("Size: 2.0 MB"), "{text}");
+}
+
+#[tokio::test]
+async fn volumes_and_networks_can_be_made_with_checked_names() {
+    use super::resources::create;
+    let (docker, seen) = engine().await;
+    create(&docker, Kind::Volumes, "backup-1").await.unwrap();
+    create(&docker, Kind::Networks, "shop_net").await.unwrap();
+    for bad in ["", "a/b", "../x", "-x", "a b"] {
+        assert_eq!(create(&docker, Kind::Volumes, bad).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
+    }
+    assert_eq!(create(&docker, Kind::Images, "x").await.unwrap_err().code, ErrorCode::InvalidInput);
+    let seen = seen.lock().unwrap().join("\n");
+    assert!(seen.contains("POST /volumes/create"), "{seen}");
+    assert!(seen.contains("/networks/create"), "{seen}");
+}

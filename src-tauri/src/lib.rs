@@ -82,6 +82,7 @@ pub fn run() {
             commands::docker::docker_prune,
             commands::docker::docker_pull,
             commands::docker::docker_run,
+            commands::docker::docker_create_resource,
             commands::docker::docker_resources,
             commands::docker::docker_stats,
             commands::terminal::serial_list_ports,

@@ -12,6 +12,7 @@
     type OpenedFiles,
   } from "../backend/files";
   import Icon, { type IconName } from "../ui/Icon.svelte";
+  import { fitMenu } from "../ui/fitMenu";
   import { baseName, formatSize, formatTime, joinPath, modeToText, parentPath, parseMode, rootPath, shellQuote, sortEntries } from "./paths";
 
   interface Props {
@@ -214,7 +215,7 @@
       anchor = entry.name;
     }
     // Keep the menu on screen; it is about 230 by 330 pixels.
-    menu = { x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 340), entry };
+    menu = { x: e.clientX, y: e.clientY, entry };
   }
 
   function closeMenu() {
@@ -475,7 +476,7 @@
 {#if menu}
   {@const one = chosen.length === 1 ? chosen[0] : null}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <ul class="menu ctx" role="menu" style:left="{menu.x}px" style:top="{menu.y}px" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+  <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
     {#if menu.entry && chosen.length > 0}
       {#if one && (one.kind === "dir" || one.kind === "symlink")}
         <li><button onclick={() => { closeMenu(); open(one); }}><Icon name="folder" size={14} /> Open</button></li>

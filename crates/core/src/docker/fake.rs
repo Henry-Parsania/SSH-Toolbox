@@ -12,6 +12,9 @@ pub type Requests = Arc<Mutex<Vec<String>>>;
 pub const CONTAINERS: &str = r#"[
   {"Id":"abc123","Names":["/web"],"Image":"nginx","State":"running","Status":"Up 2 hours","Created":200,
    "Ports":[{"IP":"0.0.0.0","PrivatePort":80,"PublicPort":8080,"Type":"tcp"}],
+   "ImageID":"sha256:aabbccddeeff00112233",
+   "Mounts":[{"Type":"volume","Name":"data","Destination":"/data"}],
+   "NetworkSettings":{"Networks":{"shop_default":{}}},
    "Labels":{"com.docker.compose.project":"shop","com.docker.compose.service":"web"}},
   {"Id":"def456","Names":["/old\u001b[31m"],"Image":"redis","State":"exited","Status":"Exited (0) a day ago","Created":100,
    "Ports":[],"Labels":{}}
@@ -178,7 +181,7 @@ async fn serve(mut socket: TcpStream, record: Requests) {
             reply(
                 "200 OK",
                 "application/json",
-                r#"{"Volumes":[{"Name":"data","Driver":"local","Mountpoint":"/var/lib/docker/volumes/data/_data","Labels":{},"Scope":"local","Options":{}}],"Warnings":null}"#,
+                r#"{"Volumes":[{"Name":"data","Driver":"local","Mountpoint":"/var/lib/docker/volumes/data/_data","Labels":{"com.docker.compose.project":"shop"},"Scope":"local","Options":{}}],"Warnings":null}"#,
             )
         } else if path.ends_with("/networks") {
             reply(
@@ -186,6 +189,14 @@ async fn serve(mut socket: TcpStream, record: Requests) {
                 "application/json",
                 r#"[{"Id":"aa11","Name":"bridge","Driver":"bridge","Scope":"local"},{"Id":"bb22","Name":"shop_default","Driver":"bridge","Scope":"local"}]"#,
             )
+        } else if path.ends_with("/system/df") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"VolumeUsage":{"ActiveCount":1,"TotalCount":1,"Items":[{"Name":"data","Driver":"local","Mountpoint":"/x","Labels":{},"Scope":"local","Options":{},"UsageData":{"Size":2048000,"RefCount":1}}]}}"#,
+            )
+        } else if method == "POST" && (path.ends_with("/volumes/create") || path.ends_with("/networks/create")) {
+            reply("201 Created", "application/json", r#"{"Name":"made","Driver":"local","Mountpoint":"/x","Labels":{},"Scope":"local","Options":{},"Id":"cc33","Warning":""}"#)
         } else if method == "POST" && path.ends_with("/containers/create") {
             reply("201 Created", "application/json", r#"{"Id":"abc123","Warnings":[]}"#)
         } else if method == "POST" && path.ends_with("/containers/prune") {

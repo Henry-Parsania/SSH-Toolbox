@@ -185,6 +185,17 @@ pub async fn docker_run(
     toolbox_core::docker::run::run(&*engines.get(&docker_id)?, &spec).await
 }
 
+/// Makes an empty volume or network.
+#[tauri::command]
+pub async fn docker_create_resource(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    kind: resources::Kind,
+    name: String,
+) -> Result<(), AppError> {
+    resources::create(&*engines.get(&docker_id)?, kind, &name).await
+}
+
 #[tauri::command]
 pub async fn docker_remove_resource(
     engines: State<'_, Engines>,

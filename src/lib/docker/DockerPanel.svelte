@@ -7,6 +7,7 @@
     dockerConnect,
     dockerInspect,
     dockerList,
+    dockerCreateResource,
     dockerPrune,
     dockerPull,
     dockerRun,
@@ -29,6 +30,7 @@
   import type { Library } from "../sessions/library.svelte";
   import PromptDialog from "../terminal/PromptDialog.svelte";
   import Icon from "../ui/Icon.svelte";
+  import { fitMenu } from "../ui/fitMenu";
   import Spark from "./Spark.svelte";
 
   interface Props {
@@ -82,6 +84,8 @@
     view = next;
     resources = [];
     filter = "";
+    resFilter = "all";
+    resSort = "name";
     void loadResources();
   }
 
@@ -99,10 +103,42 @@
     await loadResources();
   }
 
+  let resFilter = $state<"all" | "used" | "unused">("all");
+  let resSort = $state<"name" | "size">("name");
+
   const shownResources = $derived.by(() => {
     const word = filter.trim().toLowerCase();
-    return word ? resources.filter((r) => `${r.name} ${r.detail}`.toLowerCase().includes(word)) : resources;
+    let list = word
+      ? resources.filter((r) => `${r.name} ${r.detail} ${r.project ?? ""} ${r.used_by.join(" ")}`.toLowerCase().includes(word))
+      : resources;
+    if (resFilter !== "all") list = list.filter((r) => (r.used_by.length > 0) === (resFilter === "used"));
+    return resSort === "size" ? [...list].sort((a, b) => (b.size ?? -1) - (a.size ?? -1)) : list;
   });
+
+  // One line about the whole list: how many, how big, how many are not used by anything.
+  const resSummary = $derived.by(() => {
+    if (view === "containers" || resources.length === 0) return "";
+    const unused = resources.filter((r) => r.used_by.length === 0 && !r.protected).length;
+    const known = resources.filter((r) => r.size !== null);
+    const total = known.reduce((sum, r) => sum + (r.size ?? 0), 0);
+    return `${resources.length} ${view}${known.length ? ` · ${size(total)}` : ""} · ${unused} not in use`;
+  });
+
+  let creating = $state<{ kind: "volumes" | "networks"; name: string; error: string } | null>(null);
+
+  async function confirmCreate() {
+    const form = creating;
+    const id = dockerId;
+    if (!form || !id) return;
+    try {
+      await dockerCreateResource(id, form.kind, form.name.trim());
+      creating = null;
+      say(`Made ${form.name.trim()}.`);
+      await loadResources();
+    } catch (err) {
+      form.error = (err as { message?: string }).message ?? "That didn't work.";
+    }
+  }
   let stats = $state<Record<string, ContainerStats>>({});
 
   // ---- Right-click menu, and the dialogs it opens.
@@ -135,7 +171,7 @@
   function openMenu(e: MouseEvent, next: Omit<Menu, "x" | "y">) {
     e.preventDefault();
     e.stopPropagation();
-    menu = { ...next, x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 330) };
+    menu = { ...next, x: e.clientX, y: e.clientY };
   }
 
   function closeMenu() {
@@ -656,6 +692,11 @@
       {#if view === "containers" || view === "images"}
         <button class="btn small" title="Start a new container" onclick={() => startRun()}>Run…</button>
       {/if}
+      {#if view === "volumes" || view === "networks"}
+        <button class="btn small" title="Make an empty {view === 'volumes' ? 'volume' : 'network'}" onclick={() => (creating = { kind: view as "volumes" | "networks", name: "", error: "" })}>
+          New {view === "volumes" ? "volume" : "network"}…
+        </button>
+      {/if}
       <span class="spacer"></span>
       <button class="btn small" title="Remove what is not in use" onclick={() => (pruning = view)}>Clean up…</button>
     </div>
@@ -669,13 +710,38 @@
     {/if}
     {#if note}<p class="message note">{note}</p>{/if}
     {#if view !== "containers"}
+      <div class="bar">
+        <span class="count">{resSummary}</span>
+        <span class="spacer"></span>
+        <select class="state-pick" bind:value={resFilter} aria-label="Show">
+          <option value="all">All</option>
+          <option value="used">In use</option>
+          <option value="unused">Not in use</option>
+        </select>
+        {#if view !== "networks"}
+          <select class="state-pick" bind:value={resSort} aria-label="Sort by">
+            <option value="name">By name</option>
+            <option value="size">Largest first</option>
+          </select>
+        {/if}
+      </div>
       <div class="list">
         {#each shownResources as r (r.id)}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="row" ondblclick={() => showResourceDetails(r)} oncontextmenu={(e) => openMenu(e, { kind: "resource", r })}>
             <div class="what">
               <span class="name">{r.name}</span>
-              <span class="sub">{r.detail}{r.created ? ` · ${ago(r.created)}` : ""}</span>
+              <span class="sub">
+                {view === "volumes" ? `${r.size !== null ? size(r.size) : "size unknown"} · ` : ""}{r.detail}{r.created ? ` · ${ago(r.created)}` : ""}
+              </span>
+              {#if r.project}<span class="sub">Compose project: {r.project}</span>{/if}
+              {#if r.protected}
+                <span class="sub">Built into Docker</span>
+              {:else if r.used_by.length}
+                <span class="sub in-use" title={r.used_by.join(", ")}>In use by {r.used_by.join(", ")}</span>
+              {:else}
+                <span class="sub unused">Not in use</span>
+              {/if}
             </div>
             <div class="actions">
               {#if view === "images"}
@@ -773,7 +839,7 @@
   {/if}
 
   {#if menu}
-    <ul class="menu ctx" role="menu" style:left="{menu.x}px" style:top="{menu.y}px" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
       {#if menu.kind === "container" && menu.c}
         {@const c = menu.c}
         {#if c.state === "running"}
@@ -890,6 +956,25 @@
     </div>
   {/if}
 
+  {#if creating}
+    <div class="modal-backdrop">
+      <div class="modal" role="dialog" aria-label="New" tabindex="-1" onkeydown={(e) => e.key === "Escape" && (creating = null)}>
+        <h2>New {creating.kind === "volumes" ? "volume" : "network"}</h2>
+        <label class="field">
+          Name
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="text" autofocus bind:value={creating.name} spellcheck="false" onkeydown={(e) => e.key === "Enter" && confirmCreate()} />
+          <small>Letters, digits, _ . and - only.</small>
+        </label>
+        {#if creating.error}<p class="message error">{creating.error}</p>{/if}
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (creating = null)}>Cancel</button>
+          <button class="btn primary" disabled={!creating.name.trim()} onclick={confirmCreate}>Make</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   {#if killing}
     <div class="modal-backdrop">
       <div class="modal" role="alertdialog" aria-label="Kill container" tabindex="-1">
@@ -987,7 +1072,11 @@
     <div class="modal-backdrop">
       <div class="modal" role="alertdialog" aria-label="Remove" tabindex="-1">
         <h2>Remove “{removingResource.name}”?</h2>
-        <p>Docker refuses if anything still uses it.</p>
+        {#if removingResource.used_by.length}
+          <p>It is in use by {removingResource.used_by.join(", ")}, so Docker will refuse. Remove those containers first.</p>
+        {:else}
+          <p>Nothing uses it. Anything stored in it is deleted and can't be brought back.</p>
+        {/if}
         <div class="modal-actions">
           <button class="btn" onclick={() => (removingResource = null)}>Cancel</button>
           <button class="btn danger" onclick={confirmRemoveResource}>Remove</button>
@@ -1198,6 +1287,12 @@
   .pair input[type="text"] {
     flex: 1;
     min-width: 0;
+  }
+  .in-use {
+    color: var(--accent);
+  }
+  .unused {
+    color: var(--warning, #d29922);
   }
   .dot.bad {
     background: var(--danger, #f85149);
