@@ -10,7 +10,7 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 zeroize = "1.9"
-tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util", "net"] }
 tokio-util = "0.7"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
@@ -30,7 +30,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 rustls-native-certs = "0.8"
 sha2 = "0.10"
 x509-parser = "0.18.1"
-sysinfo = { version = "0.37", default-features = false, features = ["system", "disk"] }
+sysinfo = { version = "0.37", default-features = false, features = ["system", "disk", "network"] }
 tokio-serial = "5.5.0"
 bollard = "0.21.1"
 futures-util = "0.3"

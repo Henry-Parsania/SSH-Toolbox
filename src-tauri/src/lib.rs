@@ -67,11 +67,15 @@ pub fn run() {
         .manage(commands::files::Files::default())
         .manage(commands::status::StatsState::default())
         .manage(commands::docker::Engines::default())
+        .manage(commands::scan::Scans::default())
         .manage(commands::agent::Agent::new(&config.join("providers.json")))
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::scan::scan_local_networks,
+            commands::scan::scan_run,
+            commands::scan::scan_cancel,
             commands::agent::agent_providers,
             commands::agent::agent_provider_save,
             commands::agent::agent_provider_delete,

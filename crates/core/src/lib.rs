@@ -11,6 +11,7 @@ pub mod link;
 pub mod platform;
 pub mod prompt;
 pub mod reach;
+pub mod scan;
 pub mod secret;
 pub mod serial;
 pub mod sessions;

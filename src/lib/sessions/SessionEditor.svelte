@@ -10,16 +10,18 @@
     editing?: SshSession;
     /** The folder a new session starts in. */
     folder?: string;
+    /** An address to start a new session with, such as one found by the network scanner. */
+    prefill?: { host: string; port: number };
     onclose: () => void;
   }
 
-  let { library, editing, folder = "", onclose }: Props = $props();
+  let { library, editing, folder = "", prefill, onclose }: Props = $props();
 
   // The form starts from the session being edited, and doesn't follow later changes to it.
   const start = untrack(() => ({
-    name: editing?.name ?? "",
-    host: editing?.host ?? "",
-    port: editing?.port ?? 22,
+    name: editing?.name ?? prefill?.host ?? "",
+    host: editing?.host ?? prefill?.host ?? "",
+    port: editing?.port ?? prefill?.port ?? 22,
     user: editing?.user ?? "",
     auth: editing?.auth ?? ("password" as const),
     keyPath: editing?.key_path ?? "",

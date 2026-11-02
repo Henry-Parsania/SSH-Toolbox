@@ -21,6 +21,7 @@
     ["Port forwarding", "Local, remote and SOCKS forwards for a session. In the sessions list, on a session's forward button."],
     ["Files", "Browse and copy between this computer and a server (SFTP, FTP or FTPS) by dragging. It can follow the folder the terminal is in. View menu."],
     ["Docker", "Containers, images, volumes and networks on this computer or on the SSH server in the active tab: start, stop, restart, remove, details, live CPU and memory, logs and shells. View menu."],
+    ["Network tools", "Tools menu: a network scanner that finds the computers on a network (192.168.1.0/24, ranges or addresses) and the services they offer, with a button to add an SSH session, and a port scanner that shows which ports of one computer are open, with the greeting each service sends."],
     ["Agent", "An assistant for the SSH server in the active tab (the sparkle button, or View menu). It can read the terminal and files and run commands; anything that changes something is shown to you first. Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model: set one up with the gear in the panel."],
     ["Serial ports", "Open a serial device with its settings, and set DTR, RTS or send a break. File menu."],
     ["Footer", "CPU, memory and disk of this computer or of the active SSH server. Settings."],
