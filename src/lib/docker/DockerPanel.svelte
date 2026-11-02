@@ -7,8 +7,14 @@
     dockerConnect,
     dockerInspect,
     dockerList,
+    dockerPrune,
+    dockerPull,
     dockerRemoveResource,
+    dockerRename,
+    dockerResourceDetails,
     dockerResources,
+    type PruneKind,
+    type ResourceDetails,
     type DockerResource,
     type ResourceKind,
     dockerStats,
@@ -94,6 +100,154 @@
     return word ? resources.filter((r) => `${r.name} ${r.detail}`.toLowerCase().includes(word)) : resources;
   });
   let stats = $state<Record<string, ContainerStats>>({});
+
+  // ---- Right-click menu, and the dialogs it opens.
+  type Menu = {
+    x: number;
+    y: number;
+    kind: "container" | "resource" | "project";
+    c?: ContainerInfo;
+    r?: DockerResource;
+    project?: string;
+    items?: ContainerInfo[];
+  };
+  let menu = $state<Menu | null>(null);
+  let note = $state("");
+  let renaming = $state<{ c: ContainerInfo; value: string; error: string } | null>(null);
+  let killing = $state<ContainerInfo | null>(null);
+  let resDetails = $state<{ name: string; data: ResourceDetails | null; error: string; tab: "summary" | "raw" } | null>(null);
+  let pruning = $state<PruneKind | null>(null);
+  let pullText = $state("");
+  let pulling = $state(false);
+  let stateFilter = $state<"all" | "running" | "stopped">("all");
+
+  function say(text: string) {
+    note = text;
+    setTimeout(() => {
+      if (note === text) note = "";
+    }, 4000);
+  }
+
+  function openMenu(e: MouseEvent, next: Omit<Menu, "x" | "y">) {
+    e.preventDefault();
+    e.stopPropagation();
+    menu = { ...next, x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 330) };
+  }
+
+  function closeMenu() {
+    menu = null;
+  }
+
+  function copy(text: string, what: string) {
+    navigator.clipboard.writeText(text).then(
+      () => say(`${what} copied.`),
+      () => say("Couldn't copy to the clipboard."),
+    );
+  }
+
+  /** How long ago, in rough words. */
+  function ago(seconds: number): string {
+    const s = Math.max(0, Date.now() / 1000 - seconds);
+    const minutes = s / 60;
+    const hours = minutes / 60;
+    const days = hours / 24;
+    if (s < 90) return "just now";
+    if (minutes < 90) return `${Math.round(minutes)} min ago`;
+    if (hours < 36) return `${Math.round(hours)} h ago`;
+    if (days < 45) return `${Math.round(days)} days ago`;
+    if (days < 540) return `${Math.round(days / 30)} months ago`;
+    return `${Math.round(days / 365)} years ago`;
+  }
+
+  /** Starts, stops or restarts several containers one after the other. */
+  async function actAll(items: ContainerInfo[], action: "start" | "stop" | "restart") {
+    const id = dockerId;
+    if (!id) return;
+    for (const c of items) {
+      if (action === "start" ? c.state === "running" : c.state !== "running") continue;
+      busy[c.id] = true;
+      try {
+        await dockerAction(id, c.id, action);
+        error = "";
+      } catch (err) {
+        error = (err as { message?: string }).message ?? "That didn't work.";
+      } finally {
+        delete busy[c.id];
+      }
+    }
+    await refresh();
+  }
+
+  async function confirmKill() {
+    const target = killing;
+    killing = null;
+    if (target) await act(target, "kill");
+  }
+
+  async function confirmRename() {
+    const r = renaming;
+    const id = dockerId;
+    if (!r || !id) return;
+    try {
+      await dockerRename(id, r.c.id, r.value.trim());
+      renaming = null;
+      await refresh();
+    } catch (err) {
+      r.error = (err as { message?: string }).message ?? "That didn't work.";
+    }
+  }
+
+  async function showResourceDetails(r: DockerResource) {
+    const id = dockerId;
+    if (!id || view === "containers") return;
+    resDetails = { name: r.name, data: null, error: "", tab: "summary" };
+    try {
+      const data = await dockerResourceDetails(id, view, r.id);
+      if (resDetails) resDetails = { ...resDetails, data };
+    } catch (err) {
+      if (resDetails) resDetails = { ...resDetails, error: (err as { message?: string }).message ?? "Couldn't read the details." };
+    }
+  }
+
+  const pruneWords: Record<PruneKind, string> = {
+    containers: "every stopped container",
+    images: "every untagged image that no container uses",
+    volumes: "every volume that no container uses",
+    networks: "every network that nothing is attached to",
+  };
+
+  async function confirmPrune() {
+    const kind = pruning;
+    const id = dockerId;
+    pruning = null;
+    if (!kind || !id) return;
+    try {
+      const done = await dockerPrune(id, kind);
+      error = "";
+      say(done.removed === 0 && done.bytes === 0 ? "Nothing to clear." : `Cleared ${done.removed}${done.bytes ? ` · freed ${size(done.bytes)}` : ""}.`);
+    } catch (err) {
+      error = (err as { message?: string }).message ?? "That did not work.";
+    }
+    await refresh();
+  }
+
+  async function pullImage() {
+    const id = dockerId;
+    const reference = pullText.trim();
+    if (!id || !reference || pulling) return;
+    pulling = true;
+    error = "";
+    try {
+      await dockerPull(id, reference);
+      say(`Downloaded ${reference}.`);
+      pullText = "";
+      await loadResources();
+    } catch (err) {
+      error = (err as { message?: string }).message ?? "The download did not work.";
+    } finally {
+      pulling = false;
+    }
+  }
 
   async function connect() {
     await disconnect();
@@ -268,9 +422,12 @@
 
   const visible = $derived.by(() => {
     const word = filter.trim().toLowerCase();
+    const byState = containers.filter(
+      (c) => stateFilter === "all" || (stateFilter === "running") === (c.state === "running"),
+    );
     return word
-      ? containers.filter((c) => `${c.name} ${c.image} ${c.project ?? ""}`.toLowerCase().includes(word))
-      : containers;
+      ? byState.filter((c) => `${c.name} ${c.image} ${c.project ?? ""}`.toLowerCase().includes(word))
+      : byState;
   });
 
   // Compose projects first, by name, and then everything else.
@@ -283,12 +440,25 @@
     }
     const out = [...byProject.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, items]) => ({ name, items }));
-    if (others.length) out.push({ name: out.length ? "Other containers" : "", items: others });
+      .map(([name, items]) => ({ name, items, project: true }));
+    if (others.length) out.push({ name: out.length ? "Other containers" : "", items: others, project: false });
     return out;
   });
 
   const running = $derived(containers.filter((c) => c.state === "running").length);
+
+  // What the running containers use all together.
+  const totals = $derived.by(() => {
+    const all = Object.values(stats);
+    if (all.length === 0) return "";
+    const cpu = all.reduce((sum, s) => sum + s.cpu_percent, 0);
+    const memory = all.reduce((sum, s) => sum + s.memory_used, 0);
+    return ` · CPU ${cpu.toFixed(0)}% · ${size(memory)}`;
+  });
+
+  function unhealthy(c: ContainerInfo): boolean {
+    return c.status.includes("unhealthy");
+  }
 
   function dot(state: string): string {
     if (state === "running") return "ok";
@@ -368,17 +538,45 @@
     </div>
     <div class="bar">
       <input type="search" placeholder="Filter" bind:value={filter} aria-label="Filter" />
-      {#if view === "containers"}<span class="count">{running} of {containers.length} running</span>{/if}
+      {#if view === "containers"}
+        <select class="state-pick" bind:value={stateFilter} aria-label="Show">
+          <option value="all">All</option>
+          <option value="running">Running</option>
+          <option value="stopped">Stopped</option>
+        </select>
+      {/if}
     </div>
+    <div class="bar">
+      {#if view === "containers"}<span class="count">{running} of {containers.length} running{totals}</span>{/if}
+      {#if view === "images"}
+        <input
+          type="text"
+          class="pull"
+          placeholder="Download an image, such as nginx:latest"
+          bind:value={pullText}
+          disabled={pulling}
+          aria-label="Image to download"
+          onkeydown={(e) => e.key === "Enter" && pullImage()}
+        />
+        <button class="btn small" disabled={pulling || !pullText.trim()} onclick={pullImage}>{pulling ? "Downloading…" : "Pull"}</button>
+      {/if}
+      <span class="spacer"></span>
+      <button class="btn small" title="Remove what is not in use" onclick={() => (pruning = view)}>Clean up…</button>
+    </div>
+    {#if note}<p class="message note">{note}</p>{/if}
     {#if view !== "containers"}
       <div class="list">
         {#each shownResources as r (r.id)}
-          <div class="row">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="row" ondblclick={() => showResourceDetails(r)} oncontextmenu={(e) => openMenu(e, { kind: "resource", r })}>
             <div class="what">
               <span class="name">{r.name}</span>
-              <span class="sub">{r.detail}</span>
+              <span class="sub">{r.detail}{r.created ? ` · ${ago(r.created)}` : ""}</span>
             </div>
             <div class="actions">
+              <button class="icon-btn small" title="Details" onclick={() => showResourceDetails(r)}>
+                <Icon name="info" size={13} />
+              </button>
               {#if !r.protected}
                 <button class="icon-btn small" title="Remove" onclick={() => (removingResource = r)}>
                   <Icon name="trash" size={13} />
@@ -393,13 +591,26 @@
     {:else}
     <div class="list">
       {#each groups as group (group.name)}
-        {#if group.name}<h3>{group.name}</h3>{/if}
+        {#if group.name}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="group" oncontextmenu={(e) => group.project && openMenu(e, { kind: "project", project: group.name, items: group.items })}>
+            <h3>{group.name}</h3>
+            {#if group.project}
+              <span class="actions">
+                <button class="icon-btn small" title="Start all" onclick={() => actAll(group.items, "start")}><Icon name="play" size={13} /></button>
+                <button class="icon-btn small" title="Restart all" onclick={() => actAll(group.items, "restart")}><Icon name="refresh" size={13} /></button>
+                <button class="icon-btn small" title="Stop all" onclick={() => actAll(group.items, "stop")}><Icon name="stop" size={13} /></button>
+              </span>
+            {/if}
+          </div>
+        {/if}
         {#each group.items as c (c.id)}
-          <div class="row" class:dim={c.state !== "running"}>
-            <span class="dot {dot(c.state)}" title={c.state}></span>
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="row" class:dim={c.state !== "running"} ondblclick={() => showDetails(c)} oncontextmenu={(e) => openMenu(e, { kind: "container", c })}>
+            <span class="dot {unhealthy(c) ? 'bad' : dot(c.state)}" title={unhealthy(c) ? "unhealthy" : c.state}></span>
             <div class="what">
               <span class="name">{c.name}</span>
-              <span class="sub">{c.image} · {c.status}</span>
+              <span class="sub">{c.image} · {c.status}{c.created ? ` · made ${ago(c.created)}` : ""}</span>
               {#if stats[c.id]}<span class="sub">{usage(stats[c.id])}</span>{/if}
               {#if c.ports.length}<span class="sub">{c.ports.join(", ")}</span>{/if}
             </div>
@@ -445,6 +656,134 @@
 
   {#if question}
     <PromptDialog prompt={question.prompt} onanswer={answer} />
+  {/if}
+
+  <svelte:window onpointerdown={closeMenu} onblur={closeMenu} onkeydown={(e) => e.key === "Escape" && closeMenu()} />
+
+  {#if menu}
+    <ul class="menu ctx" role="menu" style:left="{menu.x}px" style:top="{menu.y}px" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+      {#if menu.kind === "container" && menu.c}
+        {@const c = menu.c}
+        {#if c.state === "running"}
+          <li><button onclick={() => { closeMenu(); open("docker_shell", c); }}><Icon name="terminal" size={14} /> Open a shell</button></li>
+        {/if}
+        <li><button onclick={() => { closeMenu(); open("docker_logs", c); }}><Icon name="log" size={14} /> Show the log</button></li>
+        <li><button onclick={() => { closeMenu(); void showDetails(c); }}><Icon name="info" size={14} /> Details</button></li>
+        <li class="sep" role="separator"></li>
+        {#if c.state === "running"}
+          <li><button onclick={() => { closeMenu(); void act(c, "stop"); }}><Icon name="stop" size={14} /> Stop</button></li>
+          <li><button onclick={() => { closeMenu(); void act(c, "restart"); }}><Icon name="refresh" size={14} /> Restart</button></li>
+          <li><button onclick={() => { closeMenu(); void act(c, "pause"); }}><Icon name="stop" size={14} /> Pause</button></li>
+          <li><button onclick={() => { closeMenu(); killing = c; }}><Icon name="close" size={14} /> Kill…</button></li>
+        {:else if c.state === "paused"}
+          <li><button onclick={() => { closeMenu(); void act(c, "unpause"); }}><Icon name="play" size={14} /> Resume</button></li>
+        {:else}
+          <li><button onclick={() => { closeMenu(); void act(c, "start"); }}><Icon name="play" size={14} /> Start</button></li>
+        {/if}
+        <li><button onclick={() => { closeMenu(); renaming = { c, value: c.name, error: "" }; }}><Icon name="edit" size={14} /> Rename…</button></li>
+        <li class="sep" role="separator"></li>
+        <li><button onclick={() => { closeMenu(); copy(c.name, "Name"); }}><Icon name="copy" size={14} /> Copy name</button></li>
+        <li><button onclick={() => { closeMenu(); copy(c.id, "ID"); }}><Icon name="copy" size={14} /> Copy ID</button></li>
+        {#if c.state === "running"}
+          <li><button onclick={() => { closeMenu(); copy(`docker exec -it ${c.name} sh`, "Command"); }}><Icon name="copy" size={14} /> Copy the shell command</button></li>
+        {/if}
+        <li class="sep" role="separator"></li>
+        <li><button onclick={() => { closeMenu(); removing = c; }}><Icon name="trash" size={14} /> Remove…</button></li>
+      {:else if menu.kind === "project" && menu.items}
+        {@const items = menu.items}
+        <li><button onclick={() => { closeMenu(); void actAll(items, "start"); }}><Icon name="play" size={14} /> Start all</button></li>
+        <li><button onclick={() => { closeMenu(); void actAll(items, "restart"); }}><Icon name="refresh" size={14} /> Restart all</button></li>
+        <li><button onclick={() => { closeMenu(); void actAll(items, "stop"); }}><Icon name="stop" size={14} /> Stop all</button></li>
+        <li class="sep" role="separator"></li>
+        <li><button onclick={() => { closeMenu(); copy(menu?.project ?? "", "Name"); }}><Icon name="copy" size={14} /> Copy project name</button></li>
+      {:else if menu.kind === "resource" && menu.r}
+        {@const r = menu.r}
+        <li><button onclick={() => { closeMenu(); void showResourceDetails(r); }}><Icon name="info" size={14} /> Details</button></li>
+        <li><button onclick={() => { closeMenu(); copy(r.name, "Name"); }}><Icon name="copy" size={14} /> Copy name</button></li>
+        <li><button onclick={() => { closeMenu(); copy(r.id, "ID"); }}><Icon name="copy" size={14} /> Copy ID</button></li>
+        {#if !r.protected}
+          <li class="sep" role="separator"></li>
+          <li><button onclick={() => { closeMenu(); removingResource = r; }}><Icon name="trash" size={14} /> Remove…</button></li>
+        {/if}
+      {/if}
+    </ul>
+  {/if}
+
+  {#if killing}
+    <div class="modal-backdrop">
+      <div class="modal" role="alertdialog" aria-label="Kill container" tabindex="-1">
+        <h2>Kill “{killing.name}”?</h2>
+        <p>The container is ended at once, without a chance to shut down cleanly. Unsaved work in it may be lost.</p>
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (killing = null)}>Cancel</button>
+          <button class="btn danger" onclick={confirmKill}>Kill</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if renaming}
+    <div class="modal-backdrop">
+      <div class="modal" role="dialog" aria-label="Rename container" tabindex="-1" onkeydown={(e) => e.key === "Escape" && (renaming = null)}>
+        <h2>Rename container</h2>
+        <label class="field">
+          New name for {renaming.c.name}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="text" autofocus bind:value={renaming.value} onkeydown={(e) => e.key === "Enter" && confirmRename()} />
+        </label>
+        {#if renaming.error}<p class="message error">{renaming.error}</p>{/if}
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (renaming = null)}>Cancel</button>
+          <button class="btn primary" onclick={confirmRename}>Rename</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if pruning}
+    <div class="modal-backdrop">
+      <div class="modal" role="alertdialog" aria-label="Clean up" tabindex="-1">
+        <h2>Clean up {pruning}?</h2>
+        <p>This removes {pruneWords[pruning]}. It can't be undone.</p>
+        <div class="modal-actions">
+          <button class="btn" onclick={() => (pruning = null)}>Cancel</button>
+          <button class="btn danger" onclick={confirmPrune}>Remove</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if resDetails}
+    {@const shown = resDetails.data ? (resDetails.tab === "raw" ? resDetails.data.raw : resDetails.data.lines.join("\n") || "Nothing to show.") : ""}
+    <div class="modal-backdrop">
+      <div class="modal wide" role="dialog" aria-label="Details" tabindex="-1">
+        <h2>{resDetails.name}</h2>
+        {#if resDetails.error}
+          <p class="message error">{resDetails.error}</p>
+        {:else if !resDetails.data}
+          <p class="hint">Reading…</p>
+        {:else}
+          <div class="tabs" role="tablist">
+            {#each [["summary", "Summary"], ["raw", "Raw"]] as [id, label] (id)}
+              <button
+                role="tab"
+                class="tab"
+                class:on={resDetails.tab === id}
+                aria-selected={resDetails.tab === id}
+                onclick={() => resDetails && (resDetails = { ...resDetails, tab: id as "summary" | "raw" })}>{label}</button
+              >
+            {/each}
+          </div>
+          <pre>{shown}</pre>
+        {/if}
+        <div class="modal-actions">
+          {#if resDetails.data}
+            <button class="btn" onclick={() => copy(shown, "Text")}>Copy</button>
+          {/if}
+          <button class="btn" onclick={() => (resDetails = null)}>Close</button>
+        </div>
+      </div>
+    </div>
   {/if}
 
   {#if removing}
@@ -614,6 +953,44 @@
   }
   .dot.ok {
     background: var(--success, #3fb950);
+  }
+  .dot.bad {
+    background: var(--danger, #f85149);
+  }
+  .spacer {
+    flex: 1;
+  }
+  .state-pick {
+    flex: none;
+    width: auto;
+  }
+  .note {
+    color: var(--accent);
+  }
+  .group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 8px;
+  }
+  .group .actions {
+    opacity: 0.55;
+  }
+  .group:hover .actions {
+    opacity: 1;
+  }
+  .ctx {
+    position: fixed;
+    z-index: 60;
+    min-width: 220px;
+  }
+  .ctx li {
+    list-style: none;
+  }
+  .ctx .sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
   }
   .dot.warn {
     background: var(--warning, #d29922);

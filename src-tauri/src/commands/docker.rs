@@ -132,6 +132,46 @@ pub async fn docker_resources(
 }
 
 #[tauri::command]
+pub async fn docker_rename(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    container_id: String,
+    name: String,
+) -> Result<(), AppError> {
+    engine::rename(&*engines.get(&docker_id)?, &container_id, &name).await
+}
+
+#[tauri::command]
+pub async fn docker_resource_details(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    kind: resources::Kind,
+    id: String,
+) -> Result<resources::ResourceDetails, AppError> {
+    resources::inspect(&*engines.get(&docker_id)?, kind, &id).await
+}
+
+/// Clears out what is unused: stopped containers, untagged images, unused volumes or networks.
+#[tauri::command]
+pub async fn docker_prune(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    kind: resources::PruneKind,
+) -> Result<resources::Pruned, AppError> {
+    resources::prune(&*engines.get(&docker_id)?, kind).await
+}
+
+/// Downloads an image and waits until it is done.
+#[tauri::command]
+pub async fn docker_pull(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    reference: String,
+) -> Result<(), AppError> {
+    resources::pull(&*engines.get(&docker_id)?, &reference).await
+}
+
+#[tauri::command]
 pub async fn docker_remove_resource(
     engines: State<'_, Engines>,
     docker_id: String,

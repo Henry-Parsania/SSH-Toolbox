@@ -4,8 +4,8 @@
 
 use bollard::Docker;
 use bollard::query_parameters::{
-    InspectContainerOptionsBuilder, ListContainersOptionsBuilder, RemoveContainerOptionsBuilder,
-    RestartContainerOptions, StartContainerOptions, StopContainerOptions,
+    InspectContainerOptionsBuilder, KillContainerOptions, ListContainersOptionsBuilder,
+    RemoveContainerOptionsBuilder, RenameContainerOptionsBuilder, RestartContainerOptions, StartContainerOptions, StopContainerOptions,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -41,6 +41,8 @@ pub struct ContainerInfo {
     pub service: Option<String>,
     /// Published ports, such as "0.0.0.0:8080->80/tcp".
     pub ports: Vec<String>,
+    /// Seconds since 1970 when the container was created.
+    pub created: i64,
 }
 
 fn text(value: &Value, key: &str) -> String {
@@ -145,6 +147,7 @@ pub async fn list_containers(docker: &Docker) -> Result<Vec<ContainerInfo>, AppE
                         .and_then(Value::as_array)
                         .map(|p| p.iter().filter_map(port_text).collect())
                         .unwrap_or_default(),
+                    created,
                 },
             ))
         })
@@ -159,6 +162,10 @@ pub enum Action {
     Start,
     Stop,
     Restart,
+    Pause,
+    Unpause,
+    /// Ends the container at once (SIGKILL), without letting it shut down. The screen asks first.
+    Kill,
     /// Removes a stopped container. A running one is never removed by force.
     Remove,
 }
@@ -189,6 +196,12 @@ pub async fn act(docker: &Docker, id: &str, action: Action) -> Result<(), AppErr
             .restart_container(id, None::<RestartContainerOptions>)
             .await
             .map_err(failed),
+        Action::Pause => docker.pause_container(id).await.map_err(failed),
+        Action::Unpause => docker.unpause_container(id).await.map_err(failed),
+        Action::Kill => docker
+            .kill_container(id, None::<KillContainerOptions>)
+            .await
+            .map_err(failed),
         Action::Remove => docker
             .remove_container(
                 id,
@@ -201,6 +214,34 @@ pub async fn act(docker: &Docker, id: &str, action: Action) -> Result<(), AppErr
             .await
             .map_err(failed),
     }
+}
+
+/// A container name as Docker allows it: letters, digits, underscore, dot and dash, starting
+/// with a letter or digit.
+fn check_name(name: &str) -> Result<(), AppError> {
+    let ok = !name.is_empty()
+        && name.len() <= 128
+        && name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
+    if ok {
+        Ok(())
+    } else {
+        Err(AppError::new(
+            ErrorCode::InvalidInput,
+            "Use letters, digits, _ . and - only, starting with a letter or digit.",
+        ))
+    }
+}
+
+pub async fn rename(docker: &Docker, id: &str, name: &str) -> Result<(), AppError> {
+    check_id(id)?;
+    check_name(name)?;
+    docker
+        .rename_container(id, RenameContainerOptionsBuilder::new().name(name).build())
+        .await
+        .map_err(failed)
 }
 
 #[derive(Debug, Clone, Serialize, Default, PartialEq, Eq)]

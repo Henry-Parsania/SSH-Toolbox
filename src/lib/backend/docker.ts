@@ -17,6 +17,8 @@ export interface ContainerInfo {
   project: string | null;
   service: string | null;
   ports: string[];
+  /** Seconds since 1970. */
+  created: number;
 }
 
 export interface ContainerDetails {
@@ -32,7 +34,7 @@ export interface ContainerDetails {
   raw: string;
 }
 
-export type ContainerAction = "start" | "stop" | "restart" | "remove";
+export type ContainerAction = "start" | "stop" | "restart" | "pause" | "unpause" | "kill" | "remove";
 
 /** Connects to Docker. Questions about the SSH login arrive through onStatus. */
 export async function dockerConnect(
@@ -87,6 +89,8 @@ export interface DockerResource {
   detail: string;
   /** Docker's own networks can't be removed. */
   protected: boolean;
+  /** Seconds since 1970, for images. */
+  created: number | null;
 }
 
 export function dockerResources(dockerId: string, kind: ResourceKind): Promise<DockerResource[]> {
@@ -95,4 +99,29 @@ export function dockerResources(dockerId: string, kind: ResourceKind): Promise<D
 
 export function dockerRemoveResource(dockerId: string, kind: ResourceKind, id: string): Promise<void> {
   return invoke<void>("docker_remove_resource", { dockerId, kind, id });
+}
+
+export function dockerRename(dockerId: string, containerId: string, name: string): Promise<void> {
+  return invoke<void>("docker_rename", { dockerId, containerId, name });
+}
+
+export interface ResourceDetails {
+  lines: string[];
+  /** The complete answer. Show as text only. */
+  raw: string;
+}
+
+export function dockerResourceDetails(dockerId: string, kind: ResourceKind, id: string): Promise<ResourceDetails> {
+  return invoke<ResourceDetails>("docker_resource_details", { dockerId, kind, id });
+}
+
+export type PruneKind = "containers" | "images" | "volumes" | "networks";
+
+export function dockerPrune(dockerId: string, kind: PruneKind): Promise<{ removed: number; bytes: number }> {
+  return invoke("docker_prune", { dockerId, kind });
+}
+
+/** Downloads an image. Resolves when it is done, which can take a while. */
+export function dockerPull(dockerId: string, reference: string): Promise<void> {
+  return invoke<void>("docker_pull", { dockerId, reference });
 }

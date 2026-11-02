@@ -82,3 +82,50 @@ async fn names_that_could_change_the_request_are_refused() {
     }
     assert!(seen.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn details_come_as_plain_lines() {
+    let (docker, _) = engine().await;
+    let image = super::resources::inspect(&docker, Kind::Images, "sha256:aabbccddeeff00112233")
+        .await
+        .unwrap();
+    let text = image.lines.join("\n");
+    assert!(text.contains("Tags: nginx:latest"), "{text}");
+    assert!(text.contains("System: linux/amd64"), "{text}");
+    assert!(text.contains("Ports: 80/tcp"), "{text}");
+    assert!(text.contains("Label maintainer: me"), "{text}");
+
+    let network = super::resources::inspect(&docker, Kind::Networks, "bb22")
+        .await
+        .unwrap();
+    let text = network.lines.join("\n");
+    assert!(text.contains("Subnet: 172.18.0.0/16"), "{text}");
+    assert!(text.contains("Container: web 172.18.0.2/16"), "{text}");
+
+    let volume = super::resources::inspect(&docker, Kind::Volumes, "data")
+        .await
+        .unwrap();
+    assert!(volume.lines.join("\n").contains("Mounted at: /var/lib/docker"));
+}
+
+#[tokio::test]
+async fn clearing_out_counts_what_went() {
+    use super::resources::{PruneKind, prune};
+    let (docker, _) = engine().await;
+    let p = prune(&docker, PruneKind::Containers).await.unwrap();
+    assert_eq!((p.removed, p.bytes), (2, 2048));
+    assert_eq!(prune(&docker, PruneKind::Images).await.unwrap().bytes, 5_000_000);
+    assert_eq!(prune(&docker, PruneKind::Volumes).await.unwrap().removed, 1);
+    assert_eq!(prune(&docker, PruneKind::Networks).await.unwrap().removed, 3);
+}
+
+#[tokio::test]
+async fn pulling_waits_and_checks_the_name() {
+    use super::resources::pull;
+    let (docker, seen) = engine().await;
+    pull(&docker, "nginx:1.27").await.unwrap();
+    assert!(seen.lock().unwrap().join("\n").contains("fromImage=nginx"));
+    for bad in ["", "-rm", "a b", "x?y=1", "a;b"] {
+        assert_eq!(pull(&docker, bad).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
+    }
+}

@@ -164,6 +164,36 @@ async fn serve(mut socket: TcpStream, record: Requests) {
                 "application/json",
                 r#"[{"Id":"aa11","Name":"bridge","Driver":"bridge","Scope":"local"},{"Id":"bb22","Name":"shop_default","Driver":"bridge","Scope":"local"}]"#,
             )
+        } else if method == "POST" && path.ends_with("/containers/prune") {
+            reply("200 OK", "application/json", r#"{"ContainersDeleted":["aa","bb"],"SpaceReclaimed":2048}"#)
+        } else if method == "POST" && path.ends_with("/images/prune") {
+            reply("200 OK", "application/json", r#"{"ImagesDeleted":[{"Deleted":"sha256:x"}],"SpaceReclaimed":5000000}"#)
+        } else if method == "POST" && path.ends_with("/volumes/prune") {
+            reply("200 OK", "application/json", r#"{"VolumesDeleted":["old"],"SpaceReclaimed":10}"#)
+        } else if method == "POST" && path.ends_with("/networks/prune") {
+            reply("200 OK", "application/json", r#"{"NetworksDeleted":["n1","n2","n3"]}"#)
+        } else if method == "POST" && path.ends_with("/images/create") {
+            reply("200 OK", "application/json", "{\"status\":\"Pulling\"}
+{\"status\":\"Done\"}
+")
+        } else if method == "GET" && path.contains("/images/") && path.ends_with("/json") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"Id":"sha256:aabbccddeeff00112233","RepoTags":["nginx:latest"],"Created":"2026-01-01T00:00:00Z","Size":142000000,"Os":"linux","Architecture":"amd64","Config":{"Cmd":["nginx","-g","daemon off;"],"ExposedPorts":{"80/tcp":{}},"Labels":{"maintainer":"me"}}}"#,
+            )
+        } else if method == "GET" && path.contains("/volumes/") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"Name":"data","Driver":"local","Mountpoint":"/var/lib/docker/volumes/data/_data","CreatedAt":"2026-01-01T00:00:00Z","Scope":"local","Labels":{},"Options":{}}"#,
+            )
+        } else if method == "GET" && path.contains("/networks/") {
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"Id":"bb22","Name":"shop_default","Driver":"bridge","Scope":"local","Internal":false,"IPAM":{"Config":[{"Subnet":"172.18.0.0/16","Gateway":"172.18.0.1"}]},"Containers":{"c1":{"Name":"web","IPv4Address":"172.18.0.2/16"}}}"#,
+            )
         } else if method == "DELETE" && (path.contains("/volumes/") || path.contains("/networks/"))
         {
             reply("204 No Content", "text/plain", "")

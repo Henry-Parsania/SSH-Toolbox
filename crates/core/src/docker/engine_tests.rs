@@ -120,3 +120,27 @@ fn stats_are_read_like_docker_does() {
     assert_eq!((s.memory_used, s.memory_limit), (800, 4000));
     assert!(super::engine::read_stats("abc", &serde_json::json!({})).is_none());
 }
+
+#[tokio::test]
+async fn pause_kill_and_rename_send_the_right_requests() {
+    let (docker, seen) = engine().await;
+    act(&docker, "abc123", Action::Pause).await.unwrap();
+    act(&docker, "abc123", Action::Unpause).await.unwrap();
+    act(&docker, "abc123", Action::Kill).await.unwrap();
+    super::engine::rename(&docker, "abc123", "web-2").await.unwrap();
+    let seen = seen.lock().unwrap().join("\n");
+    assert!(seen.contains("/containers/abc123/pause"), "{seen}");
+    assert!(seen.contains("/containers/abc123/unpause"), "{seen}");
+    assert!(seen.contains("/containers/abc123/kill"), "{seen}");
+    assert!(seen.contains("/containers/abc123/rename?name=web-2"), "{seen}");
+}
+
+#[tokio::test]
+async fn names_that_are_not_names_are_refused_for_renaming() {
+    let (docker, seen) = engine().await;
+    for bad in ["", "-x", "a b", "a/b", "a?name=b", "é"] {
+        let error = super::engine::rename(&docker, "abc123", bad).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{bad}");
+    }
+    assert!(seen.lock().unwrap().is_empty());
+}
