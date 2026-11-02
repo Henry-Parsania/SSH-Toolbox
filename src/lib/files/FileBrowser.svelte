@@ -479,34 +479,34 @@
   <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
     {#if menu.entry && chosen.length > 0}
       {#if one && (one.kind === "dir" || one.kind === "symlink")}
-        <li><button onclick={() => { closeMenu(); open(one); }}><Icon name="folder" size={14} /> Open</button></li>
+        <li><button onclick={() => { open(one); closeMenu(); }}><Icon name="folder" size={14} /> Open</button></li>
       {/if}
       {#if ontransfer}
-        <li><button onclick={() => { closeMenu(); transfer(); }}><Icon name={transferIcon} size={14} /> {transferLabel}</button></li>
+        <li><button onclick={() => { transfer(); closeMenu(); }}><Icon name={transferIcon} size={14} /> {transferLabel}</button></li>
       {/if}
       <li class="sep" role="separator"></li>
-      <li><button onclick={() => { closeMenu(); void startDelete(); }}><Icon name="trash" size={14} /> Delete</button></li>
+      <li><button onclick={() => { void startDelete(); closeMenu(); }}><Icon name="trash" size={14} /> Delete</button></li>
       {#if files?.root_delete}
-        <li><button onclick={() => { closeMenu(); startRootDelete(); }}><Icon name="shield" size={14} /> Delete as root (sudo)…</button></li>
+        <li><button onclick={() => { startRootDelete(); closeMenu(); }}><Icon name="shield" size={14} /> Delete as root (sudo)…</button></li>
       {/if}
       {#if one}
-        <li><button onclick={() => { closeMenu(); dialog = { kind: "rename", entry: one, value: one.name }; }}><Icon name="edit" size={14} /> Rename</button></li>
+        <li><button onclick={() => { dialog = { kind: "rename", entry: one, value: one.name }; closeMenu(); }}><Icon name="edit" size={14} /> Rename</button></li>
       {/if}
       <li class="sep" role="separator"></li>
-      <li><button onclick={() => { closeMenu(); copyPaths(); }}><Icon name="copy" size={14} /> Copy file path</button></li>
+      <li><button onclick={() => { copyPaths(); closeMenu(); }}><Icon name="copy" size={14} /> Copy file path</button></li>
       {#if oncopytoterminal}
-        <li><button onclick={() => { closeMenu(); copyToTerminal(); }}><Icon name="terminal" size={14} /> Copy file path to terminal <span class="hintkey">(middle click)</span></button></li>
+        <li><button onclick={() => { copyToTerminal(); closeMenu(); }}><Icon name="terminal" size={14} /> Copy file path to terminal <span class="hintkey">(middle click)</span></button></li>
       {/if}
       {#if one}
-        <li><button onclick={() => { closeMenu(); showProperties(); }}><Icon name="info" size={14} /> Properties</button></li>
+        <li><button onclick={() => { showProperties(); closeMenu(); }}><Icon name="info" size={14} /> Properties</button></li>
         {#if files?.chmod}
-          <li><button onclick={() => { closeMenu(); startChmod(); }}><Icon name="key" size={14} /> Permissions</button></li>
+          <li><button onclick={() => { startChmod(); closeMenu(); }}><Icon name="key" size={14} /> Permissions</button></li>
         {/if}
       {/if}
       <li class="sep" role="separator"></li>
     {/if}
-    <li><button onclick={() => { closeMenu(); dialog = { kind: "mkdir", value: "" }; }}><Icon name="folder-plus" size={14} /> New folder</button></li>
-    <li><button onclick={() => { closeMenu(); reload(); }}><Icon name="refresh" size={14} /> Refresh</button></li>
+    <li><button onclick={() => { dialog = { kind: "mkdir", value: "" }; closeMenu(); }}><Icon name="folder-plus" size={14} /> New folder</button></li>
+    <li><button onclick={() => { reload(); closeMenu(); }}><Icon name="refresh" size={14} /> Refresh</button></li>
   </ul>
 {/if}
 

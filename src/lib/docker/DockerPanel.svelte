@@ -843,48 +843,48 @@
       {#if menu.kind === "container" && menu.c}
         {@const c = menu.c}
         {#if c.state === "running"}
-          <li><button onclick={() => { closeMenu(); open("docker_shell", c); }}><Icon name="terminal" size={14} /> Open a shell</button></li>
+          <li><button onclick={() => { open("docker_shell", c); closeMenu(); }}><Icon name="terminal" size={14} /> Open a shell</button></li>
         {/if}
-        <li><button onclick={() => { closeMenu(); open("docker_logs", c); }}><Icon name="log" size={14} /> Show the log</button></li>
-        <li><button onclick={() => { closeMenu(); void showDetails(c); }}><Icon name="info" size={14} /> Details</button></li>
+        <li><button onclick={() => { open("docker_logs", c); closeMenu(); }}><Icon name="log" size={14} /> Show the log</button></li>
+        <li><button onclick={() => { void showDetails(c); closeMenu(); }}><Icon name="info" size={14} /> Details</button></li>
         <li class="sep" role="separator"></li>
         {#if c.state === "running"}
-          <li><button onclick={() => { closeMenu(); void act(c, "stop"); }}><Icon name="stop" size={14} /> Stop</button></li>
-          <li><button onclick={() => { closeMenu(); void act(c, "restart"); }}><Icon name="refresh" size={14} /> Restart</button></li>
-          <li><button onclick={() => { closeMenu(); void act(c, "pause"); }}><Icon name="stop" size={14} /> Pause</button></li>
-          <li><button onclick={() => { closeMenu(); killing = c; }}><Icon name="close" size={14} /> Kill…</button></li>
+          <li><button onclick={() => { void act(c, "stop"); closeMenu(); }}><Icon name="stop" size={14} /> Stop</button></li>
+          <li><button onclick={() => { void act(c, "restart"); closeMenu(); }}><Icon name="refresh" size={14} /> Restart</button></li>
+          <li><button onclick={() => { void act(c, "pause"); closeMenu(); }}><Icon name="stop" size={14} /> Pause</button></li>
+          <li><button onclick={() => { killing = c; closeMenu(); }}><Icon name="close" size={14} /> Kill…</button></li>
         {:else if c.state === "paused"}
-          <li><button onclick={() => { closeMenu(); void act(c, "unpause"); }}><Icon name="play" size={14} /> Resume</button></li>
+          <li><button onclick={() => { void act(c, "unpause"); closeMenu(); }}><Icon name="play" size={14} /> Resume</button></li>
         {:else}
-          <li><button onclick={() => { closeMenu(); void act(c, "start"); }}><Icon name="play" size={14} /> Start</button></li>
+          <li><button onclick={() => { void act(c, "start"); closeMenu(); }}><Icon name="play" size={14} /> Start</button></li>
         {/if}
-        <li><button onclick={() => { closeMenu(); renaming = { c, value: c.name, error: "" }; }}><Icon name="edit" size={14} /> Rename…</button></li>
+        <li><button onclick={() => { renaming = { c, value: c.name, error: "" }; closeMenu(); }}><Icon name="edit" size={14} /> Rename…</button></li>
         <li class="sep" role="separator"></li>
-        <li><button onclick={() => { closeMenu(); copy(c.name, "Name"); }}><Icon name="copy" size={14} /> Copy name</button></li>
-        <li><button onclick={() => { closeMenu(); copy(c.id, "ID"); }}><Icon name="copy" size={14} /> Copy ID</button></li>
+        <li><button onclick={() => { copy(c.name, "Name"); closeMenu(); }}><Icon name="copy" size={14} /> Copy name</button></li>
+        <li><button onclick={() => { copy(c.id, "ID"); closeMenu(); }}><Icon name="copy" size={14} /> Copy ID</button></li>
         {#if c.state === "running"}
-          <li><button onclick={() => { closeMenu(); copy(`docker exec -it ${c.name} sh`, "Command"); }}><Icon name="copy" size={14} /> Copy the shell command</button></li>
+          <li><button onclick={() => { copy(`docker exec -it ${c.name} sh`, "Command"); closeMenu(); }}><Icon name="copy" size={14} /> Copy the shell command</button></li>
         {/if}
         <li class="sep" role="separator"></li>
-        <li><button onclick={() => { closeMenu(); removing = c; }}><Icon name="trash" size={14} /> Remove…</button></li>
+        <li><button onclick={() => { removing = c; closeMenu(); }}><Icon name="trash" size={14} /> Remove…</button></li>
       {:else if menu.kind === "project" && menu.items}
         {@const items = menu.items}
-        <li><button onclick={() => { closeMenu(); void actAll(items, "start"); }}><Icon name="play" size={14} /> Start all</button></li>
-        <li><button onclick={() => { closeMenu(); void actAll(items, "restart"); }}><Icon name="refresh" size={14} /> Restart all</button></li>
-        <li><button onclick={() => { closeMenu(); void actAll(items, "stop"); }}><Icon name="stop" size={14} /> Stop all</button></li>
+        <li><button onclick={() => { void actAll(items, "start"); closeMenu(); }}><Icon name="play" size={14} /> Start all</button></li>
+        <li><button onclick={() => { void actAll(items, "restart"); closeMenu(); }}><Icon name="refresh" size={14} /> Restart all</button></li>
+        <li><button onclick={() => { void actAll(items, "stop"); closeMenu(); }}><Icon name="stop" size={14} /> Stop all</button></li>
         <li class="sep" role="separator"></li>
-        <li><button onclick={() => { closeMenu(); copy(menu?.project ?? "", "Name"); }}><Icon name="copy" size={14} /> Copy project name</button></li>
+        <li><button onclick={() => { copy(menu?.project ?? "", "Name"); closeMenu(); }}><Icon name="copy" size={14} /> Copy project name</button></li>
       {:else if menu.kind === "resource" && menu.r}
         {@const r = menu.r}
         {#if view === "images"}
-          <li><button onclick={() => { closeMenu(); startRun(r.name === "(untagged)" ? r.id : r.name); }}><Icon name="play" size={14} /> Run a container…</button></li>
+          <li><button onclick={() => { startRun(r.name === "(untagged)" ? r.id : r.name); closeMenu(); }}><Icon name="play" size={14} /> Run a container…</button></li>
         {/if}
-        <li><button onclick={() => { closeMenu(); void showResourceDetails(r); }}><Icon name="info" size={14} /> Details</button></li>
-        <li><button onclick={() => { closeMenu(); copy(r.name, "Name"); }}><Icon name="copy" size={14} /> Copy name</button></li>
-        <li><button onclick={() => { closeMenu(); copy(r.id, "ID"); }}><Icon name="copy" size={14} /> Copy ID</button></li>
+        <li><button onclick={() => { void showResourceDetails(r); closeMenu(); }}><Icon name="info" size={14} /> Details</button></li>
+        <li><button onclick={() => { copy(r.name, "Name"); closeMenu(); }}><Icon name="copy" size={14} /> Copy name</button></li>
+        <li><button onclick={() => { copy(r.id, "ID"); closeMenu(); }}><Icon name="copy" size={14} /> Copy ID</button></li>
         {#if !r.protected}
           <li class="sep" role="separator"></li>
-          <li><button onclick={() => { closeMenu(); removingResource = r; }}><Icon name="trash" size={14} /> Remove…</button></li>
+          <li><button onclick={() => { removingResource = r; closeMenu(); }}><Icon name="trash" size={14} /> Remove…</button></li>
         {/if}
       {/if}
     </ul>
