@@ -180,6 +180,28 @@ describe("the agent loop", () => {
     expect(failing.chat.steps.at(-1)).toMatchObject({ kind: "note", text: "The provider didn't accept the API key." });
   });
 
+  it("can run commands in the visible terminal and read the result and exit code back from the screen", async () => {
+    const screen: string[] = ["$ "];
+    const typeInTerminal = vi.fn(async (_s: string, text: string) => {
+      const id = /toolbox-(\w+) \$\?/.exec(text)![1];
+      screen.push(`$ ${text.replace(/^\x15/, "").replace(/\r$/, "")}`, "hello from the server", `[toolbox-${id} 3]`, "$ ");
+    });
+    const { chat, deps } = setup([{ stop: "tools", tool_calls: [call("run_command", { command: "ls /srv" })] }, { text: "ok" }], {
+      typeInTerminal,
+      readTerminal: vi.fn(() => screen.join("\n")),
+    });
+    chat.setUseTerminal(true);
+    chat.setAutoRead(true);
+    await chat.send("list", () => ctx);
+    expect(deps.exec).not.toHaveBeenCalled();
+    const typed = typeInTerminal.mock.calls[0][1];
+    expect(typed.startsWith("\x15ls /srv; echo ")).toBe(true);
+    expect(typed.endsWith("\r")).toBe(true);
+    const step = tools(chat)[0];
+    expect(step.state).toBe("done");
+    expect(step.result).toBe("Exit code 3\nhello from the server");
+  });
+
   it("needs a provider", async () => {
     const { chat, deps } = setup([]);
     chat.setProvider("");

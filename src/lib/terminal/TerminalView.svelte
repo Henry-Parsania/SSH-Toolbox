@@ -290,7 +290,11 @@
       const buffer = term.buffer.active;
       const lines: string[] = [];
       for (let i = Math.max(0, buffer.length - maxLines - 50); i < buffer.length; i++) {
-        lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
+        const row = buffer.getLine(i);
+        const text = row?.translateToString(true) ?? "";
+        // A long line that the screen wrapped is one line again.
+        if (row?.isWrapped && lines.length) lines[lines.length - 1] += text;
+        else lines.push(text);
       }
       while (lines.length && lines[lines.length - 1] === "") lines.pop();
       return lines.slice(-maxLines).join("\n");

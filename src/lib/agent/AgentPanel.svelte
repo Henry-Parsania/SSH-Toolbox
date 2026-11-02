@@ -160,6 +160,10 @@
       <input type="checkbox" checked={chat.autoRead} onchange={(e) => chat.setAutoRead(e.currentTarget.checked)} />
       Run read-only commands without asking
     </label>
+    <label class="check" title="Commands are typed into your own terminal, so you can watch them, and share its folder and variables. They are still shown to you for approval, and only POSIX shells such as bash and zsh are supported.">
+      <input type="checkbox" checked={chat.useTerminal} disabled={!context.terminalSession} onchange={(e) => chat.setUseTerminal(e.currentTarget.checked)} />
+      Run its commands in my terminal (visible)
+    </label>
     <div class="composer">
       <textarea
         rows="2"
