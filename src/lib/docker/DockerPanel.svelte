@@ -493,6 +493,8 @@
   }
 </script>
 
+<svelte:window onpointerdown={closeMenu} onblur={closeMenu} onkeydown={(e) => e.key === "Escape" && closeMenu()} />
+
 <aside class="panel" aria-label="Docker">
   <header>
     <span class="heading"><Icon name="box" size={16} /> Docker{#if shownName}<span class="where">{shownName}</span>{/if}</span>
@@ -657,8 +659,6 @@
   {#if question}
     <PromptDialog prompt={question.prompt} onanswer={answer} />
   {/if}
-
-  <svelte:window onpointerdown={closeMenu} onblur={closeMenu} onkeydown={(e) => e.key === "Escape" && closeMenu()} />
 
   {#if menu}
     <ul class="menu ctx" role="menu" style:left="{menu.x}px" style:top="{menu.y}px" onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
