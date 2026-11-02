@@ -29,7 +29,7 @@ pub struct Files {
 }
 
 impl Files {
-    fn backend(&self, id: &str) -> Result<Arc<dyn FileBackend>, AppError> {
+    pub fn backend(&self, id: &str) -> Result<Arc<dyn FileBackend>, AppError> {
         self.backends
             .lock()
             .unwrap()

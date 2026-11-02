@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod connect;
 pub mod docker;
 pub mod files;

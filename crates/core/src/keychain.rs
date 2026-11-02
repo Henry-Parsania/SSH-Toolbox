@@ -21,16 +21,19 @@ pub enum SecretKind {
     Password,
     Passphrase,
     FtpPassword,
+    /// The key of a language-model provider (the "session" is `agent-<provider id>`).
+    ApiKey,
 }
 
 impl SecretKind {
-    const ALL: [SecretKind; 3] = [Self::Password, Self::Passphrase, Self::FtpPassword];
+    const ALL: [SecretKind; 4] = [Self::Password, Self::Passphrase, Self::FtpPassword, Self::ApiKey];
 
     fn as_str(self) -> &'static str {
         match self {
             Self::Password => "password",
             Self::Passphrase => "passphrase",
             Self::FtpPassword => "ftp_password",
+            Self::ApiKey => "api_key",
         }
     }
 }
