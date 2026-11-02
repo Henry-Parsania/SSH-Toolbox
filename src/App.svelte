@@ -24,6 +24,9 @@
   import MenuBar, { type Menu } from "./lib/ui/MenuBar.svelte";
   import DockerPanel from "./lib/docker/DockerPanel.svelte";
   import FilesPanel from "./lib/files/FilesPanel.svelte";
+  import AgentPanel from "./lib/agent/AgentPanel.svelte";
+  import { AgentChat } from "./lib/agent/agent.svelte";
+  import { realDeps } from "./lib/agent/deps";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
   import { Reachability } from "./lib/status/reach.svelte";
   import StatusBar from "./lib/status/StatusBar.svelte";
@@ -50,10 +53,12 @@
   let filesOpen = $state(savedOpen("files-open", false));
   // Docker lives under the sessions list.
   let dockerOpen = $state(savedOpen("docker-open", false));
+  let agentOpen = $state(savedOpen("agent-open", false));
   $effect(() => {
     localStorage.setItem("sidebar-open", sidebarOpen ? "1" : "0");
     localStorage.setItem("files-open", filesOpen ? "1" : "0");
     localStorage.setItem("docker-open", dockerOpen ? "1" : "0");
+    localStorage.setItem("agent-open", agentOpen ? "1" : "0");
   });
   // Widths of the two side panels, which can be dragged. They are kept for next time.
   const saved = (key: string, fallback: number) => {
@@ -62,24 +67,27 @@
   };
   let sidebarWidth = $state(saved("sidebar-width", 264));
   let filesWidth = $state(saved("files-width", 460));
+  let agentWidth = $state(saved("agent-width", 420));
 
-  function resizeSide(e: PointerEvent, side: "sidebar" | "files") {
+  function resizeSide(e: PointerEvent, side: "sidebar" | "files" | "agent") {
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture(e.pointerId);
     const start = e.clientX;
-    const from = side === "sidebar" ? sidebarWidth : filesWidth;
+    const from = side === "sidebar" ? sidebarWidth : side === "files" ? filesWidth : agentWidth;
     const move = (ev: PointerEvent) => {
       const delta = ev.clientX - start;
       const wanted = Math.round(side === "sidebar" ? from + delta : from - delta);
       const width = Math.min(Math.max(wanted, 200), Math.max(240, window.innerWidth - 360));
       if (side === "sidebar") sidebarWidth = width;
-      else filesWidth = width;
+      else if (side === "files") filesWidth = width;
+      else agentWidth = width;
     };
     const stop = () => {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", stop);
       handle.removeEventListener("pointercancel", stop);
-      localStorage.setItem(side === "sidebar" ? "sidebar-width" : "files-width", String(side === "sidebar" ? sidebarWidth : filesWidth));
+      const widths = { sidebar: sidebarWidth, files: filesWidth, agent: agentWidth };
+      localStorage.setItem(`${side}-width`, String(widths[side]));
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", stop);
@@ -185,6 +193,14 @@
     return tab ? (workspace.cwd[tab.active] ?? "") : "";
   });
 
+  // The agent works on the server of the active tab. Its conversation lives as long as the app.
+  const agent = new AgentChat(realDeps);
+  const agentContext = $derived({
+    sessionName: activeSshSession?.name ?? "",
+    savedSessionId: activeSshSession?.id ?? null,
+    terminalSession: activeTerminalSession,
+  });
+
   // The colour theme applies to the whole window, not only to the terminal.
   $effect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -257,6 +273,7 @@
       items: [
         { label: "Sessions list", checked: sidebarOpen, onselect: () => (sidebarOpen = !sidebarOpen) },
         { label: "Files panel", checked: filesOpen, onselect: () => (filesOpen = !filesOpen) },
+        { label: "Agent panel", checked: agentOpen, onselect: () => (agentOpen = !agentOpen) },
         {
           label: "Docker panel",
           checked: dockerOpen,
@@ -429,6 +446,8 @@
         // Docker lives under the sessions list, so that has to be showing.
         if (dockerOpen) sidebarOpen = true;
       }}
+      {agentOpen}
+      onagent={() => (agentOpen = !agentOpen)}
     />
       <main class="tabs">
         {#each workspace.tabs as tab (tab.id)}
@@ -481,6 +500,13 @@
             follow={followedFolder}
             terminalSession={activeTerminalSession}
             onclose={() => (filesOpen = false)} />
+        </div>
+      {/if}
+      {#if agentOpen}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="grip" onpointerdown={(e) => resizeSide(e, "agent")}></div>
+        <div class="side" style:width="{agentWidth}px">
+          <AgentPanel chat={agent} context={agentContext} onclose={() => (agentOpen = false)} />
         </div>
       {/if}
     </div>

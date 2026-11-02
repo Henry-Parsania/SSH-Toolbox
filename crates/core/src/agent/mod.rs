@@ -11,3 +11,6 @@ pub mod redact;
 
 #[cfg(test)]
 mod llm_tests;
+
+#[cfg(test)]
+mod exec_tests;

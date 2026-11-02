@@ -21,9 +21,11 @@
     onfiles: () => void;
     dockerOpen: boolean;
     ondocker: () => void;
+    agentOpen: boolean;
+    onagent: () => void;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -219,6 +221,15 @@
       onclick={ondocker}
     >
       <Icon name="box" size={16} />
+    </button>
+    <button
+      class="icon-btn"
+      class:on={agentOpen}
+      aria-label="Agent"
+      title="Agent: an assistant that can look at the server and help"
+      onclick={onagent}
+    >
+      <Icon name="sparkle" size={16} />
     </button>
     <span class="sep"></span>
     <button class="icon-btn" aria-label="Settings" title="Settings" onclick={onsettings}>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { keepAlive } from "../layout/detach";
+  import { registerTerminalReader } from "./access";
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -283,6 +284,18 @@
     // Capture phase, so it runs before xterm's own paste handler.
     host.addEventListener("paste", onPasteEvent, true);
 
+    // What the agent reads: the last lines of the screen and its scrollback, as plain text.
+    let unregisterReader = () => {};
+    function readText(maxLines: number): string {
+      const buffer = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = Math.max(0, buffer.length - maxLines - 50); i < buffer.length; i++) {
+        lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
+      }
+      while (lines.length && lines[lines.length - 1] === "") lines.pop();
+      return lines.slice(-maxLines).join("\n");
+    }
+
     // Save the whole scrollback as a text file in Downloads (T9).
     saveHook = saveOutput;
     function saveOutput() {
@@ -373,6 +386,7 @@
           return;
         }
         sessionId = id;
+        unregisterReader = registerTerminalReader(id, readText);
         onsession?.(id);
         input.enable();
         if (earlyAcks > 0) acks.processed(earlyAcks);
@@ -407,6 +421,7 @@
       // A session handed to another window keeps running.
       if (sessionId && keepAlive.has(sessionId)) keepAlive.delete(sessionId);
       else if (sessionId) void terminalClose(sessionId).catch(() => {});
+      unregisterReader();
       onsession?.(null);
       term.dispose();
     };

@@ -37,7 +37,8 @@
     | "log"
     | "monitor"
     | "copy"
-    | "shield";
+    | "shield"
+    | "sparkle";
 
   interface Props {
     name: IconName;
@@ -86,6 +87,7 @@
     monitor: "M3 5h18v11H3zM8 20h8M12 16v4M6 13l3-4 3 3 3-5 3 4",
     copy: "M9 9h10a1 1 0 011 1v10a1 1 0 01-1 1H9a1 1 0 01-1-1V10a1 1 0 011-1zM16 9V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3",
     shield: "M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3zM9.5 12l2 2 3.5-4",
+    sparkle: "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z",
   };
 </script>
 
