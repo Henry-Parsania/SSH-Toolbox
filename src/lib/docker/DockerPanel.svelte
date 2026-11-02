@@ -9,6 +9,9 @@
     dockerList,
     dockerPrune,
     dockerPull,
+    dockerRun,
+    type PullProgress,
+    type RunSpec,
     dockerRemoveResource,
     dockerRename,
     dockerResourceDetails,
@@ -26,6 +29,7 @@
   import type { Library } from "../sessions/library.svelte";
   import PromptDialog from "../terminal/PromptDialog.svelte";
   import Icon from "../ui/Icon.svelte";
+  import Spark from "./Spark.svelte";
 
   interface Props {
     library: Library;
@@ -56,7 +60,7 @@
   let question = $state<{ id: string; prompt: Prompt } | null>(null);
   let operation = "";
 
-  let details = $state<{ name: string; data: ContainerDetails | null; error: string; tab: string } | null>(null);
+  let details = $state<{ id: string; name: string; data: ContainerDetails | null; error: string; tab: string } | null>(null);
   let removing = $state<ContainerInfo | null>(null);
   let filter = $state("");
   let view = $state<"containers" | ResourceKind>("containers");
@@ -231,14 +235,17 @@
     await refresh();
   }
 
+  let pullProgress = $state<PullProgress | null>(null);
+
   async function pullImage() {
     const id = dockerId;
     const reference = pullText.trim();
     if (!id || !reference || pulling) return;
     pulling = true;
+    pullProgress = null;
     error = "";
     try {
-      await dockerPull(id, reference);
+      await dockerPull(id, reference, (p) => (pullProgress = p));
       say(`Downloaded ${reference}.`);
       pullText = "";
       await loadResources();
@@ -246,7 +253,86 @@
       error = (err as { message?: string }).message ?? "The download did not work.";
     } finally {
       pulling = false;
+      pullProgress = null;
     }
+  }
+
+  const pullPercent = $derived(pullProgress && pullProgress.total > 0 ? Math.min(100, Math.round((pullProgress.done / pullProgress.total) * 100)) : null);
+
+  // ---- Running a new container.
+  type RunForm = {
+    image: string;
+    name: string;
+    restart: RunSpec["restart"];
+    localhostOnly: boolean;
+    ports: { host: string; container: string; udp: boolean }[];
+    volumes: { source: string; target: string; readOnly: boolean }[];
+    env: string;
+    error: string;
+    working: boolean;
+  };
+  let runForm = $state<RunForm | null>(null);
+
+  function startRun(image = "") {
+    runForm = { image, name: "", restart: "no", localhostOnly: true, ports: [], volumes: [], env: "", error: "", working: false };
+  }
+
+  async function confirmRun() {
+    const form = runForm;
+    const id = dockerId;
+    if (!form || !id) return;
+    const number = (text: string) => (/^\d{1,5}$/.test(text.trim()) ? Number(text.trim()) : NaN);
+    const ports: RunSpec["ports"] = [];
+    for (const p of form.ports) {
+      if (!p.host.trim() && !p.container.trim()) continue;
+      const [host, container] = [number(p.host), number(p.container)];
+      if (!(host >= 1 && host <= 65535 && container >= 1 && container <= 65535)) {
+        form.error = "Ports are numbers from 1 to 65535. Fill in both, or remove the row.";
+        return;
+      }
+      ports.push({ host, container, udp: p.udp });
+    }
+    const volumes = form.volumes
+      .filter((v) => v.source.trim() || v.target.trim())
+      .map((v) => ({ source: v.source.trim(), target: v.target.trim(), read_only: v.readOnly }));
+    const env = form.env
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    form.error = "";
+    form.working = true;
+    try {
+      await dockerRun(id, {
+        image: form.image.trim(),
+        name: form.name.trim(),
+        ports,
+        localhost_only: form.localhostOnly,
+        volumes,
+        env,
+        restart: form.restart,
+      });
+      const started = form.name.trim() || form.image.trim();
+      runForm = null;
+      show("containers");
+      say(`Started ${started}.`);
+      await refresh();
+    } catch (err) {
+      form.error = (err as { message?: string }).message ?? "That didn't work.";
+      form.working = false;
+    }
+  }
+
+  // ---- Recent readings, for the small graphs.
+  const HISTORY = 60;
+  let history = $state<Record<string, { cpu: number[]; mem: number[] }>>({});
+
+  function remember(list: ContainerStats[]) {
+    const next: Record<string, { cpu: number[]; mem: number[] }> = {};
+    for (const s of list) {
+      const old = history[s.id] ?? { cpu: [], mem: [] };
+      next[s.id] = { cpu: [...old.cpu, s.cpu_percent].slice(-HISTORY), mem: [...old.mem, s.memory_used].slice(-HISTORY) };
+    }
+    history = next;
   }
 
   async function connect() {
@@ -336,6 +422,7 @@
     const id = dockerId;
     if (!id) {
       stats = {};
+      history = {};
       return;
     }
     let stopped = false;
@@ -343,7 +430,10 @@
       if (document.hidden) return;
       try {
         const list = await dockerStats(id);
-        if (!stopped) stats = Object.fromEntries(list.map((s) => [s.id, s]));
+        if (!stopped) {
+          stats = Object.fromEntries(list.map((s) => [s.id, s]));
+          remember(list);
+        }
       } catch {
         // The list shows the connection problem; readings are only extra.
       }
@@ -399,7 +489,7 @@
   async function showDetails(container: ContainerInfo) {
     const id = dockerId;
     if (!id) return;
-    details = { name: container.name, data: null, error: "", tab: "summary" };
+    details = { id: container.id, name: container.name, data: null, error: "", tab: "summary" };
     try {
       const data = await dockerInspect(id, container.id);
       if (details) details = { ...details, data };
@@ -472,6 +562,7 @@
     ["ports", "Ports"],
     ["mounts", "Mounts"],
     ["networks", "Networks"],
+    ["usage", "Usage"],
     ["raw", "Raw"],
   ] as const;
 
@@ -562,9 +653,20 @@
         />
         <button class="btn small" disabled={pulling || !pullText.trim()} onclick={pullImage}>{pulling ? "Downloading…" : "Pull"}</button>
       {/if}
+      {#if view === "containers" || view === "images"}
+        <button class="btn small" title="Start a new container" onclick={() => startRun()}>Run…</button>
+      {/if}
       <span class="spacer"></span>
       <button class="btn small" title="Remove what is not in use" onclick={() => (pruning = view)}>Clean up…</button>
     </div>
+    {#if pulling}
+      <div class="progress" role="progressbar" aria-valuenow={pullPercent ?? undefined} aria-valuemin="0" aria-valuemax="100">
+        <div class="fill" style:width="{pullPercent ?? 4}%"></div>
+      </div>
+      <p class="message note">
+        {#if pullProgress && pullProgress.total > 0}{pullPercent}% · {size(pullProgress.done)} of {size(pullProgress.total)} · {pullProgress.status}{:else}Starting the download…{/if}
+      </p>
+    {/if}
     {#if note}<p class="message note">{note}</p>{/if}
     {#if view !== "containers"}
       <div class="list">
@@ -576,6 +678,11 @@
               <span class="sub">{r.detail}{r.created ? ` · ${ago(r.created)}` : ""}</span>
             </div>
             <div class="actions">
+              {#if view === "images"}
+                <button class="icon-btn small" title="Run a container from this image" onclick={() => startRun(r.name === "(untagged)" ? r.id : r.name)}>
+                  <Icon name="play" size={13} />
+                </button>
+              {/if}
               <button class="icon-btn small" title="Details" onclick={() => showResourceDetails(r)}>
                 <Icon name="info" size={13} />
               </button>
@@ -613,7 +720,12 @@
             <div class="what">
               <span class="name">{c.name}</span>
               <span class="sub">{c.image} · {c.status}{c.created ? ` · made ${ago(c.created)}` : ""}</span>
-              {#if stats[c.id]}<span class="sub">{usage(stats[c.id])}</span>{/if}
+              {#if stats[c.id]}
+                <span class="sub usage">
+                  {usage(stats[c.id])}
+                  {#if (history[c.id]?.cpu.length ?? 0) > 1}<Spark values={history[c.id].cpu} label="Recent CPU use" />{/if}
+                </span>
+              {/if}
               {#if c.ports.length}<span class="sub">{c.ports.join(", ")}</span>{/if}
             </div>
             <div class="actions">
@@ -698,6 +810,9 @@
         <li><button onclick={() => { closeMenu(); copy(menu?.project ?? "", "Name"); }}><Icon name="copy" size={14} /> Copy project name</button></li>
       {:else if menu.kind === "resource" && menu.r}
         {@const r = menu.r}
+        {#if view === "images"}
+          <li><button onclick={() => { closeMenu(); startRun(r.name === "(untagged)" ? r.id : r.name); }}><Icon name="play" size={14} /> Run a container…</button></li>
+        {/if}
         <li><button onclick={() => { closeMenu(); void showResourceDetails(r); }}><Icon name="info" size={14} /> Details</button></li>
         <li><button onclick={() => { closeMenu(); copy(r.name, "Name"); }}><Icon name="copy" size={14} /> Copy name</button></li>
         <li><button onclick={() => { closeMenu(); copy(r.id, "ID"); }}><Icon name="copy" size={14} /> Copy ID</button></li>
@@ -707,6 +822,72 @@
         {/if}
       {/if}
     </ul>
+  {/if}
+
+  {#if runForm}
+    <div class="modal-backdrop">
+      <div class="modal wide" role="dialog" aria-label="Run a container" tabindex="-1" onkeydown={(e) => e.key === "Escape" && !runForm?.working && (runForm = null)}>
+        <h2>Run a container</h2>
+        <label class="field">
+          Image
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="text" autofocus bind:value={runForm.image} placeholder="nginx:latest" spellcheck="false" />
+          <small>If it isn't on this computer yet, it is downloaded first.</small>
+        </label>
+        <div class="two">
+          <label class="field">
+            Name (optional)
+            <input type="text" bind:value={runForm.name} spellcheck="false" />
+          </label>
+          <label class="field">
+            Restart
+            <select bind:value={runForm.restart}>
+              <option value="no">Never</option>
+              <option value="unless-stopped">Unless stopped</option>
+              <option value="always">Always</option>
+              <option value="on-failure">On failure</option>
+            </select>
+          </label>
+        </div>
+
+        <h3 class="sect">Ports <button class="btn small" onclick={() => runForm?.ports.push({ host: "", container: "", udp: false })}>Add</button></h3>
+        {#each runForm.ports as p, i (i)}
+          <div class="pair">
+            <input type="text" inputmode="numeric" placeholder="Computer port" bind:value={p.host} aria-label="Port on the computer" />
+            <span>→</span>
+            <input type="text" inputmode="numeric" placeholder="Container port" bind:value={p.container} aria-label="Port in the container" />
+            <label class="check"><input type="checkbox" bind:checked={p.udp} /> UDP</label>
+            <button class="icon-btn small" title="Remove" onclick={() => runForm?.ports.splice(i, 1)}><Icon name="close" size={13} /></button>
+          </div>
+        {/each}
+        {#if runForm.ports.length}
+          <label class="check"><input type="checkbox" bind:checked={runForm.localhostOnly} /> Reachable from this computer only (127.0.0.1)</label>
+        {/if}
+
+        <h3 class="sect">Folders and volumes <button class="btn small" onclick={() => runForm?.volumes.push({ source: "", target: "", readOnly: false })}>Add</button></h3>
+        {#each runForm.volumes as v, i (i)}
+          <div class="pair">
+            <input type="text" placeholder="Folder (/srv/data) or volume name" bind:value={v.source} spellcheck="false" aria-label="Folder or volume" />
+            <span>→</span>
+            <input type="text" placeholder="Path in the container" bind:value={v.target} spellcheck="false" aria-label="Path in the container" />
+            <label class="check"><input type="checkbox" bind:checked={v.readOnly} /> Read-only</label>
+            <button class="icon-btn small" title="Remove" onclick={() => runForm?.volumes.splice(i, 1)}><Icon name="close" size={13} /></button>
+          </div>
+        {/each}
+
+        <label class="field">
+          Environment variables (one NAME=value per line)
+          <textarea rows="3" bind:value={runForm.env} spellcheck="false"></textarea>
+        </label>
+        {#if runForm.error}<p class="message error">{runForm.error}</p>{/if}
+        <div class="modal-actions">
+          <button class="btn" disabled={runForm.working} onclick={() => (runForm = null)}>Cancel</button>
+          <button class="btn primary" disabled={runForm.working || !runForm.image.trim()} onclick={confirmRun}>
+            {runForm.working ? "Starting…" : "Run"}
+          </button>
+        </div>
+      </div>
+    </div>
   {/if}
 
   {#if killing}
@@ -835,7 +1016,25 @@
               >
             {/each}
           </div>
-          <pre>{lines(details.data, details.tab)}</pre>
+          {#if details.tab === "usage"}
+            {@const h = history[details.id]}
+            {#if h && h.cpu.length > 1}
+              <div class="graphs">
+                <div>
+                  <span class="sub">CPU, last {Math.round((h.cpu.length * 6) / 60)} min · now {h.cpu[h.cpu.length - 1].toFixed(1)}% · highest {Math.max(...h.cpu).toFixed(1)}%</span>
+                  <Spark values={h.cpu} width={420} height={70} label="CPU use" />
+                </div>
+                <div>
+                  <span class="sub">Memory · now {size(h.mem[h.mem.length - 1])} · highest {size(Math.max(...h.mem))}</span>
+                  <Spark values={h.mem} width={420} height={70} label="Memory use" />
+                </div>
+              </div>
+            {:else}
+              <p class="hint">Readings appear here while the container is running. Keep this open for a few seconds.</p>
+            {/if}
+          {:else}
+            <pre>{lines(details.data, details.tab)}</pre>
+          {/if}
         {/if}
         <div class="modal-actions">
           <button class="btn" onclick={() => (details = null)}>Close</button>
@@ -953,6 +1152,52 @@
   }
   .dot.ok {
     background: var(--success, #3fb950);
+  }
+  .progress {
+    height: 6px;
+    margin: 2px 14px 4px;
+    overflow: hidden;
+    background: var(--bg-2);
+    border-radius: 3px;
+  }
+  .progress .fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s;
+  }
+  .usage {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .graphs {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .sect {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .pair input[type="text"] {
+    flex: 1;
+    min-width: 0;
   }
   .dot.bad {
     background: var(--danger, #f85149);

@@ -72,7 +72,7 @@ fn check_image_id(id: &str) -> Result<(), AppError> {
 }
 
 /// A volume name: letters, digits, underscore, dot and dash, not starting with a symbol.
-fn check_volume_name(name: &str) -> Result<(), AppError> {
+pub(super) fn check_volume_name(name: &str) -> Result<(), AppError> {
     let ok = !name.is_empty()
         && name.len() <= 255
         && name
@@ -404,7 +404,7 @@ pub async fn prune(docker: &Docker, kind: PruneKind) -> Result<Pruned, AppError>
 }
 
 /// An image reference such as `nginx`, `nginx:1.27` or `ghcr.io/me/app:tag`.
-fn check_reference(reference: &str) -> Result<(), AppError> {
+pub(super) fn check_reference(reference: &str) -> Result<(), AppError> {
     let ok = !reference.is_empty()
         && reference.len() <= 255
         && reference
@@ -424,18 +424,61 @@ fn check_reference(reference: &str) -> Result<(), AppError> {
     }
 }
 
-/// Downloads an image, waiting until it is finished.
-pub async fn pull(docker: &Docker, reference: &str) -> Result<(), AppError> {
+/// How far a download has got. The total is only known once Docker has said how big the parts are,
+/// so it can grow while the download starts.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PullProgress {
+    pub done: u64,
+    pub total: u64,
+    /// Docker's own word for the step, such as "Downloading" (cleaned).
+    pub status: String,
+}
+
+/// Downloads an image, waiting until it is finished. `on_progress` is told how it is going, at
+/// most about six times a second, and once more at the end.
+pub async fn pull(
+    docker: &Docker,
+    reference: &str,
+    on_progress: impl Fn(PullProgress),
+) -> Result<(), AppError> {
     use futures_util::StreamExt;
+    use std::collections::HashMap;
     check_reference(reference)?;
     let options = bollard::query_parameters::CreateImageOptionsBuilder::new()
         .from_image(reference)
         .build();
     let mut stream = Box::pin(docker.create_image(Some(options), None, None));
     let work = async {
+        // Each layer of the image is downloaded on its own; this is how far each has got.
+        let mut layers: HashMap<String, (u64, u64)> = HashMap::new();
+        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        let mut status = String::new();
         while let Some(step) = stream.next().await {
-            step.map_err(failed)?;
+            let step = step.map_err(failed)?;
+            let value = serde_json::to_value(&step).map_err(internal)?;
+            status = text(&value, "status");
+            if let Some(id) = value.get("id").and_then(Value::as_str) {
+                let current = value.pointer("/progressDetail/current").and_then(Value::as_u64);
+                let total = value.pointer("/progressDetail/total").and_then(Value::as_u64);
+                let entry = layers.entry(clean(id)).or_insert((0, 0));
+                if let (Some(c), Some(t)) = (current, total) {
+                    *entry = (c.min(t), t);
+                }
+                if status.contains("complete") {
+                    entry.0 = entry.1;
+                }
+            }
+            if last.elapsed() >= std::time::Duration::from_millis(150) {
+                last = std::time::Instant::now();
+                on_progress(PullProgress {
+                    done: layers.values().map(|l| l.0).sum(),
+                    total: layers.values().map(|l| l.1).sum(),
+                    status: status.clone(),
+                });
+            }
         }
+        let total = layers.values().map(|l| l.1).sum();
+        on_progress(PullProgress { done: total, total, status });
         Ok(())
     };
     tokio::time::timeout(std::time::Duration::from_secs(900), work)

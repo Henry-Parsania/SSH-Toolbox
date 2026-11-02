@@ -121,7 +121,33 @@ export function dockerPrune(dockerId: string, kind: PruneKind): Promise<{ remove
   return invoke("docker_prune", { dockerId, kind });
 }
 
-/** Downloads an image. Resolves when it is done, which can take a while. */
-export function dockerPull(dockerId: string, reference: string): Promise<void> {
-  return invoke<void>("docker_pull", { dockerId, reference });
+export interface PullProgress {
+  done: number;
+  /** Grows while the download starts, as Docker reports the size of each part. */
+  total: number;
+  status: string;
+}
+
+/** Downloads an image. Resolves when it is done; onProgress says how it is going. */
+export function dockerPull(dockerId: string, reference: string, onProgress: (p: PullProgress) => void): Promise<void> {
+  const channel = new Channel<PullProgress>();
+  channel.onmessage = onProgress;
+  return invoke<void>("docker_pull", { dockerId, reference, onProgress: channel });
+}
+
+export interface RunSpec {
+  image: string;
+  name: string;
+  ports: { host: number; container: number; udp: boolean }[];
+  /** Publish the ports on 127.0.0.1 only. */
+  localhost_only: boolean;
+  volumes: { source: string; target: string; read_only: boolean }[];
+  /** NAME=value lines. */
+  env: string[];
+  restart: "no" | "always" | "unless-stopped" | "on-failure";
+}
+
+/** Starts a new container from an image (downloading it first if needed). Returns its ID. */
+export function dockerRun(dockerId: string, spec: RunSpec): Promise<string> {
+  return invoke<string>("docker_run", { dockerId, spec });
 }

@@ -123,9 +123,21 @@ async fn clearing_out_counts_what_went() {
 async fn pulling_waits_and_checks_the_name() {
     use super::resources::pull;
     let (docker, seen) = engine().await;
-    pull(&docker, "nginx:1.27").await.unwrap();
+    pull(&docker, "nginx:1.27", |_| {}).await.unwrap();
     assert!(seen.lock().unwrap().join("\n").contains("fromImage=nginx"));
     for bad in ["", "-rm", "a b", "x?y=1", "a;b"] {
-        assert_eq!(pull(&docker, bad).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
+        assert_eq!(pull(&docker, bad, |_| {}).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
     }
+}
+
+#[tokio::test]
+async fn pulling_reports_how_far_it_has_got_and_ends_complete() {
+    use super::resources::pull;
+    use std::sync::Mutex;
+    let (docker, _) = engine().await;
+    let seen = Mutex::new(Vec::new());
+    pull(&docker, "nginx", |p| seen.lock().unwrap().push(p)).await.unwrap();
+    let seen = seen.into_inner().unwrap();
+    let last = seen.last().expect("at least the final report");
+    assert_eq!((last.done, last.total), (100, 100));
 }

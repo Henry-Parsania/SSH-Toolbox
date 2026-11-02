@@ -116,6 +116,28 @@ async fn serve(mut socket: TcpStream, record: Requests) {
         let target = words.next().unwrap_or("").to_string();
         let path = target.split('?').next().unwrap_or("").to_string();
         record.lock().unwrap().push(format!("{method} {target}"));
+        // Take the request's body off the connection so it isn't mistaken for the next request.
+        let length = head
+            .lines()
+            .find_map(|l| {
+                l.to_lowercase()
+                    .strip_prefix("content-length:")
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+            })
+            .unwrap_or(0);
+        while pending.len() < length {
+            match socket.read(&mut chunk).await {
+                Ok(0) | Err(_) => return,
+                Ok(n) => pending.extend_from_slice(&chunk[..n]),
+            }
+        }
+        let body: Vec<u8> = pending.drain(..length).collect();
+        if path.ends_with("/containers/create") {
+            record
+                .lock()
+                .unwrap()
+                .push(format!("BODY {}", String::from_utf8_lossy(&body)));
+        }
 
         if path.ends_with("/abc123/logs") {
             return stream_log(&mut socket).await;
@@ -164,6 +186,8 @@ async fn serve(mut socket: TcpStream, record: Requests) {
                 "application/json",
                 r#"[{"Id":"aa11","Name":"bridge","Driver":"bridge","Scope":"local"},{"Id":"bb22","Name":"shop_default","Driver":"bridge","Scope":"local"}]"#,
             )
+        } else if method == "POST" && path.ends_with("/containers/create") {
+            reply("201 Created", "application/json", r#"{"Id":"abc123","Warnings":[]}"#)
         } else if method == "POST" && path.ends_with("/containers/prune") {
             reply("200 OK", "application/json", r#"{"ContainersDeleted":["aa","bb"],"SpaceReclaimed":2048}"#)
         } else if method == "POST" && path.ends_with("/images/prune") {
@@ -173,9 +197,16 @@ async fn serve(mut socket: TcpStream, record: Requests) {
         } else if method == "POST" && path.ends_with("/networks/prune") {
             reply("200 OK", "application/json", r#"{"NetworksDeleted":["n1","n2","n3"]}"#)
         } else if method == "POST" && path.ends_with("/images/create") {
-            reply("200 OK", "application/json", "{\"status\":\"Pulling\"}
-{\"status\":\"Done\"}
-")
+            reply(
+                "200 OK",
+                "application/json",
+                concat!(
+                    "{\"status\":\"Pulling fs layer\",\"id\":\"l1\"}\r\n",
+                    "{\"status\":\"Downloading\",\"id\":\"l1\",\"progressDetail\":{\"current\":50,\"total\":100}}\r\n",
+                    "{\"status\":\"Pull complete\",\"id\":\"l1\"}\r\n",
+                    "{\"status\":\"Done\"}\r\n",
+                ),
+            )
         } else if method == "GET" && path.contains("/images/") && path.ends_with("/json") {
             reply(
                 "200 OK",

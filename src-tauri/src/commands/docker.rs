@@ -167,8 +167,22 @@ pub async fn docker_pull(
     engines: State<'_, Engines>,
     docker_id: String,
     reference: String,
+    on_progress: Channel<resources::PullProgress>,
 ) -> Result<(), AppError> {
-    resources::pull(&*engines.get(&docker_id)?, &reference).await
+    resources::pull(&*engines.get(&docker_id)?, &reference, |p| {
+        let _ = on_progress.send(p);
+    })
+    .await
+}
+
+/// Starts a new container from an image (downloading it first if needed). Returns its ID.
+#[tauri::command]
+pub async fn docker_run(
+    engines: State<'_, Engines>,
+    docker_id: String,
+    spec: toolbox_core::docker::run::RunSpec,
+) -> Result<String, AppError> {
+    toolbox_core::docker::run::run(&*engines.get(&docker_id)?, &spec).await
 }
 
 #[tauri::command]

@@ -218,7 +218,7 @@ pub async fn act(docker: &Docker, id: &str, action: Action) -> Result<(), AppErr
 
 /// A container name as Docker allows it: letters, digits, underscore, dot and dash, starting
 /// with a letter or digit.
-fn check_name(name: &str) -> Result<(), AppError> {
+pub(super) fn check_name(name: &str) -> Result<(), AppError> {
     let ok = !name.is_empty()
         && name.len() <= 128
         && name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())

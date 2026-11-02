@@ -3,6 +3,7 @@
 pub mod engine;
 pub mod pane;
 pub mod resources;
+pub mod run;
 pub mod ssh;
 
 #[cfg(test)]
