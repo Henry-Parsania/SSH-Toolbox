@@ -92,7 +92,7 @@
           </button>
         </header>
       {/if}
-      {#if !shown}
+      {#if !shown && !(workspace.tabs.length === 0 && !crowded)}
         <div class="empty">
           <h3>What should this pane show?</h3>
           {#if workspace.hiddenTabs.length > 0}

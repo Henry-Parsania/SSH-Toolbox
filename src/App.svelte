@@ -479,7 +479,8 @@
           onsession={(session) => openSaved(session)}
         />
 
-        {#if workspace.tabs.length === 0}
+        <!-- With nothing open and one pane, the welcome screen is shown. With several panes, each empty pane has its own chooser. -->
+        {#if workspace.tabs.length === 0 && workspace.groupCount === 1}
           <div class="welcome">
             <div class="mark"><Icon name="terminal" size={34} /></div>
             <h1>SSH Toolbox</h1>
