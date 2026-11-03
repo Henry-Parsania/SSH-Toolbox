@@ -34,8 +34,15 @@ fn wsl_available() -> bool {
 
 #[cfg(windows)]
 fn windows_build() -> Option<u32> {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
-    let output = Command::new("cmd").args(["/C", "ver"]).output().ok()?;
+    // Without this flag Windows flashes a console window each time the app starts.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let output = Command::new("cmd")
+        .args(["/C", "ver"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
     parse_windows_build(&String::from_utf8_lossy(&output.stdout))
 }
 
