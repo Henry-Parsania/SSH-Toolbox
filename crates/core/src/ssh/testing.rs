@@ -80,6 +80,15 @@ pub struct Accepts {
     pub sftp_root: Option<std::path::PathBuf>,
     /// Pretends to be a server that has Docker.
     pub docker: Option<DockerFake>,
+    /// Accepts X11 forwarding. When a shell starts, a program on the server "opens a window".
+    pub x11: Option<X11Fake>,
+}
+
+/// How the pretend server treats X11.
+#[derive(Clone, Copy, Default)]
+pub struct X11Fake {
+    /// The program brings a cookie that isn't the one it was given.
+    pub wrong_cookie: bool,
 }
 
 /// What the `docker` command does on a server pretending to have Docker.
@@ -117,6 +126,10 @@ pub struct Stats {
     /// Channels that carry a forwarded connection, in either direction: their data belongs to the
     /// stream, not to a shell.
     pub forwarding_channels: Mutex<std::collections::HashSet<ChannelId>>,
+    /// X11 forwarding requests: protocol, cookie and screen.
+    pub x11_requests: Mutex<Vec<(String, String, u32)>>,
+    /// What the local X server answered the pretend program, one entry per program.
+    pub x11_answers: Mutex<Vec<Vec<u8>>>,
 }
 
 #[derive(Clone)]
@@ -130,6 +143,7 @@ impl server::Server for TestServer {
             self.1.clone(),
             HashMap::new(),
             HashMap::new(),
+            HashMap::new(),
         )
     }
 }
@@ -140,6 +154,8 @@ pub struct TestHandler(
     HashMap<ChannelId, (String, Vec<u8>)>,
     /// Session channels the server was given, kept for a subsystem that wants one.
     HashMap<ChannelId, Channel<Msg>>,
+    /// The cookie each channel was given for X11.
+    HashMap<ChannelId, String>,
 );
 
 impl TestHandler {
@@ -334,6 +350,29 @@ impl server::Handler for TestHandler {
         Ok(true)
     }
 
+    async fn x11_request(
+        &mut self,
+        channel: ChannelId,
+        _single_connection: bool,
+        protocol: &str,
+        cookie: &str,
+        screen: u32,
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
+        if self.0.x11.is_none() {
+            session.channel_failure(channel)?;
+            return Ok(());
+        }
+        self.1
+            .x11_requests
+            .lock()
+            .unwrap()
+            .push((protocol.into(), cookie.into(), screen));
+        self.4.insert(channel, cookie.to_string());
+        session.channel_success(channel)?;
+        Ok(())
+    }
+
     async fn pty_request(
         &mut self,
         channel: ChannelId,
@@ -371,6 +410,39 @@ impl server::Handler for TestHandler {
         self.1.shells.fetch_add(1, Ordering::SeqCst);
         session.channel_success(channel)?;
         session.data(channel, b"welcome-banner".to_vec())?;
+        if let (Some(x11), Some(cookie)) = (self.0.x11, self.4.get(&channel)) {
+            let cookie = if x11.wrong_cookie {
+                vec![0xEE; 16]
+            } else {
+                (0..cookie.len() / 2)
+                    .map(|i| u8::from_str_radix(&cookie[2 * i..2 * i + 2], 16).unwrap_or(0))
+                    .collect()
+            };
+            let (handle, stats) = (session.handle(), self.1.clone());
+            tokio::spawn(async move {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let Ok(opened) = handle.channel_open_x11("127.0.0.1", 40000).await else {
+                    stats.x11_answers.lock().unwrap().push(b"refused".to_vec());
+                    return;
+                };
+                let mut program = opened.into_stream();
+                let _ = program
+                    .write_all(&crate::x11::setup::request(false, &cookie))
+                    .await;
+                let mut answer = Vec::new();
+                let mut buffer = [0u8; 64];
+                // The local server answers, or the tunnel is closed on the program.
+                if let Ok(Ok(n)) = tokio::time::timeout(
+                    std::time::Duration::from_secs(3),
+                    program.read(&mut buffer),
+                )
+                .await
+                {
+                    answer.extend_from_slice(&buffer[..n]);
+                }
+                stats.x11_answers.lock().unwrap().push(answer);
+            });
+        }
         Ok(())
     }
 

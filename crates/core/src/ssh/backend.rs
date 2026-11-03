@@ -14,7 +14,7 @@ use super::pool::{ConnectionPool, SharedConnection};
 use crate::error::{AppError, ErrorCode};
 use crate::keychain::Keychain;
 use crate::prompt::{PromptBroker, Prompter};
-use crate::sessions::SessionStore;
+use crate::sessions::{SavedSession, SessionStore};
 use crate::terminal::{
     BackendEvent, MAX_BACKEND_READ, OutputSink, PumpConfig, QUEUE_SIZE, Session, SessionRegistry,
     TermSize, TerminalBackend, TerminalStatus, spawn_pump,
@@ -29,9 +29,20 @@ pub struct SshServices {
     pub sessions_file: std::path::PathBuf,
     /// The `known_hosts` file the host key rules use.
     pub known_hosts: std::path::PathBuf,
+    /// The X server that windows from programs on the server are shown on.
+    pub x11: Arc<crate::x11::X11Local>,
 }
 
 type Writer = ChannelWriteHalf<Msg>;
+
+/// A shell that has just been opened.
+struct Opened {
+    reader: russh::ChannelReadHalf,
+    shared: Arc<SharedConnection>,
+    /// Something to tell the user in the terminal.
+    notice: Option<String>,
+    x11_requested: bool,
+}
 
 pub struct SshBackend {
     /// Runs a process monitor instead of the login shell.
@@ -39,6 +50,11 @@ pub struct SshBackend {
     cancel: CancellationToken,
     writer: tokio::sync::Mutex<Option<Writer>>,
     size: Mutex<TermSize>,
+}
+
+/// A line the app writes into the terminal itself, apart from what the server sends.
+fn note(text: &str) -> BackendEvent {
+    BackendEvent::Data(format!("\r\n[{text}]\r\n").into_bytes())
 }
 
 fn lost() -> AppError {
@@ -57,7 +73,7 @@ impl SshBackend {
         services: &SshServices,
         saved_session_id: &str,
         sink: &Arc<dyn OutputSink>,
-    ) -> Result<(russh::ChannelReadHalf, Arc<SharedConnection>), AppError> {
+    ) -> Result<Opened, AppError> {
         let path = services.sessions_file.clone();
         let loaded = tokio::task::spawn_blocking(move || SessionStore::new(path).load())
             .await
@@ -66,6 +82,10 @@ impl SshBackend {
             return Err(AppError::new(ErrorCode::InvalidInput, problem));
         }
         let chain = resolve_chain(&loaded.file, saved_session_id)?;
+        let wants_x11 = !self.monitor
+            && loaded.file.sessions.iter().any(|s| {
+                matches!(s, SavedSession::Ssh { id, x11: true, .. } if id == saved_session_id)
+            });
         let prompter = Prompter::new(services.broker.clone(), sink.clone(), self.cancel.clone());
         let shared = services
             .pool
@@ -81,6 +101,29 @@ impl SshBackend {
             .channel_open_session()
             .await
             .map_err(|_| lost())?;
+        // Windows from programs on the server. If this can't be set up the shell still opens,
+        // and the terminal says why there are no windows.
+        let mut notice = None;
+        if wants_x11 {
+            match services.x11.prepare(&shared.handle.x11).await {
+                Ok(forward) => {
+                    channel
+                        .request_x11(
+                            true,
+                            false,
+                            crate::x11::setup::COOKIE_PROTOCOL,
+                            crate::x11::display::hex(&forward.fake_cookie),
+                            forward.local.screen,
+                        )
+                        .await
+                        .map_err(|_| lost())?;
+                }
+                Err(error) => {
+                    notice = Some(format!("X11 forwarding is off: {}", error.message));
+                }
+            }
+        }
+        let x11_requested = wants_x11 && notice.is_none();
         channel
             .request_pty(
                 false,
@@ -103,7 +146,12 @@ impl SshBackend {
         }
         let (reader, writer) = channel.split();
         *self.writer.lock().await = Some(writer);
-        Ok((reader, shared))
+        Ok(Opened {
+            reader,
+            shared,
+            notice,
+            x11_requested,
+        })
     }
 
     async fn run(
@@ -118,7 +166,12 @@ impl SshBackend {
             result = self.establish(&services, &saved_session_id, &sink) => result,
             _ = self.cancel.cancelled() => return,
         };
-        let (mut reader, shared) = match opened {
+        let Opened {
+            mut reader,
+            shared,
+            notice,
+            x11_requested,
+        } = match opened {
             Ok(ok) => ok,
             Err(error) => {
                 if error.code != ErrorCode::Cancelled {
@@ -128,6 +181,11 @@ impl SshBackend {
             }
         };
         let _ = sink.send_status(TerminalStatus::Connected);
+        if let Some(notice) = notice {
+            let _ = events.send(note(&notice)).await;
+        }
+        // The server answers the X11 request first, then the shell's.
+        let mut x11_answer_due = x11_requested;
 
         let mut exit_code = None;
         // The channel's queue ending without a close message means the connection itself went.
@@ -154,6 +212,12 @@ impl SshBackend {
                 Some(ChannelMsg::ExitStatus { exit_status }) => {
                     exit_code = Some(exit_status as i32);
                 }
+                Some(ChannelMsg::Failure) if x11_answer_due => {
+                    x11_answer_due = false;
+                    let text = "X11 forwarding is off: the server refused it. It may need X11Forwarding enabled, or xauth installed.";
+                    let _ = events.send(note(text)).await;
+                }
+                Some(ChannelMsg::Success) if x11_answer_due => x11_answer_due = false,
                 Some(ChannelMsg::Close) => break,
                 None => {
                     connection_ended = true;

@@ -182,6 +182,7 @@ mod tests {
             auth: SshAuth::Agent,
             key_path: String::new(),
             jump: jump.into(),
+            x11: false,
         }
     }
 

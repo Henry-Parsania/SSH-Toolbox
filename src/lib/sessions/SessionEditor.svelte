@@ -27,6 +27,7 @@
     keyPath: editing?.key_path ?? "",
     folder: editing?.folder ?? folder,
     jump: editing?.jump ?? "",
+    x11: editing?.x11 ?? false,
   }));
   let name = $state(start.name);
   let host = $state(start.host);
@@ -36,6 +37,7 @@
   let keyPath = $state(start.keyPath);
   let inFolder = $state(start.folder);
   let jump = $state(start.jump);
+  let x11 = $state(start.x11);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -81,6 +83,7 @@
       auth,
       key_path: auth === "key" ? keyPath.trim() : "",
       jump,
+      x11,
     };
     const sessions = editing
       ? library.file.session.map((s) => (s.id === id ? session : s))
@@ -156,6 +159,11 @@
         {/each}
       </select>
       <small>Connects to that session first, then on to this one. Up to 3 hops.</small>
+    </label>
+    <label class="check">
+      <input type="checkbox" bind:checked={x11} />
+      Show windows of programs on the server (X11)
+      <small>Needs an X server on this computer (Tools, X server) and X11 forwarding allowed on the server.</small>
     </label>
     {#if library.keychain && auth === "password"}
       <label class="field">

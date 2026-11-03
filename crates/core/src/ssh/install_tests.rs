@@ -239,6 +239,7 @@ fn world() -> World {
         pool: ConnectionPool::new(),
         sessions_file: dir.path().join("sessions.toml"),
         known_hosts: dir.path().join("known_hosts"),
+        x11: Arc::new(crate::x11::X11Local::new(dir.path().join("x11"))),
     });
     World {
         services,
@@ -287,6 +288,7 @@ fn save_session(w: &World, id: &str, port: u16) {
         auth: SshAuth::Password,
         key_path: String::new(),
         jump: String::new(),
+        x11: false,
     });
     store.save(&file).unwrap();
     w.secrets

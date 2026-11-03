@@ -21,6 +21,7 @@ const ssh = (id: string, name: string, folder = "", host = "h.example", jump = "
   auth: "agent",
   key_path: "",
   jump,
+  x11: false,
 });
 
 const file = (): SessionsFile => ({

@@ -81,6 +81,9 @@ pub enum SavedSession {
         /// The ID of another SSH session to go through, or empty.
         #[serde(default)]
         jump: String,
+        /// Show windows of programs run on the server on this computer.
+        #[serde(default)]
+        x11: bool,
     },
     Serial {
         id: String,
@@ -382,6 +385,7 @@ mod tests {
             auth: SshAuth::Key,
             key_path: "~/.ssh/id_ed25519".into(),
             jump: jump.into(),
+            x11: false,
         }
     }
 

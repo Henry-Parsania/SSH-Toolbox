@@ -16,3 +16,4 @@ pub mod startup;
 pub mod status;
 pub mod terminal;
 pub mod window;
+pub mod x11;

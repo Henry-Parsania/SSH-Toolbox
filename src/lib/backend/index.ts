@@ -235,6 +235,7 @@ export type SavedSession =
       auth: "password" | "key" | "agent";
       key_path: string;
       jump: string;
+      x11: boolean;
     }
   | {
       type: "serial";

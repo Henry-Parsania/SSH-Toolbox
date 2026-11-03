@@ -35,12 +35,14 @@ pub fn run() {
     let keychain = Arc::new(Keychain::system());
     let broker = PromptBroker::new();
     let config = toolbox_core::config::config_dir().unwrap_or_else(|| PathBuf::from("."));
+    let x11 = Arc::new(toolbox_core::x11::X11Local::new(config.join("x11")));
     let services = Arc::new(SshServices {
         keychain: keychain.clone(),
         broker: broker.clone(),
         pool: ConnectionPool::new(),
         sessions_file: config.join("sessions.toml"),
         known_hosts: default_known_hosts().unwrap_or_else(|| config.join("known_hosts")),
+        x11: x11.clone(),
     });
 
     let app = tauri::Builder::default()
@@ -53,12 +55,16 @@ pub fn run() {
                         handle.exit(0);
                     }
                 });
+                // The window starts hidden (tauri.conf.json) so it appears once, already at its
+                // saved size and position, instead of opening and then jumping.
                 if let Some(dir) = toolbox_core::config::config_dir() {
-                    window_state::install(window, dir.join("window.json"));
+                    window_state::install(window.clone(), dir.join("window.json"));
                 }
+                let _ = window.show();
             }
             Ok(())
         })
+        .manage(x11)
         .manage(commands::startup::Startup::now())
         .manage(keychain)
         .manage(broker)
@@ -73,6 +79,9 @@ pub fn run() {
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::x11::x11_status,
+            commands::x11::x11_start,
+            commands::x11::x11_stop,
             commands::scan::scan_local_networks,
             commands::scan::scan_run,
             commands::scan::scan_cancel,
@@ -167,6 +176,8 @@ pub fn run() {
         if let RunEvent::Exit = event {
             let terminals = handle.state::<commands::terminal::Terminals>();
             tauri::async_runtime::block_on(terminals.sessions.close_all());
+            // An X server the app started goes with it.
+            handle.state::<Arc<toolbox_core::x11::X11Local>>().stop_now();
         }
     });
 }

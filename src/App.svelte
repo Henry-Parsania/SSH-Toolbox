@@ -26,6 +26,7 @@
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import AgentPanel from "./lib/agent/AgentPanel.svelte";
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
+  import XServerDialog from "./lib/x11/XServerDialog.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
   import { realDeps } from "./lib/agent/deps";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
@@ -43,6 +44,7 @@
   let sidebarCommand = $state<{ name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number } } | null>(null);
   // The network tools window, when it is open.
   let scanner = $state<"network" | "ports" | null>(null);
+  let xserver = $state(false);
   function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number }) {
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1, prefill };
@@ -318,6 +320,7 @@
       items: [
         { label: "Network scanner…", onselect: () => (scanner = "network") },
         { label: "Port scanner…", onselect: () => (scanner = "ports") },
+        { label: "X server…", onselect: () => (xserver = true) },
       ],
     },
     {
@@ -523,6 +526,9 @@
   </div>
   {#if scanner}
     <ScannerDialog initialTab={scanner} onclose={() => (scanner = null)} onnewsession={(host, port) => sessionCommand("ssh", { host, port })} />
+  {/if}
+  {#if xserver}
+    <XServerDialog onclose={() => (xserver = false)} />
   {/if}
   {#if help}
     <HelpDialog page={help} onclose={() => (help = null)} />

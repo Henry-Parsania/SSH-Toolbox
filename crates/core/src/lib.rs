@@ -19,6 +19,7 @@ pub mod settings;
 pub mod ssh;
 pub mod stats;
 pub mod terminal;
+pub mod x11;
 
 pub use error::{AppError, ErrorCode};
 pub use platform::PlatformInfo;

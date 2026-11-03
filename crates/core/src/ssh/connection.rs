@@ -60,6 +60,7 @@ pub type RemoteForwards = Arc<Mutex<std::collections::HashMap<u32, (String, u16)
 pub struct ClientHandler {
     asking: Arc<AtomicBool>,
     remote: RemoteForwards,
+    x11: crate::x11::Slot,
     host: String,
     port: u16,
     known_hosts: PathBuf,
@@ -75,8 +76,8 @@ fn refuse(failure: &Failure, error: AppError) -> Result<bool, russh::Error> {
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
-    // A server can open channels towards this computer. Only remote forwards the user asked
-    // for are accepted (below). Everything else is refused, so a hostile server can't reach
+    // A server can open channels towards this computer. Only remote forwards and X11 windows the
+    // user asked for are accepted (below). Everything else is refused, so a hostile server can't reach
     // an agent, a display or any other service through the connection.
     async fn server_channel_open_session(
         &mut self,
@@ -129,14 +130,22 @@ impl client::Handler for ClientHandler {
         Ok(())
     }
 
+    /// A program on the server opens a window. Accepted only when this connection was set up
+    /// for X11 forwarding, and the program must then bring the cookie we gave the server.
     async fn server_channel_open_x11(
         &mut self,
-        _channel: russh::Channel<client::Msg>,
+        channel: russh::Channel<client::Msg>,
         _originator: &str,
         _originator_port: u32,
-        _reply: russh::client::ChannelOpenHandle,
+        reply: russh::client::ChannelOpenHandle,
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
+        let forward = self.x11.lock().unwrap().clone();
+        let Some(forward) = forward else {
+            return Ok(()); // Dropping the handle refuses the channel.
+        };
+        reply.accept().await;
+        tokio::spawn(crate::x11::serve(channel.into_stream(), forward));
         Ok(())
     }
 
@@ -238,6 +247,8 @@ pub struct Connection {
     handle: Handle<ClientHandler>,
     /// Where remote forwards on this connection lead.
     pub remote: RemoteForwards,
+    /// Where windows of programs on the server go, once a session asks for them.
+    pub x11: crate::x11::Slot,
 }
 
 impl std::ops::Deref for Connection {
@@ -266,20 +277,28 @@ fn make_handler(
     port: u16,
     known_hosts: PathBuf,
     prompter: Prompter,
-) -> (ClientHandler, Failure, RemoteForwards, Arc<AtomicBool>) {
+) -> (
+    ClientHandler,
+    Failure,
+    RemoteForwards,
+    crate::x11::Slot,
+    Arc<AtomicBool>,
+) {
     let failure: Failure = Arc::default();
     let remote = RemoteForwards::default();
+    let x11 = crate::x11::Slot::default();
     let asking = Arc::new(AtomicBool::new(false));
     let handler = ClientHandler {
         asking: asking.clone(),
         remote: remote.clone(),
+        x11: x11.clone(),
         host: host.to_string(),
         port,
         known_hosts,
         prompter,
         failure: failure.clone(),
     };
-    (handler, failure, remote, asking)
+    (handler, failure, remote, x11, asking)
 }
 
 /// Turns what the library said into a plain message, with the host key check's own reason first
@@ -313,13 +332,17 @@ pub async fn connect(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure, remote, asking) = make_handler(host, port, known_hosts, prompter);
+    let (handler, failure, remote, x11, asking) = make_handler(host, port, known_hosts, prompter);
     let attempt = with_deadline(
         client::connect(make_config(), (host, port), handler),
         &asking,
     )
     .await;
-    explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
+    explain(attempt, &failure, host, port).map(|handle| Connection {
+        handle,
+        remote,
+        x11,
+    })
 }
 
 /// Connects to `host` by way of an already open connection (a jump host). The server's key is
@@ -331,7 +354,7 @@ pub async fn connect_through(
     known_hosts: PathBuf,
     prompter: Prompter,
 ) -> Result<Connection, AppError> {
-    let (handler, failure, remote, asking) = make_handler(host, port, known_hosts, prompter);
+    let (handler, failure, remote, x11, asking) = make_handler(host, port, known_hosts, prompter);
     let attempt = with_deadline(
         async {
             let channel = jump
@@ -342,5 +365,9 @@ pub async fn connect_through(
         &asking,
     )
     .await;
-    explain(attempt, &failure, host, port).map(|handle| Connection { handle, remote })
+    explain(attempt, &failure, host, port).map(|handle| Connection {
+        handle,
+        remote,
+        x11,
+    })
 }

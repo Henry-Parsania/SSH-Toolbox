@@ -422,6 +422,7 @@ impl Importer<'_> {
             auth,
             key_path,
             jump,
+            x11: false,
         });
         self.result.added.push(host.alias.clone());
         Ok(id)
