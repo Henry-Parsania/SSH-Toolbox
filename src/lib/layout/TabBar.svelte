@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SessionSpec } from "../backend";
+  import { fitMenu } from "../ui/fitMenu";
   import Icon, { type IconName } from "../ui/Icon.svelte";
   import { leaves } from "./panes";
   import type { Tab, Workspace } from "./workspace.svelte";
@@ -23,10 +24,20 @@
     ondocker: () => void;
     agentOpen: boolean;
     onagent: () => void;
+    /** Moves a tab into a window of its own. */
+    ondetach: (tabId: string) => void;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent, ondetach }: Props = $props();
   let menuOpen = $state(false);
+  // The right-click menu on a tab.
+  let tabMenu = $state<{ x: number; y: number; id: string } | null>(null);
+
+  /** Runs an action from the tab menu, then closes it. The action goes first because it reads the menu. */
+  function act(action: () => void) {
+    action();
+    tabMenu = null;
+  }
 
   let editing = $state<string | null>(null);
   let draft = $state("");
@@ -81,6 +92,22 @@
   }
 </script>
 
+<svelte:window onpointerdown={() => (tabMenu = null)} onblur={() => (tabMenu = null)} onkeydown={(e) => e.key === "Escape" && (tabMenu = null)} />
+
+{#if tabMenu}
+  {@const target = tabMenu}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <ul class="menu ctx" role="menu" use:fitMenu={{ x: target.x, y: target.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    <li><button onclick={() => act(() => workspace.duplicateTab(target.id, "row"))}><Icon name="split-h" size={14} /> Duplicate to the right <span class="hintkey">(side by side)</span></button></li>
+    <li><button onclick={() => act(() => workspace.duplicateTab(target.id, "column"))}><Icon name="split-v" size={14} /> Duplicate below <span class="hintkey">(top and bottom)</span></button></li>
+    <li class="sep" role="separator"></li>
+    <li><button onclick={() => act(() => { const t = workspace.tabs.find((x) => x.id === target.id); if (t) startRename(t.id, t.title); })}><Icon name="edit" size={14} /> Rename</button></li>
+    <li><button onclick={() => act(() => ondetach(target.id))}><Icon name="up" size={14} /> Move to its own window</button></li>
+    <li class="sep" role="separator"></li>
+    <li><button onclick={() => act(() => workspace.closeTab(target.id))}><Icon name="close" size={14} /> Close tab</button></li>
+  </ul>
+{/if}
+
 <div class="bar">
   <button
     class="icon-btn lead"
@@ -105,8 +132,15 @@
         tabindex="-1"
         aria-selected={tab.id === workspace.activeTabId}
         onpointerdown={(e) => {
+          // Only the main button chooses the tab. The right button just opens the menu.
+          if (e.button !== 0) return;
           workspace.selectTab(tab.id);
           startDrag(e, tab.id);
+        }}
+        oncontextmenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          tabMenu = { x: e.clientX, y: e.clientY, id: tab.id };
         }}
         ondblclick={() => startRename(tab.id, tab.title)}
         onauxclick={(e) => {
@@ -391,6 +425,23 @@
     top: calc(100% + 6px);
     left: 0;
     z-index: 11;
+  }
+  .ctx {
+    position: fixed;
+    z-index: 60;
+    min-width: 230px;
+  }
+  .ctx li {
+    list-style: none;
+  }
+  .ctx .sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
+  }
+  .hintkey {
+    color: var(--text-faint);
+    font-size: 11px;
   }
   .shown {
     flex: none;

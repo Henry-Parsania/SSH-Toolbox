@@ -109,3 +109,4 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - Splits inside one tab (the older kind) still load and draw, but nothing creates them any more.
 - Saved layout (`layout.toml`) has new fields `groups`, `group_tabs`, `active_group`. A layout from before panes loads as one pane showing the tab that was in front. The tab `view` field is still read so old panel tabs can be dropped.
 - Not built: dragging a tab onto a pane, dragging panes around.
+- Duplicate (2026-11-03): right-click a tab, Duplicate to the right / below (also in the Terminal menu for the front tab) opens a new tab with the same session spec (same saved SSH session, shell or WSL distro) in a new pane next to that tab's pane. A new connection or shell, nothing copied, so a local shell starts in its default folder. The right mouse button no longer selects a tab; it only opens the tab menu (Duplicate, Rename, Move to its own window, Close).

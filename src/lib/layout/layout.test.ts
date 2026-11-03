@@ -290,3 +290,30 @@ describe("panes from the empty-pane chooser", () => {
     expect(w.groupCount).toBe(2);
   });
 });
+
+describe("Workspace.duplicateTab", () => {
+  it("opens a copy of the connection in a new pane beside the tab, or below it", () => {
+    const w = new Workspace();
+    const ssh = w.newTab({ type: "ssh", saved_session_id: "s1" }, "server");
+    w.newTab({ type: "local", shell_id: "x" }, "shell"); // in front now
+    const copy = w.duplicateTab(ssh.id, "row");
+    expect(copy?.title).toBe("server");
+    expect(copy?.root).toMatchObject({ spec: { type: "ssh", saved_session_id: "s1" } });
+    expect(copy?.id).not.toBe(ssh.id);
+    expect(w.groupCount).toBe(2);
+    expect(w.activeTabId).toBe(copy?.id);
+    expect(w.tabs.map((t) => t.title)).toEqual(["server", "shell", "server"]);
+
+    // A second copy, below, splits the pane the chosen tab is in.
+    w.duplicateTab(copy!.id, "column");
+    expect(w.groupCount).toBe(3);
+    expect(w.tabs).toHaveLength(4);
+    expect(w.groups.kind === "split" && w.groups.children.some((c) => c.kind === "split" && c.direction === "column")).toBe(true);
+  });
+
+  it("does nothing for a tab that does not exist", () => {
+    const w = new Workspace();
+    expect(w.duplicateTab("nope", "row")).toBeNull();
+    expect(w.groupCount).toBe(1);
+  });
+});

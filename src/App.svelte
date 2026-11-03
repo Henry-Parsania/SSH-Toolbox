@@ -224,8 +224,11 @@
   // starts with an empty screen.
   function detachActiveTab() {
     const tab = workspace.activeTab;
-    if (!tab) return;
-    const payload = workspace.detachTab(tab.id);
+    if (tab) detachTab(tab.id);
+  }
+
+  function detachTab(id: string) {
+    const payload = workspace.detachTab(id);
     if (payload) void windowOpen(payload.title, encodePayload(payload)).catch(() => {});
   }
 
@@ -303,6 +306,8 @@
       items: [
         { label: "Split side by side", hint: "Ctrl+Shift+E", onselect: () => workspace.split("row") },
         { label: "Split top and bottom", hint: "Ctrl+Shift+O", onselect: () => workspace.split("column") },
+        { label: "Duplicate this tab to the right", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "row") },
+        { label: "Duplicate this tab below", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "column") },
         { label: "Close pane", hint: "Ctrl+Shift+W", onselect: () => workspace.closeActivePane() },
         { label: "Move this tab to its own window", disabled: workspace.tabs.length === 0, onselect: detachActiveTab },
         "separator",
@@ -462,6 +467,7 @@
       }}
       {agentOpen}
       onagent={() => (agentOpen = !agentOpen)}
+      ondetach={detachTab}
     />
       <main class="tabs">
         <GroupLayout

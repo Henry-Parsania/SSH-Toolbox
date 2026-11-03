@@ -260,6 +260,22 @@ export class Workspace {
     if (group) this.focusGroup(group);
   }
 
+  /**
+   * Opens a copy of a tab's connection in a new pane beside it (`row`) or below it (`column`).
+   * It is a new session of the same kind, such as a second shell on the same server, and starts
+   * empty: nothing is copied from the first.
+   */
+  duplicateTab(tabId: string, direction: Direction): Tab | null {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    const leaf = tab ? (findLeaf(tab.root, tab.active) ?? leaves(tab.root)[0]) : undefined;
+    if (!tab || !leaf) return null;
+    // The copy goes next to the tab that was chosen, wherever that is showing.
+    const group = this.groupOf(tabId);
+    if (group) this.focusGroup(group);
+    this.splitGroup(direction);
+    return this.newTab(leaf.spec, leaf.title);
+  }
+
   /** Divides the window: a new pane beside (or below) the current one. */
   split(direction: Direction) {
     this.splitGroup(direction);
