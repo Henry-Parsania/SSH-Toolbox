@@ -3,6 +3,7 @@
   import type { SavedSession } from "../backend";
   import { settings } from "../settings.svelte";
   import type { Reachability } from "../status/reach.svelte";
+  import { fitMenu } from "../ui/fitMenu";
   import Icon from "../ui/Icon.svelte";
   import ForwardsDialog from "./ForwardsDialog.svelte";
   import FtpEditor from "./FtpEditor.svelte";
@@ -40,6 +41,20 @@
   let keySetupFor = $state<SshSession | null>(null);
   let renaming = $state<{ id: string; name: string } | null>(null);
   let message = $state("");
+  // The right-click menu: the same actions as the small buttons on the row.
+  let menu = $state<{ x: number; y: number; target: { folder: TreeItem & { kind: "folder" } } | { session: SavedSession } } | null>(null);
+
+  function openMenu(e: MouseEvent, target: NonNullable<typeof menu>["target"]) {
+    e.preventDefault();
+    e.stopPropagation();
+    menu = { x: e.clientX, y: e.clientY, target };
+  }
+
+  /** Runs a menu action, then closes the menu. The action goes first because it reads the menu's target. */
+  function act(action: () => void) {
+    action();
+    menu = null;
+  }
 
   const tree = $derived(buildTree(library.file, search));
 
@@ -141,7 +156,8 @@
 
 {#snippet row(item: TreeItem, depth: number)}
   {#if item.kind === "folder"}
-    <div class="item folder" style:padding-left="{6 + depth * 14}px">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="item folder" style:padding-left="{6 + depth * 14}px" oncontextmenu={(e) => openMenu(e, { folder: item })}>
       <button
         class="label"
         onclick={() => (collapsed[item.folder.id] = !collapsed[item.folder.id])}
@@ -179,7 +195,8 @@
       {/each}
     {/if}
   {:else}
-    <div class="item" style:padding-left="{6 + depth * 14 + 13}px">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="item" style:padding-left="{6 + depth * 14 + 13}px" oncontextmenu={(e) => openMenu(e, { session: item.session })}>
       <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
         <span class="glyph"><Icon name={iconOf(item.session)} size={15} /></span>
         {#if dot(item.session)}
@@ -228,6 +245,42 @@
     </div>
   {/if}
 {/snippet}
+
+<svelte:window onpointerdown={() => (menu = null)} onblur={() => (menu = null)} onkeydown={(e) => e.key === "Escape" && (menu = null)} />
+
+{#if menu}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    {#if "folder" in menu.target}
+      {@const f = menu.target.folder.folder}
+      <li><button onclick={() => act(() => (editor = { folder: f.id }))}><Icon name="plus" size={14} /> New session here</button></li>
+      <li><button onclick={() => act(() => addFolder(f.id))}><Icon name="folder-plus" size={14} /> New folder inside</button></li>
+      <li><button onclick={() => act(() => (renaming = { id: f.id, name: f.name }))}><Icon name="edit" size={14} /> Rename</button></li>
+      <li class="sep" role="separator"></li>
+      <li><button onclick={() => act(() => (confirm = { kind: "folder", id: f.id, name: f.name }))}><Icon name="trash" size={14} /> Delete folder</button></li>
+    {:else}
+      {@const sess = menu.target.session}
+      <li><button onclick={() => act(() => onopen(sess))}><Icon name="play" size={14} /> Connect in a new tab</button></li>
+      {#if sess.type === "ssh"}
+        <li><button onclick={() => act(() => onmonitor?.(sess))}><Icon name="monitor" size={14} /> Process monitor</button></li>
+        <li><button onclick={() => act(() => (forwardsFor = sess))}><Icon name="route" size={14} /> Port forwarding</button></li>
+        <li><button onclick={() => act(() => (keySetupFor = sess))}><Icon name="key" size={14} /> Set up key login</button></li>
+      {/if}
+      <li class="sep" role="separator"></li>
+      <li>
+        <button
+          onclick={() =>
+            act(() => {
+              if (sess.type === "ssh") editor = { editing: sess };
+              else if (sess.type === "ftp") ftpEditor = { editing: sess };
+              else serialEditor = { editing: sess };
+            })}><Icon name="edit" size={14} /> Edit</button
+        >
+      </li>
+      <li><button onclick={() => act(() => (confirm = { kind: "session", id: sess.id, name: sess.name }))}><Icon name="trash" size={14} /> Delete</button></li>
+    {/if}
+  </ul>
+{/if}
 
 <aside class="sidebar">
   <header>
@@ -472,6 +525,19 @@
     padding: 0 6px;
     color: var(--text-faint);
     font-size: 11px;
+  }
+  .ctx {
+    position: fixed;
+    z-index: 60;
+    min-width: 200px;
+  }
+  .ctx li {
+    list-style: none;
+  }
+  .ctx .sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
   }
   .tools {
     display: none;
