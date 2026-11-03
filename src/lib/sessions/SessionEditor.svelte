@@ -160,11 +160,13 @@
       </select>
       <small>Connects to that session first, then on to this one. Up to 3 hops.</small>
     </label>
-    <label class="check">
-      <input type="checkbox" bind:checked={x11} />
-      Show windows of programs on the server (X11)
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" bind:checked={x11} />
+        Show windows of programs on the server (X11)
+      </label>
       <small>Needs an X server on this computer (Tools, X server) and X11 forwarding allowed on the server.</small>
-    </label>
+    </div>
     {#if library.keychain && auth === "password"}
       <label class="field">
         Save password in the keychain (optional)
