@@ -30,6 +30,11 @@ export interface PlatformInfo {
   windows_build: number | null;
 }
 
+/** The version and exact build, for telling which build is running. */
+export function appVersion(): Promise<string> {
+  return invoke<string>("app_version");
+}
+
 export function platformInfo(): Promise<PlatformInfo> {
   return invoke<PlatformInfo>("platform_info");
 }

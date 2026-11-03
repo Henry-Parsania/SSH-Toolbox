@@ -55,6 +55,8 @@ pub fn run() {
                         handle.exit(0);
                     }
                 });
+                // The title names the exact build, so it is clear which one is running.
+                let _ = window.set_title(&format!("SSH Toolbox {}", commands::platform::version_line()));
                 // The window starts hidden (tauri.conf.json) so it appears once, already at its
                 // saved size and position, instead of opening and then jumping.
                 if let Some(dir) = toolbox_core::config::config_dir() {
@@ -79,6 +81,7 @@ pub fn run() {
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
+            commands::platform::app_version,
             commands::x11::x11_status,
             commands::x11::x11_start,
             commands::x11::x11_stop,

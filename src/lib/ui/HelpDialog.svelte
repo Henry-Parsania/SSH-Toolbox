@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appVersion } from "../backend";
   // A list of what the app can do and how to reach it, so nothing gets forgotten.
 
   interface Props {
@@ -8,6 +9,8 @@
   }
 
   let { page = "features", onclose }: Props = $props();
+  let version = $state("");
+  void appVersion().then((v) => (version = v)).catch(() => {});
   let current = $state<"features" | "shortcuts" | "about">("features");
   $effect(() => {
     current = page;
@@ -87,6 +90,7 @@
         SSH Toolbox is a personal terminal and server toolbox for Windows and Ubuntu: terminals, SSH, files, serial
         ports and Docker in one window.
       </p>
+      <p><strong>Version {version}</strong></p>
       <p class="muted">Passwords and passphrases are kept in your system keychain, never in the app's files.</p>
     {/if}
 
