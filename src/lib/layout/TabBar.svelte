@@ -14,8 +14,6 @@
     /** What the menu offers: local shells, and WSL distributions when WSL is there. */
     options: NewTabOption[];
     onnew: (option?: NewTabOption) => void;
-    /** Opens a shell in a new pane beside the current one. */
-    onsplit: (option: NewTabOption, direction: "row" | "column") => void;
     onsettings: () => void;
     onsidebar: () => void;
     sidebarOpen: boolean;
@@ -27,7 +25,7 @@
     onagent: () => void;
   }
 
-  let { workspace, options, onnew, onsplit, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent }: Props = $props();
   let menuOpen = $state(false);
 
   let editing = $state<string | null>(null);
@@ -47,7 +45,6 @@
 
   /** The icon says what kind of session the tab holds. */
   function iconFor(tab: Tab): IconName {
-    if (tab.view) return tab.view === "files" ? "folder" : tab.view === "docker" ? "box" : "sparkle";
     const spec = leaves(tab.root)[0]?.spec;
     return spec?.type === "ssh" ? "server" : spec?.type === "serial" ? "serial" : "terminal";
   }
@@ -181,36 +178,6 @@
               </button>
             </li>
           {/each}
-          <li class="sep" role="separator"></li>
-          <li class="head">Split side by side with</li>
-          {#each options as option (option.label)}
-            <li>
-              <button
-                onclick={() => {
-                  menuOpen = false;
-                  onsplit(option, "row");
-                }}
-              >
-                <Icon name="split-h" size={14} />
-                {option.label}
-              </button>
-            </li>
-          {/each}
-          <li class="sep" role="separator"></li>
-          <li class="head">Split top and bottom with</li>
-          {#each options as option (option.label)}
-            <li>
-              <button
-                onclick={() => {
-                  menuOpen = false;
-                  onsplit(option, "column");
-                }}
-              >
-                <Icon name="split-v" size={14} />
-                {option.label}
-              </button>
-            </li>
-          {/each}
         </ul>
       {/if}
     </div>
@@ -227,19 +194,11 @@
   <div class="tools">
     <button
       class="icon-btn"
-      aria-label="Split side by side"
-      title="Split side by side (Ctrl+Shift+E)"
+      aria-label="Split"
+      title="Split the window into another pane (Ctrl+Shift+E). Then click the pane and choose what it shows."
       onclick={() => workspace.split("row")}
     >
       <Icon name="split-h" size={16} />
-    </button>
-    <button
-      class="icon-btn"
-      aria-label="Split top and bottom"
-      title="Split top and bottom (Ctrl+Shift+O)"
-      onclick={() => workspace.split("column")}
-    >
-      <Icon name="split-v" size={16} />
     </button>
     <button
       class="icon-btn"
@@ -440,16 +399,5 @@
     background: var(--accent);
     border-radius: 50%;
     opacity: 0.8;
-  }
-  .drop .sep {
-    height: 1px;
-    margin: 4px 6px;
-    background: var(--border);
-  }
-  .drop .head {
-    padding: 4px 10px 2px;
-    color: var(--text-faint);
-    font-size: 11px;
-    list-style: none;
   }
 </style>

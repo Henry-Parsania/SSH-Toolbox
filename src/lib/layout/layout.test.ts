@@ -88,7 +88,7 @@ describe("Workspace", () => {
     expect(w.activeTab?.title).toBe("two");
   });
 
-  it("splitting divides the window and the new pane shows a tab that was hidden", () => {
+  it("splitting divides the window and the new pane starts empty", () => {
     const w = setup();
     w.newTab(spec, "two");
     expect(w.groupCount).toBe(1);
@@ -96,10 +96,9 @@ describe("Workspace", () => {
     w.split("row");
     expect(w.groupCount).toBe(2);
     expect(w.activeGroup).not.toBe(first);
-    // "one" was hidden behind "two", so the new pane shows it.
-    expect(w.activeTab?.title).toBe("one");
+    expect(w.activeTab).toBeUndefined();
     expect(w.groupTab[first]).toBe(w.tabs[1].id);
-    expect(w.hiddenTabs).toEqual([]);
+    expect(w.hiddenTabs.map((t) => t.title)).toEqual(["one"]);
     expect(w.moveGroupFocus("left")).toBe(true);
     expect(w.activeGroup).toBe(first);
     expect(w.moveGroupFocus("left")).toBe(false); // at the edge: stays
@@ -112,6 +111,7 @@ describe("Workspace", () => {
     w.split("row");
     const right = w.activeGroup;
     const left = w.groupOf(two.id)!;
+    w.selectTab(one.id);
     expect(w.groupOf(one.id)).toBe(right);
     // Pick "two" for the right pane: it comes from the left pane, which gets "one".
     w.selectTab(two.id);
@@ -130,21 +130,6 @@ describe("Workspace", () => {
     expect(w.tabs).toHaveLength(2);
     expect(w.activeGroup).not.toBe(extra);
     w.closeGroup(w.activeGroup);
-    expect(w.groupCount).toBe(1);
-  });
-
-  it("a panel opens in a pane beside the current one, and the button closes it again", () => {
-    const w = setup();
-    w.toggleView("files", "Files");
-    expect(w.groupCount).toBe(2);
-    expect(w.viewShown("files")).toBe(true);
-    expect(w.activeTab?.view).toBe("files");
-    // The panel follows the terminal that was in front.
-    expect(w.contextTab?.title).toBe("one");
-    w.toggleView("files", "Files");
-    expect(w.viewShown("files")).toBe(false);
-    expect(w.tabs.map((t) => t.title)).toEqual(["one"]);
-    // The pane it filled goes too, so no empty pane is left.
     expect(w.groupCount).toBe(1);
   });
 
@@ -184,15 +169,13 @@ describe("Workspace layout saving", () => {
     w.newTab({ type: "wsl", distro: "Ubuntu" }, "two");
     w.split("row");
     w.resizeGroupDivider([], 0, 0.2);
-    w.toggleView("files", "Files");
     w.selectTab(w.tabs[0].id);
 
     const saved = JSON.parse(JSON.stringify(w.toLayout()));
     const again = new Workspace();
     again.restore(saved);
 
-    expect(again.tabs.map((t) => t.title)).toEqual(["one", "two", "Files"]);
-    expect(again.tabs[2].view).toBe("files");
+    expect(again.tabs.map((t) => t.title)).toEqual(["one", "two"]);
     expect(again.groupCount).toBe(w.groupCount);
     expect(again.groupTab).toEqual(w.groupTab);
     expect(again.activeGroup).toBe(w.activeGroup);
@@ -256,22 +239,54 @@ describe("restoring SSH panes", () => {
   });
 });
 
-describe("Workspace.splitWith", () => {
-  it("opens the chosen session as a new tab in a new pane beside the current one", () => {
+describe("panes from the empty-pane chooser", () => {
+  const spec = { type: "local", shell_id: "x" } as const;
+
+  it("a split opens an empty pane when every tab is already showing, and a tab opened there fills it", () => {
     const w = new Workspace();
-    w.newTab({ type: "local", shell_id: "a" }, "A");
-    w.splitWith("row", { type: "ssh", saved_session_id: "s1" }, "Server");
-    w.splitWith("column", { type: "local", shell_id: "b" }, "B");
-    expect(w.groupCount).toBe(3);
-    expect(w.tabs.map((t) => t.title)).toEqual(["A", "Server", "B"]);
+    w.newTab(spec, "A");
+    w.split("row");
+    const empty = w.activeGroup;
+    expect(w.groupTab[empty]).toBeUndefined();
+    expect(w.activeTab).toBeUndefined();
+    // The panel beside it still has something to follow.
+    expect(w.contextTab?.title).toBe("A");
+    // Choosing "new terminal" in the empty pane opens a tab in it.
+    w.newTab(spec, "B");
+    expect(w.groupTab[empty]).toBe(w.tabs[1].id);
     expect(w.hiddenTabs).toEqual([]);
-    expect(w.activeTab?.title).toBe("B");
+    expect(w.groupCount).toBe(2);
   });
 
-  it("works with nothing open yet", () => {
+  it("an empty pane can be given a tab that is open but hidden", () => {
     const w = new Workspace();
-    w.splitWith("row", { type: "local", shell_id: "a" }, "A");
-    expect(w.tabs).toHaveLength(1);
-    expect(w.activeTab?.title).toBe("A");
+    w.newTab(spec, "A");
+    w.newTab(spec, "B");
+    w.split("column");
+    w.closeGroup(w.activeGroup);
+    w.split("column");
+    const hidden = w.hiddenTabs;
+    expect(hidden.length + Object.keys(w.groupTab).length).toBe(2);
+  });
+
+  it("tabs saved as panels by an earlier version are dropped on restore", () => {
+    const w = new Workspace();
+    w.restore({
+      version: 1,
+      active_tab: "f",
+      tabs: [
+        { id: "a", title: "a", active: "pa", root: { kind: "leaf", pane_id: "pa", title: "a" } },
+        { id: "f", title: "Files", active: "pf", root: { kind: "leaf", pane_id: "pf", title: "Files" }, view: "files" },
+      ],
+      groups: { kind: "split", direction: "row", sizes: [0.5, 0.5], children: [
+        { kind: "leaf", pane_id: "g1", title: "" },
+        { kind: "leaf", pane_id: "g2", title: "" },
+      ] },
+      group_tabs: { g1: "a", g2: "f" },
+      active_group: "g2",
+    });
+    expect(w.tabs.map((t) => t.title)).toEqual(["a"]);
+    expect(w.groupTab).toEqual({ g1: "a" });
+    expect(w.groupCount).toBe(2);
   });
 });

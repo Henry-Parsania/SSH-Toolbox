@@ -17,7 +17,7 @@
   });
 
   const features: [string, string][] = [
-    ["Terminals and tabs", "Local shells and WSL, in tabs. The window can be divided into as many panes as you like (the split buttons, Terminal menu, Ctrl+Shift+E and Ctrl+Shift+O). Click a pane, then click a tab in the bar at the top to show that tab in the pane. Files, Docker and the Agent are tabs too: their buttons open them in a pane beside the current one. The arrow beside + can open a shell in a new pane, and right-clicking a saved session offers Open side by side and Open top and bottom. Tabs can be dragged into a new order and renamed. The last layout comes back next time. Terminal menu."],
+    ["Terminals and tabs", "Local shells and WSL, in tabs. The Split button (or Ctrl+Shift+E, and Ctrl+Shift+O for top and bottom in the Terminal menu) divides the window into another pane. Click a pane to work in it: pick one of the open tabs in the bar at the top to show it there, or start a new terminal or saved session in it. Tabs can be dragged into a new order and renamed. The last layout comes back next time. Terminal menu."],
     ["SSH sessions", "Saved in the sessions list, in folders, with password, key or agent login and optional jump hosts. A dot shows which servers answer. File menu."],
     ["Process monitor", "A button on each SSH session opens btop, htop or top (whichever the server has) in a pop-up window, to watch and manage processes. In the sessions list."],
     ["Key setup", "Make a key and put it on a server so passwords aren't needed. In the sessions list, on a session's key button."],

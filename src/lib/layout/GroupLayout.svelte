@@ -3,23 +3,27 @@
   // a tab. Every tab is drawn once, in a flat list, and moved to the place of the pane that shows
   // it, so switching or splitting never restarts a running terminal.
 
-  import type { Snippet } from "svelte";
-  import type { PlatformInfo } from "../backend";
+  import type { PlatformInfo, SavedSession } from "../backend";
   import Icon from "../ui/Icon.svelte";
   import PaneTree from "./PaneTree.svelte";
   import { placeAll, type DividerPlace } from "./panes";
-  import type { Tab, Workspace } from "./workspace.svelte";
+  import type { NewTabOption } from "./TabBar.svelte";
+  import type { Workspace } from "./workspace.svelte";
 
   interface Props {
     workspace: Workspace;
     platform: PlatformInfo;
-    /** Draws a tab that is a panel (files, Docker, the agent). */
-    view: Snippet<[Tab]>;
-    /** Starts a new terminal in a pane. */
-    onnew: () => void;
+    /** The shells a pane can start. */
+    options: NewTabOption[];
+    /** The saved sessions a pane can open. */
+    sessions: SavedSession[];
+    /** Starts a shell in the chosen pane. */
+    onshell: (option: NewTabOption) => void;
+    /** Opens a saved session in the chosen pane. */
+    onsession: (session: SavedSession) => void;
   }
 
-  let { workspace, platform, view, onnew }: Props = $props();
+  let { workspace, platform, options, sessions, onshell, onsession }: Props = $props();
 
   const placed = $derived(placeAll(workspace.groups));
   const rects = $derived(new Map(placed.panes.map((p) => [p.leaf.pane_id, p.rect])));
@@ -90,17 +94,39 @@
       {/if}
       {#if !shown}
         <div class="empty">
-          <p>Choose a tab from the bar above to show it here.</p>
+          <h3>What should this pane show?</h3>
           {#if workspace.hiddenTabs.length > 0}
+            <section>
+              <h4>Open tabs</h4>
+              <div class="choices">
+                {#each workspace.hiddenTabs as tab (tab.id)}
+                  <button class="btn small" onclick={() => workspace.assign(leaf.pane_id, tab.id)}>{tab.title}</button>
+                {/each}
+              </div>
+            </section>
+          {/if}
+          <section>
+            <h4>New terminal</h4>
             <div class="choices">
-              {#each workspace.hiddenTabs as tab (tab.id)}
-                <button class="btn small" onclick={() => workspace.assign(leaf.pane_id, tab.id)}>{tab.title}</button>
+              {#each options as option (option.label)}
+                <button class="btn small" onclick={() => { workspace.focusGroup(leaf.pane_id); onshell(option); }}>
+                  <Icon name="terminal" size={13} /> {option.label}
+                </button>
               {/each}
             </div>
+          </section>
+          {#if sessions.length > 0}
+            <section>
+              <h4>Saved sessions</h4>
+              <div class="choices">
+                {#each sessions as session (session.id)}
+                  <button class="btn small" onclick={() => { workspace.focusGroup(leaf.pane_id); onsession(session); }}>
+                    <Icon name={session.type === "serial" ? "serial" : "server"} size={13} /> {session.name}
+                  </button>
+                {/each}
+              </div>
+            </section>
           {/if}
-          <button class="btn" onclick={() => { workspace.focusGroup(leaf.pane_id); onnew(); }}>
-            <Icon name="terminal" size={14} /> New terminal here
-          </button>
         </div>
       {/if}
     </div>
@@ -120,19 +146,15 @@
       style:height={rect ? (crowded ? `calc(${pct(rect.bottom - rect.top)} - ${HEADER}px)` : pct(rect.bottom - rect.top)) : "0"}
       onpointerdowncapture={() => group && workspace.focusGroup(group)}
     >
-      {#if tab.view}
-        {@render view(tab)}
-      {:else}
-        <PaneTree
-          node={tab.root}
-          tabId={tab.id}
-          activePane={group === workspace.activeGroup ? tab.active : ""}
-          visible={!!rect}
-          crowded={workspace.paneCount(tab) > 1}
-          {platform}
-          {workspace}
-        />
-      {/if}
+      <PaneTree
+        node={tab.root}
+        tabId={tab.id}
+        activePane={group === workspace.activeGroup ? tab.active : ""}
+        visible={!!rect}
+        crowded={workspace.paneCount(tab) > 1}
+        {platform}
+        {workspace}
+      />
     </div>
   {/each}
 
@@ -200,11 +222,26 @@
     justify-content: center;
     gap: 12px;
     padding: 16px;
+    overflow-y: auto;
     color: var(--text-muted);
     text-align: center;
   }
-  .empty p {
+  .empty h3 {
     margin: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .empty h4 {
+    margin: 0 0 6px;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .empty section {
+    max-width: 560px;
   }
   .choices {
     display: flex;
