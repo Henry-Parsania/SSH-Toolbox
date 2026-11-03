@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { findLeaf, leaves } from "./panes";
 import { shortcutFor } from "./shortcuts";
 import { Workspace } from "./workspace.svelte";
 
@@ -177,5 +178,28 @@ describe("restoring SSH panes", () => {
     expect(w.waiting).toEqual({ a: true });
     w.connect("a");
     expect(w.waiting).toEqual({});
+  });
+});
+
+describe("Workspace.splitWith", () => {
+  it("puts the chosen session in a new pane beside the current one", () => {
+    const w = new Workspace();
+    w.newTab({ type: "local", shell_id: "a" }, "A");
+    w.splitWith("row", { type: "ssh", saved_session_id: "s1" }, "Server");
+    w.splitWith("column", { type: "local", shell_id: "b" }, "B");
+    const tab = w.activeTab!;
+    const specs = leaves(tab.root).map((l) => l.spec);
+    expect(specs).toEqual([
+      { type: "local", shell_id: "a" },
+      { type: "ssh", saved_session_id: "s1" },
+      { type: "local", shell_id: "b" },
+    ]);
+    expect(findLeaf(tab.root, tab.active)?.spec).toEqual({ type: "local", shell_id: "b" });
+  });
+
+  it("opens a tab when there is none to split", () => {
+    const w = new Workspace();
+    w.splitWith("row", { type: "local", shell_id: "a" }, "A");
+    expect(w.tabs).toHaveLength(1);
   });
 });

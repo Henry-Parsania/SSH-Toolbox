@@ -152,6 +152,19 @@ export class Workspace {
     tab.active = added.pane_id;
   }
 
+  /** Splits the active pane and opens `spec` in the new one, so a split can hold any session. */
+  splitWith(direction: Direction, spec: SessionSpec, title: string) {
+    const tab = this.activeTab;
+    const current = tab ? findLeaf(tab.root, tab.active) : undefined;
+    if (!tab || !current) {
+      this.newTab(spec, title);
+      return;
+    }
+    const added = newLeaf(spec, title);
+    tab.root = splitPane(tab.root, current.pane_id, direction, added);
+    tab.active = added.pane_id;
+  }
+
   /** Closes a pane, and its tab if it was the last one. */
   closePane(tabId: string, paneId: string) {
     const tab = this.tabs.find((t) => t.id === tabId);

@@ -17,7 +17,7 @@
   interface Props {
     library: Library;
     /** Open a saved session in a new tab. */
-    onopen: (session: SavedSession) => void;
+    onopen: (session: SavedSession, where?: "tab" | "row" | "column") => void;
     /** Open the server's process monitor (btop, htop or top) in a new tab. */
     onmonitor?: (session: SavedSession) => void;
     /** Each time this goes up, the editor for a new session opens. */
@@ -261,6 +261,10 @@
     {:else}
       {@const sess = menu.target.session}
       <li><button onclick={() => act(() => onopen(sess))}><Icon name="play" size={14} /> Connect in a new tab</button></li>
+      {#if sess.type !== "ftp"}
+        <li><button onclick={() => act(() => onopen(sess, "row"))}><Icon name="split-h" size={14} /> Open side by side</button></li>
+        <li><button onclick={() => act(() => onopen(sess, "column"))}><Icon name="split-v" size={14} /> Open top and bottom</button></li>
+      {/if}
       {#if sess.type === "ssh"}
         <li><button onclick={() => act(() => onmonitor?.(sess))}><Icon name="monitor" size={14} /> Process monitor</button></li>
         <li><button onclick={() => act(() => (forwardsFor = sess))}><Icon name="route" size={14} /> Port forwarding</button></li>

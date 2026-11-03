@@ -229,8 +229,16 @@
   }
 
   // Only SSH sessions can be opened so far. Serial and FTP arrive in phases 3 and 4.
-  function openSaved(session: SavedSession) {
-    if (session.type === "ssh") {
+  function openSaved(session: SavedSession, where: "tab" | "row" | "column" = "tab") {
+    if (where !== "tab" && session.type !== "ftp") {
+      // In a split, next to the pane that has the keyboard.
+      const spec = session.type === "ssh" ? { type: "ssh" as const, saved_session_id: session.id } : { type: "serial" as const, saved_session_id: session.id };
+      workspace.splitWith(where, spec, session.name);
+      if (session.type === "ssh") {
+        filesOpen = true;
+        ftpOpened = null;
+      }
+    } else if (session.type === "ssh") {
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
       // The server's files appear beside the terminal.
       filesOpen = true;
@@ -361,6 +369,10 @@
     if (option) workspace.newTab(option.spec, option.label);
   }
 
+  function splitWithOption(option: NewTabOption, direction: "row" | "column") {
+    workspace.splitWith(direction, option.spec, option.label);
+  }
+
   function newSession() {
     sidebarOpen = true;
     newSessionSignal++;
@@ -449,6 +461,7 @@
       {options}
       {sidebarOpen}
       onnew={newTab}
+      onsplit={splitWithOption}
       onsettings={() => (showSettings = true)}
       onsidebar={() => (sidebarOpen = !sidebarOpen)}
       {filesOpen}

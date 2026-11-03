@@ -17,7 +17,7 @@
   });
 
   const features: [string, string][] = [
-    ["Terminals and tabs", "Local shells and WSL, in tabs that can be split, dragged into a new order and renamed. The last layout comes back next time. Terminal menu."],
+    ["Terminals and tabs", "Local shells and WSL, in tabs that can be split side by side or top and bottom, as many times as you like. The arrow beside + opens any shell in a split, and right-clicking a saved session offers Open side by side and Open top and bottom. Tabs can be dragged into a new order and renamed. The last layout comes back next time. Terminal menu."],
     ["SSH sessions", "Saved in the sessions list, in folders, with password, key or agent login and optional jump hosts. A dot shows which servers answer. File menu."],
     ["Process monitor", "A button on each SSH session opens btop, htop or top (whichever the server has) in a pop-up window, to watch and manage processes. In the sessions list."],
     ["Key setup", "Make a key and put it on a server so passwords aren't needed. In the sessions list, on a session's key button."],
