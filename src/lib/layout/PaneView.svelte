@@ -47,6 +47,31 @@
     attempt++;
   }
 
+  const canReconnect = $derived(node.spec?.type === "ssh" || node.spec?.type === "serial");
+
+  // Like MobaXterm: once the session has ended, R starts it again and C closes the pane. While it
+  // is still connecting, Esc gives up (a letter could be the start of something the user is typing
+  // ahead). Only the pane that has the keyboard listens, and typing in a
+  // box (a password question, a search) is left alone.
+  $effect(() => {
+    if (!active || !visible || (!ended && !connecting)) return;
+    const onkey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable]") && !target.closest(".xterm")) return;
+      if (document.querySelector(".modal-backdrop")) return;
+      const key = e.key.toLowerCase();
+      if (ended && key === "r" && canReconnect) reconnect();
+      else if (ended && key === "c") workspace.closePane(tabId, node.pane_id);
+      else if (!ended && e.key === "Escape") workspace.closePane(tabId, node.pane_id);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("keydown", onkey, true);
+    return () => window.removeEventListener("keydown", onkey, true);
+  });
+
   function onstatus(status: TerminalStatus) {
     connecting = status.type === "connecting";
     if (status.type === "exited") {
@@ -94,7 +119,7 @@
       />
     {/key}
     {#if connecting && !ended}
-      <div class="connecting"><span class="spinner"></span> Connecting…</div>
+      <div class="connecting"><span class="spinner"></span> Connecting… <span class="hint">Press Esc to cancel</span></div>
     {/if}
   {/if}
   {#if node.spec?.type === "serial" && sessionId && !ended}
@@ -134,12 +159,12 @@
       <span class="text">{ended}</span>
       <span class="actions">
         {#if node.spec?.type === "ssh" || node.spec?.type === "serial"}
-          <button class="btn small primary" onclick={reconnect}>
-            <Icon name="refresh" size={13} /> Reconnect
+          <button class="btn small primary" title="Press R" onclick={reconnect}>
+            <Icon name="refresh" size={13} /> Reconnect <span class="key">R</span>
           </button>
         {/if}
-        <button class="btn small" onclick={() => workspace.closePane(tabId, node.pane_id)}>
-          Close pane
+        <button class="btn small" title="Press C" onclick={() => workspace.closePane(tabId, node.pane_id)}>
+          Close <span class="key">C</span>
         </button>
       </span>
     </div>
@@ -300,6 +325,18 @@
     border-left: 3px solid var(--warning);
     border-radius: var(--radius);
     box-shadow: var(--shadow-small);
+  }
+  .key {
+    margin-left: 4px;
+    padding: 0 5px;
+    font: 11px var(--mono);
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    opacity: 0.7;
+  }
+  .hint {
+    margin-left: 8px;
+    color: var(--text-faint);
   }
   .actions {
     display: flex;
