@@ -12,12 +12,12 @@
     type SavedSession,
     type Shell,
   } from "./lib/backend";
-  import PaneTree from "./lib/layout/PaneTree.svelte";
+  import GroupLayout from "./lib/layout/GroupLayout.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
   import { encodePayload } from "./lib/layout/detach";
   import { leaves, newLeaf } from "./lib/layout/panes";
   import { shortcutFor } from "./lib/layout/shortcuts";
-  import { Workspace } from "./lib/layout/workspace.svelte";
+  import { Workspace, type Tab } from "./lib/layout/workspace.svelte";
   import SettingsDialog from "./lib/SettingsDialog.svelte";
   import { Library } from "./lib/sessions/library.svelte";
   import HelpDialog from "./lib/ui/HelpDialog.svelte";
@@ -56,15 +56,20 @@
     return value === null ? fallback : value === "1";
   };
   let sidebarOpen = $state(savedOpen("sidebar-open", true));
-  let filesOpen = $state(savedOpen("files-open", false));
-  // Docker lives under the sessions list.
-  let dockerOpen = $state(savedOpen("docker-open", false));
-  let agentOpen = $state(savedOpen("agent-open", false));
+  // Files, Docker and the agent are tabs that fill a pane, like any terminal.
+  const filesOpen = $derived(workspace.viewShown("files"));
+  const dockerOpen = $derived(workspace.viewShown("docker"));
+  const agentOpen = $derived(workspace.viewShown("agent"));
+  const VIEW_TITLES = { files: "Files", docker: "Docker", agent: "Agent" } as const;
+  function toggleView(view: "files" | "docker" | "agent") {
+    workspace.toggleView(view, VIEW_TITLES[view]);
+  }
+  /** Shows a panel in a pane beside the current one, unless it is already showing. */
+  function showView(view: "files" | "docker" | "agent") {
+    if (!workspace.viewShown(view)) toggleView(view);
+  }
   $effect(() => {
     localStorage.setItem("sidebar-open", sidebarOpen ? "1" : "0");
-    localStorage.setItem("files-open", filesOpen ? "1" : "0");
-    localStorage.setItem("docker-open", dockerOpen ? "1" : "0");
-    localStorage.setItem("agent-open", agentOpen ? "1" : "0");
   });
   // Widths of the two side panels, which can be dragged. They are kept for next time.
   const saved = (key: string, fallback: number) => {
@@ -94,34 +99,6 @@
       handle.removeEventListener("pointercancel", stop);
       const widths = { sidebar: sidebarWidth, files: filesWidth, agent: agentWidth };
       localStorage.setItem(`${side}-width`, String(widths[side]));
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", stop);
-    handle.addEventListener("pointercancel", stop);
-  }
-  // The Docker section's height can be dragged, and is kept for next time.
-  let dockHeight = $state(
-    (() => {
-      const n = Number(localStorage.getItem("docker-height"));
-      return n >= 140 && n <= 2000 ? n : 320;
-    })(),
-  );
-  function resizeDock(e: PointerEvent) {
-    e.preventDefault();
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
-    const startY = e.clientY;
-    const start = dockHeight;
-    const move = (ev: PointerEvent) => {
-      // Dragging up makes it taller. The sessions list keeps at least 120 px.
-      const most = Math.max(140, window.innerHeight - 28 - 120 - 60);
-      dockHeight = Math.min(most, Math.max(140, start + (startY - ev.clientY)));
-    };
-    const stop = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", stop);
-      handle.removeEventListener("pointercancel", stop);
-      localStorage.setItem("docker-height", String(Math.round(dockHeight)));
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", stop);
@@ -157,7 +134,7 @@
 
   // The footer shows the server of the active SSH pane, and this computer for anything else.
   const footerTarget = $derived.by(() => {
-    const tab = workspace.activeTab;
+    const tab = workspace.contextTab;
     const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
     return leaf?.spec?.type === "ssh"
       ? { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title }
@@ -169,7 +146,7 @@
 
   // The server whose files the panel shows: the one in the active pane, if it is an SSH session.
   const activeSession = $derived.by(() => {
-    const tab = workspace.activeTab;
+    const tab = workspace.contextTab;
     const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
     if (leaf?.spec?.type === "ssh") {
       return { kind: "ssh" as const, id: leaf.spec.saved_session_id, name: leaf.title };
@@ -181,7 +158,7 @@
 
   // The SSH server in the active pane, whose Docker the left panel shows.
   const activeSshSession = $derived.by(() => {
-    const tab = workspace.activeTab;
+    const tab = workspace.contextTab;
     const leaf = tab ? leaves(tab.root).find((l) => l.pane_id === tab.active) : undefined;
     if (leaf?.spec?.type !== "ssh" || workspace.waiting[leaf.pane_id]) return null;
     return { id: leaf.spec.saved_session_id, name: leaf.title };
@@ -189,13 +166,13 @@
 
   // The backend session of the active pane, so the file panel can send it a folder to go to.
   const activeTerminalSession = $derived.by(() => {
-    const tab = workspace.activeTab;
+    const tab = workspace.contextTab;
     return tab ? (workspace.sessionIds[tab.active] ?? "") : "";
   });
 
   // The folder the active pane's shell reported, for the file panel to follow.
   const followedFolder = $derived.by(() => {
-    const tab = workspace.activeTab;
+    const tab = workspace.contextTab;
     return tab ? (workspace.cwd[tab.active] ?? "") : "";
   });
 
@@ -236,25 +213,25 @@
       const spec = session.type === "ssh" ? { type: "ssh" as const, saved_session_id: session.id } : { type: "serial" as const, saved_session_id: session.id };
       workspace.splitWith(where, spec, session.name);
       if (session.type === "ssh") {
-        filesOpen = true;
+        showView("files");
         ftpOpened = null;
       }
     } else if (session.type === "ssh") {
       workspace.newTab({ type: "ssh", saved_session_id: session.id }, session.name);
       // The server's files appear beside the terminal.
-      filesOpen = true;
+      showView("files");
       ftpOpened = null;
     } else if (session.type === "serial") {
       workspace.newTab({ type: "serial", saved_session_id: session.id }, session.name);
     } else if (session.type === "ftp") {
       ftpOpened = { kind: "ftp", id: session.id, name: session.name };
-      filesOpen = true;
+      showView("files");
     }
   }
   // Choosing another tab or pane goes back to following the terminal.
   $effect(() => {
-    void workspace.activeTabId;
-    void workspace.activeTab?.active;
+    void workspace.contextTab?.id;
+    void workspace.contextTab?.active;
     untrack(() => (ftpOpened = null));
   });
   let restored = false;
@@ -286,16 +263,9 @@
       label: "View",
       items: [
         { label: "Sessions list", checked: sidebarOpen, onselect: () => (sidebarOpen = !sidebarOpen) },
-        { label: "Files panel", checked: filesOpen, onselect: () => (filesOpen = !filesOpen) },
-        { label: "Agent panel", checked: agentOpen, onselect: () => (agentOpen = !agentOpen) },
-        {
-          label: "Docker panel",
-          checked: dockerOpen,
-          onselect: () => {
-            dockerOpen = !dockerOpen;
-            if (dockerOpen) sidebarOpen = true;
-          },
-        },
+        { label: "Files pane", checked: filesOpen, onselect: () => toggleView("files") },
+        { label: "Agent pane", checked: agentOpen, onselect: () => toggleView("agent") },
+        { label: "Docker pane", checked: dockerOpen, onselect: () => toggleView("docker") },
         {
           label: "Footer (CPU, memory, disk)",
           checked: settings.stats_enabled,
@@ -434,24 +404,30 @@
     </div>
   </div>
 {:else if platform}
+  {#snippet tabView(tab: Tab)}
+    {#if tab.view === "files"}
+      <FilesPanel
+        source={activeSession}
+        follow={followedFolder}
+        terminalSession={activeTerminalSession}
+        onclose={() => workspace.closeViewTab(tab.id)} />
+    {:else if tab.view === "agent"}
+      <AgentPanel chat={agent} context={agentContext} onclose={() => workspace.closeViewTab(tab.id)} />
+    {:else if tab.view === "docker"}
+      <DockerPanel
+        {library}
+        active={activeSshSession}
+        onopen={(spec, title) => workspace.newTab(spec, title)}
+        onclose={() => workspace.closeViewTab(tab.id)}
+      />
+    {/if}
+  {/snippet}
   <div class="app">
     <MenuBar {menus} />
     <div class="body">
       {#if sidebarOpen}
         <div class="side column" style:width="{sidebarWidth}px">
           <div class="top-part"><Sidebar {library} onopen={openSaved} onmonitor={openMonitor} {newSessionSignal} command={sidebarCommand} {reach} /></div>
-          {#if dockerOpen}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="grip-h" onpointerdown={resizeDock}></div>
-            <div class="dock" style:height="{dockHeight}px">
-              <DockerPanel
-                {library}
-                active={activeSshSession}
-                onopen={(spec, title) => workspace.newTab(spec, title)}
-                onclose={() => (dockerOpen = false)}
-              />
-            </div>
-          {/if}
         </div>
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="grip" onpointerdown={(e) => resizeSide(e, "sidebar")}></div>
@@ -466,31 +442,14 @@
       onsettings={() => (showSettings = true)}
       onsidebar={() => (sidebarOpen = !sidebarOpen)}
       {filesOpen}
-      onfiles={() => (filesOpen = !filesOpen)}
+      onfiles={() => toggleView("files")}
       {dockerOpen}
-      ondocker={() => {
-        dockerOpen = !dockerOpen;
-        // Docker lives under the sessions list, so that has to be showing.
-        if (dockerOpen) sidebarOpen = true;
-      }}
+      ondocker={() => toggleView("docker")}
       {agentOpen}
-      onagent={() => (agentOpen = !agentOpen)}
+      onagent={() => toggleView("agent")}
     />
       <main class="tabs">
-        {#each workspace.tabs as tab (tab.id)}
-          <!-- Hidden tabs stay mounted, so their terminals keep running. -->
-          <div class="tab-body" class:hidden={tab.id !== workspace.activeTabId}>
-            <PaneTree
-              node={tab.root}
-              tabId={tab.id}
-              activePane={tab.active}
-              visible={tab.id === workspace.activeTabId}
-              crowded={workspace.paneCount(tab) > 1}
-              {platform}
-              {workspace}
-            />
-          </div>
-        {/each}
+        <GroupLayout {workspace} {platform} view={tabView} onnew={() => newTab()} />
 
         {#if workspace.tabs.length === 0}
           <div class="welcome">
@@ -518,24 +477,6 @@
         <StatusBar target={footerTarget} />
       {/if}
       </div>
-      {#if filesOpen}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="grip" onpointerdown={(e) => resizeSide(e, "files")}></div>
-        <div class="side" style:width="{filesWidth}px">
-          <FilesPanel
-            source={activeSession}
-            follow={followedFolder}
-            terminalSession={activeTerminalSession}
-            onclose={() => (filesOpen = false)} />
-        </div>
-      {/if}
-      {#if agentOpen}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="grip" onpointerdown={(e) => resizeSide(e, "agent")}></div>
-        <div class="side" style:width="{agentWidth}px">
-          <AgentPanel chat={agent} context={agentContext} onclose={() => (agentOpen = false)} />
-        </div>
-      {/if}
     </div>
   </div>
   {#if scanner}
@@ -572,24 +513,6 @@
     flex: 1;
     min-height: 120px;
     min-width: 0;
-  }
-  .dock {
-    display: flex;
-    flex: none;
-    min-height: 140px;
-    min-width: 0;
-  }
-  /* A thin strip between the sessions and Docker that can be dragged up and down. */
-  .grip-h {
-    flex: none;
-    height: 7px;
-    margin: -3px 0;
-    z-index: 6;
-    cursor: row-resize;
-  }
-  .grip-h:hover {
-    background: var(--accent);
-    opacity: 0.4;
   }
   .side {
     display: flex;

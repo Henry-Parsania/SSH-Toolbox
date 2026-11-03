@@ -201,7 +201,11 @@ export function openLink(url: string): Promise<void> {
 export interface SavedLayout {
   version: number;
   active_tab: string;
-  tabs: { id: string; title: string; active: string; root: SavedPane }[];
+  tabs: { id: string; title: string; active: string; root: SavedPane; view?: "files" | "docker" | "agent" }[];
+  /** The panes the window is divided into, and which tab each shows. Missing in older layouts. */
+  groups?: SavedPane;
+  group_tabs?: Record<string, string>;
+  active_group?: string;
 }
 
 export type SavedPane =

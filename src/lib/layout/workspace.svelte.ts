@@ -19,17 +19,130 @@ import {
   type SplitPath,
 } from "./panes";
 
+/** The panels that can be a tab of their own, next to terminals. */
+export type TabView = "files" | "docker" | "agent";
+
 export interface Tab {
   id: string;
   title: string;
   root: PaneNode;
   /** The pane that has the keyboard. */
   active: string;
+  /** Set when the tab shows a panel (files, Docker, the agent) instead of terminals. */
+  view?: TabView;
 }
 
 export class Workspace {
   tabs = $state<Tab[]>([]);
-  activeTabId = $state("");
+  /**
+   * The window is divided into panes ("groups"), in a tree like the one inside a tab. Each group
+   * shows one tab, chosen from the tab bar. A group's id is the id of its leaf.
+   */
+  groups = $state<PaneNode>(newLeaf(null, ""));
+  /** The tab each group shows. A group with no entry is empty. */
+  groupTab = $state<Record<string, string>>({});
+  /** The group that was clicked last: new tabs open in it and the tab bar chooses for it. */
+  activeGroup = $state("");
+  /** The last terminal tab that was in front, for panels that follow the terminal. */
+  lastTerminalTabId = $state("");
+
+  constructor() {
+    this.activeGroup = (this.groups as Extract<PaneNode, { kind: "leaf" }>).pane_id;
+  }
+
+  /** The tab the active group shows. Setting it shows that tab in the active group. */
+  get activeTabId(): string {
+    return this.groupTab[this.activeGroup] ?? "";
+  }
+
+  set activeTabId(id: string) {
+    this.assign(this.activeGroup, id);
+  }
+
+  /** The group showing a tab, if any. */
+  groupOf(tabId: string): string | null {
+    return Object.entries(this.groupTab).find(([, t]) => t === tabId)?.[0] ?? null;
+  }
+
+  /** Shows a tab in a group. A tab is only in one group: if another shows it, they swap. */
+  assign(groupId: string, tabId: string) {
+    if (tabId && !this.tabs.some((t) => t.id === tabId)) return;
+    const before = this.groupTab[groupId];
+    if (tabId) {
+      const other = this.groupOf(tabId);
+      if (other && other !== groupId) {
+        if (before) this.groupTab[other] = before;
+        else delete this.groupTab[other];
+      }
+      this.groupTab[groupId] = tabId;
+    } else {
+      delete this.groupTab[groupId];
+    }
+    this.noteContext();
+  }
+
+  /** Remembers the terminal tab in front, for the panels that follow the terminal. */
+  noteContext() {
+    const tab = this.tabs.find((t) => t.id === this.activeTabId);
+    if (tab && !tab.view) this.lastTerminalTabId = tab.id;
+  }
+
+  /** The terminal tab that files, Docker and the agent follow: the one in front, or the last one that was. */
+  get contextTab(): Tab | undefined {
+    const front = this.activeTab;
+    if (front && !front.view) return front;
+    return this.tabs.find((t) => t.id === this.lastTerminalTabId && !t.view);
+  }
+
+  /** Tabs that are not shown in any group. */
+  get hiddenTabs(): Tab[] {
+    const shown = new Set(Object.values(this.groupTab));
+    return this.tabs.filter((t) => !shown.has(t.id));
+  }
+
+  focusGroup(id: string) {
+    if (this.activeGroup === id || !findLeaf(this.groups, id)) return;
+    this.activeGroup = id;
+    this.noteContext();
+  }
+
+  /** Splits the active group. The new group shows a tab that was hidden, if there is one. */
+  splitGroup(direction: Direction): string {
+    const added = newLeaf(null, "");
+    this.groups = splitPane(this.groups, this.activeGroup, direction, added);
+    this.activeGroup = added.pane_id;
+    const next = this.hiddenTabs[0];
+    if (next) this.assign(added.pane_id, next.id);
+    return added.pane_id;
+  }
+
+  /** Closes a group. Its tab stays open, in the tab bar. The last group can't be closed. */
+  closeGroup(id: string) {
+    const next = focusAfterClose(this.groups, id);
+    const root = closePane(this.groups, id);
+    if (!root) return;
+    this.groups = root;
+    delete this.groupTab[id];
+    if (this.activeGroup === id && next) this.activeGroup = next;
+    this.noteContext();
+  }
+
+  moveGroupFocus(move: Move): boolean {
+    const target = neighbour(this.groups, this.activeGroup, move);
+    if (!target) return false;
+    this.activeGroup = target;
+    this.noteContext();
+    return true;
+  }
+
+  resizeGroupDivider(path: SplitPath, divider: number, delta: number) {
+    this.groups = moveDivider(this.groups, path, divider, delta);
+  }
+
+  /** How many groups the window is divided into. */
+  get groupCount(): number {
+    return leaves(this.groups).length;
+  }
   /** Which pane should show its search box, and how many times it has been asked. */
   searchTarget = $state("");
   searchCount = $state(0);
@@ -97,11 +210,59 @@ export class Workspace {
     return this.tabs.find((t) => t.id === this.activeTabId);
   }
 
-  newTab(spec: SessionSpec | null, title: string): Tab {
+  newTab(spec: SessionSpec | null, title: string, view?: TabView): Tab {
     const leaf = newLeaf(spec, title);
-    const tab: Tab = { id: crypto.randomUUID(), title, root: leaf, active: leaf.pane_id };
+    const tab: Tab = { id: crypto.randomUUID(), title, root: leaf, active: leaf.pane_id, view };
     this.tabs.push(tab);
     this.activeTabId = tab.id;
+    return tab;
+  }
+
+  /** The tab for a panel, if one is open. */
+  viewTab(view: TabView): Tab | undefined {
+    return this.tabs.find((t) => t.view === view);
+  }
+
+  /** Whether a panel is showing in some group. */
+  viewShown(view: TabView): boolean {
+    const tab = this.viewTab(view);
+    return !!tab && this.groupOf(tab.id) !== null;
+  }
+
+  /**
+   * The button for a panel: shows it in a new pane beside the current one, or closes it if it is
+   * already showing.
+   */
+  toggleView(view: TabView, title: string) {
+    const tab = this.viewTab(view);
+    if (tab && this.groupOf(tab.id)) {
+      this.closeViewTab(tab.id);
+      return;
+    }
+    const target = this.groupTab[this.activeGroup] ? this.splitGroupEmpty("row") : this.activeGroup;
+    const made = tab ?? this.newTabUnshown(null, title, view);
+    this.assign(target, made.id);
+  }
+
+  /** Closes a panel's tab, and the pane it filled too if that leaves the pane empty. */
+  closeViewTab(id: string) {
+    const group = this.groupOf(id);
+    this.closeTab(id);
+    if (group && !this.groupTab[group] && this.groupCount > 1) this.closeGroup(group);
+  }
+
+  /** A split with nothing in the new group yet. */
+  private splitGroupEmpty(direction: Direction): string {
+    const added = newLeaf(null, "");
+    this.groups = splitPane(this.groups, this.activeGroup, direction, added);
+    this.activeGroup = added.pane_id;
+    return added.pane_id;
+  }
+
+  private newTabUnshown(spec: SessionSpec | null, title: string, view?: TabView): Tab {
+    const leaf = newLeaf(spec, title);
+    const tab: Tab = { id: crypto.randomUUID(), title, root: leaf, active: leaf.pane_id, view };
+    this.tabs.push(tab);
     return tab;
   }
 
@@ -114,7 +275,23 @@ export class Workspace {
     const at = this.tabs.findIndex((t) => t.id === id);
     if (at < 0) return;
     this.tabs.splice(at, 1);
-    if (this.activeTabId === id) this.activeTabId = (this.tabs[at] ?? this.tabs[at - 1])?.id ?? "";
+    const freed = Object.entries(this.groupTab)
+      .filter(([, t]) => t === id)
+      .map(([g]) => g);
+    for (const group of freed) delete this.groupTab[group];
+    // A pane left empty shows the neighbouring tab, or another that isn't on screen, so it isn't
+    // left blank.
+    for (const group of freed) {
+      const hidden = this.hiddenTabs;
+      const neighbour = this.tabs[at] ?? this.tabs[at - 1];
+      const next =
+        (neighbour && hidden.some((t) => t.id === neighbour.id) ? neighbour : undefined) ??
+        hidden.find((t) => !t.view) ??
+        hidden[0];
+      if (next) this.assign(group, next.id);
+    }
+    if (this.lastTerminalTabId === id) this.lastTerminalTabId = "";
+    this.noteContext();
   }
 
   renameTab(id: string, title: string) {
@@ -139,30 +316,19 @@ export class Workspace {
   focusPane(tabId: string, paneId: string) {
     const tab = this.tabs.find((t) => t.id === tabId);
     if (tab && findLeaf(tab.root, paneId)) tab.active = paneId;
+    const group = this.groupOf(tabId);
+    if (group) this.focusGroup(group);
   }
 
-  /** Splits the active pane of the active tab. The new pane runs the same kind of session. */
+  /** Divides the window: a new pane beside (or below) the current one. */
   split(direction: Direction) {
-    const tab = this.activeTab;
-    if (!tab) return;
-    const current = findLeaf(tab.root, tab.active);
-    if (!current) return;
-    const added = newLeaf(current.spec, current.title);
-    tab.root = splitPane(tab.root, current.pane_id, direction, added);
-    tab.active = added.pane_id;
+    this.splitGroup(direction);
   }
 
-  /** Splits the active pane and opens `spec` in the new one, so a split can hold any session. */
+  /** Divides the window and opens a new tab running `spec` in the new pane. */
   splitWith(direction: Direction, spec: SessionSpec, title: string) {
-    const tab = this.activeTab;
-    const current = tab ? findLeaf(tab.root, tab.active) : undefined;
-    if (!tab || !current) {
-      this.newTab(spec, title);
-      return;
-    }
-    const added = newLeaf(spec, title);
-    tab.root = splitPane(tab.root, current.pane_id, direction, added);
-    tab.active = added.pane_id;
+    this.splitGroupEmpty(direction);
+    this.newTab(spec, title);
   }
 
   /** Closes a pane, and its tab if it was the last one. */
@@ -186,9 +352,9 @@ export class Workspace {
 
   moveFocus(move: Move) {
     const tab = this.activeTab;
-    if (!tab) return;
-    const target = neighbour(tab.root, tab.active, move);
-    if (target) tab.active = target;
+    const target = tab ? neighbour(tab.root, tab.active, move) : null;
+    if (tab && target) tab.active = target;
+    else this.moveGroupFocus(move);
   }
 
   resizeDivider(tabId: string, path: SplitPath, divider: number, delta: number) {
@@ -211,7 +377,11 @@ export class Workspace {
         title: t.title,
         active: t.active,
         root: t.root as SavedPane,
+        view: t.view,
       })),
+      groups: $state.snapshot(this.groups) as SavedPane,
+      group_tabs: $state.snapshot(this.groupTab),
+      active_group: this.activeGroup,
     };
   }
 
@@ -229,10 +399,26 @@ export class Workspace {
       title: t.title,
       active: t.active,
       root: fromSaved(t.root),
+      view: t.view,
     }));
-    this.activeTabId = this.tabs.some((t) => t.id === layout.active_tab)
-      ? layout.active_tab
-      : (this.tabs[0]?.id ?? "");
+    const front = this.tabs.some((t) => t.id === layout.active_tab) ? layout.active_tab : (this.tabs[0]?.id ?? "");
+    const known = new Set(this.tabs.map((t) => t.id));
+    if (layout.groups && layout.group_tabs) {
+      this.groups = fromSaved(layout.groups);
+      const ids = leaves(this.groups).map((l) => l.pane_id);
+      this.groupTab = {};
+      for (const [group, tab] of Object.entries(layout.group_tabs)) {
+        if (ids.includes(group) && known.has(tab)) this.groupTab[group] = tab;
+      }
+      this.activeGroup = ids.includes(layout.active_group ?? "") ? (layout.active_group as string) : ids[0];
+    } else {
+      // A layout from before panes: one pane showing the tab that was in front.
+      this.groups = newLeaf(null, "");
+      this.activeGroup = (this.groups as Extract<PaneNode, { kind: "leaf" }>).pane_id;
+      this.groupTab = {};
+      if (front) this.groupTab[this.activeGroup] = front;
+    }
+    this.noteContext();
   }
 
   paneCount(tab: Tab): number {

@@ -44,6 +44,9 @@ pub struct TabLayout {
     /// The pane that had the keyboard.
     pub active: String,
     pub root: PaneNode,
+    /// `files`, `docker` or `agent` when the tab shows a panel instead of terminals.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -52,6 +55,12 @@ pub struct Layout {
     pub version: u32,
     pub active_tab: String,
     pub tabs: Vec<TabLayout>,
+    /// The panes the window is divided into. Each leaf is a pane, shown in `group_tabs`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups: Option<PaneNode>,
+    /// The tab each pane shows, by pane ID.
+    pub group_tabs: std::collections::HashMap<String, String>,
+    pub active_group: String,
 }
 
 fn invalid() -> AppError {
@@ -105,6 +114,20 @@ impl Layout {
         if panes > MAX_PANES {
             return Err(invalid());
         }
+        if let Some(groups) = &self.groups {
+            let mut count = 0;
+            if !check_node(groups, 0, &mut count) || count > MAX_PANES {
+                return Err(invalid());
+            }
+            if !self.group_tabs.keys().all(|g| contains_pane(groups, g))
+                || !self
+                    .group_tabs
+                    .values()
+                    .all(|t| self.tabs.iter().any(|x| &x.id == t))
+            {
+                return Err(invalid());
+            }
+        }
         Ok(())
     }
 }
@@ -146,11 +169,15 @@ mod tests {
         Layout {
             version: 1,
             active_tab: "t2".into(),
+            groups: None,
+            group_tabs: Default::default(),
+            active_group: String::new(),
             tabs: vec![
                 TabLayout {
                     id: "t1".into(),
                     title: "one".into(),
                     active: "a".into(),
+                    view: None,
                     root: leaf(
                         "a",
                         Some(SessionSpec::Local {
@@ -162,6 +189,7 @@ mod tests {
                     id: "t2".into(),
                     title: "two".into(),
                     active: "c".into(),
+                    view: None,
                     root: PaneNode::Split {
                         direction: Direction::Row,
                         sizes: vec![0.25, 0.75],
@@ -211,6 +239,9 @@ mod tests {
             &Layout {
                 version: 1,
                 active_tab: String::new(),
+                groups: None,
+                group_tabs: Default::default(),
+                active_group: String::new(),
                 tabs: vec![],
             },
         )
@@ -274,10 +305,14 @@ mod tests {
         let layout = Layout {
             version: 1,
             active_tab: "t".into(),
+            groups: None,
+            group_tabs: Default::default(),
+            active_group: String::new(),
             tabs: vec![TabLayout {
                 id: "t".into(),
                 title: "t".into(),
                 active: "x".into(),
+                view: None,
                 root: deep,
             }],
         };
@@ -286,11 +321,15 @@ mod tests {
         let many = Layout {
             version: 1,
             active_tab: String::new(),
+            groups: None,
+            group_tabs: Default::default(),
+            active_group: String::new(),
             tabs: (0..=MAX_TABS)
                 .map(|i| TabLayout {
                     id: i.to_string(),
                     title: "t".into(),
                     active: "p".into(),
+                    view: None,
                     root: leaf("p", None),
                 })
                 .collect(),
@@ -305,5 +344,65 @@ mod tests {
         bad.tabs[0].active = "nope".into();
         assert!(save(&path, &bad).is_err());
         assert!(!path.exists());
+    }
+}
+
+#[cfg(test)]
+mod group_tests {
+    use super::*;
+
+    fn leaf(id: &str) -> PaneNode {
+        PaneNode::Leaf {
+            pane_id: id.into(),
+            spec: None,
+            title: String::new(),
+        }
+    }
+
+    fn tab(id: &str, view: Option<&str>) -> TabLayout {
+        TabLayout {
+            id: id.into(),
+            title: id.into(),
+            active: "p".into(),
+            root: leaf("p"),
+            view: view.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn panes_and_what_they_show_survive_a_save() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("layout.toml");
+        let layout = Layout {
+            version: 1,
+            active_tab: "a".into(),
+            tabs: vec![tab("a", None), tab("f", Some("files"))],
+            groups: Some(PaneNode::Split {
+                direction: Direction::Row,
+                sizes: vec![0.4, 0.6],
+                children: vec![leaf("g1"), leaf("g2")],
+            }),
+            group_tabs: [("g1".to_string(), "a".to_string()), ("g2".to_string(), "f".to_string())].into(),
+            active_group: "g2".into(),
+        };
+        save(&path, &layout).unwrap();
+        assert_eq!(load(&path), Some(layout));
+    }
+
+    #[test]
+    fn a_pane_pointing_at_a_missing_tab_or_pane_is_refused() {
+        let mut layout = Layout {
+            version: 1,
+            active_tab: "a".into(),
+            tabs: vec![tab("a", None)],
+            groups: Some(leaf("g1")),
+            group_tabs: [("g1".to_string(), "nope".to_string())].into(),
+            active_group: "g1".into(),
+        };
+        assert!(layout.validate().is_err());
+        layout.group_tabs = [("zzz".to_string(), "a".to_string())].into();
+        assert!(layout.validate().is_err());
+        layout.group_tabs = [("g1".to_string(), "a".to_string())].into();
+        assert!(layout.validate().is_ok());
     }
 }

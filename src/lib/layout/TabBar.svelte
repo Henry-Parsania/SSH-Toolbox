@@ -47,6 +47,7 @@
 
   /** The icon says what kind of session the tab holds. */
   function iconFor(tab: Tab): IconName {
+    if (tab.view) return tab.view === "files" ? "folder" : tab.view === "docker" ? "box" : "sparkle";
     const spec = leaves(tab.root)[0]?.spec;
     return spec?.type === "ssh" ? "server" : spec?.type === "serial" ? "serial" : "terminal";
   }
@@ -101,6 +102,7 @@
         class="tab"
         class:active={tab.id === workspace.activeTabId}
         class:dragging={tab.id === dragging}
+        class:elsewhere={tab.id !== workspace.activeTabId && workspace.groupOf(tab.id) !== null}
         data-tab={tab.id}
         role="tab"
         tabindex="-1"
@@ -115,6 +117,9 @@
         }}
       >
         <span class="kind"><Icon name={iconFor(tab)} size={14} /></span>
+        {#if tab.id !== workspace.activeTabId && workspace.groupOf(tab.id) !== null}
+          <span class="shown" title="Showing in another pane"></span>
+        {/if}
         {#if editing === tab.id}
           <!-- svelte-ignore a11y_autofocus -->
           <input
@@ -427,6 +432,14 @@
     top: calc(100% + 6px);
     left: 0;
     z-index: 11;
+  }
+  .shown {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0.8;
   }
   .drop .sep {
     height: 1px;

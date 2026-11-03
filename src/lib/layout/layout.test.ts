@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findLeaf, leaves } from "./panes";
+import { newLeaf, splitPane } from "./panes";
 import { shortcutFor } from "./shortcuts";
 import { Workspace } from "./workspace.svelte";
 
@@ -88,19 +88,64 @@ describe("Workspace", () => {
     expect(w.activeTab?.title).toBe("two");
   });
 
-  it("splitting copies the session and focuses the new pane; closing goes back", () => {
+  it("splitting divides the window and the new pane shows a tab that was hidden", () => {
     const w = setup();
-    const first = w.activeTab!.active;
+    w.newTab(spec, "two");
+    expect(w.groupCount).toBe(1);
+    const first = w.activeGroup;
     w.split("row");
-    const tab = w.activeTab!;
-    expect(w.paneCount(tab)).toBe(2);
-    expect(tab.active).not.toBe(first);
-    w.moveFocus("left");
-    expect(tab.active).toBe(first);
-    w.moveFocus("left"); // at the edge: stays
-    expect(tab.active).toBe(first);
-    w.closeActivePane();
-    expect(w.paneCount(tab)).toBe(1);
+    expect(w.groupCount).toBe(2);
+    expect(w.activeGroup).not.toBe(first);
+    // "one" was hidden behind "two", so the new pane shows it.
+    expect(w.activeTab?.title).toBe("one");
+    expect(w.groupTab[first]).toBe(w.tabs[1].id);
+    expect(w.hiddenTabs).toEqual([]);
+    expect(w.moveGroupFocus("left")).toBe(true);
+    expect(w.activeGroup).toBe(first);
+    expect(w.moveGroupFocus("left")).toBe(false); // at the edge: stays
+  });
+
+  it("choosing a tab shows it in the active pane, and a tab shown elsewhere swaps places", () => {
+    const w = setup();
+    const [one] = w.tabs;
+    const two = w.newTab(spec, "two");
+    w.split("row");
+    const right = w.activeGroup;
+    const left = w.groupOf(two.id)!;
+    expect(w.groupOf(one.id)).toBe(right);
+    // Pick "two" for the right pane: it comes from the left pane, which gets "one".
+    w.selectTab(two.id);
+    expect(w.groupTab[right]).toBe(two.id);
+    expect(w.groupTab[left]).toBe(one.id);
+    expect(w.activeTab?.title).toBe("two");
+  });
+
+  it("closing a pane keeps its tab, and the last pane can't be closed", () => {
+    const w = setup();
+    w.newTab(spec, "two");
+    w.split("column");
+    const extra = w.activeGroup;
+    w.closeGroup(extra);
+    expect(w.groupCount).toBe(1);
+    expect(w.tabs).toHaveLength(2);
+    expect(w.activeGroup).not.toBe(extra);
+    w.closeGroup(w.activeGroup);
+    expect(w.groupCount).toBe(1);
+  });
+
+  it("a panel opens in a pane beside the current one, and the button closes it again", () => {
+    const w = setup();
+    w.toggleView("files", "Files");
+    expect(w.groupCount).toBe(2);
+    expect(w.viewShown("files")).toBe(true);
+    expect(w.activeTab?.view).toBe("files");
+    // The panel follows the terminal that was in front.
+    expect(w.contextTab?.title).toBe("one");
+    w.toggleView("files", "Files");
+    expect(w.viewShown("files")).toBe(false);
+    expect(w.tabs.map((t) => t.title)).toEqual(["one"]);
+    // The pane it filled goes too, so no empty pane is left.
+    expect(w.groupCount).toBe(1);
   });
 
   it("closing the last pane closes the tab", () => {
@@ -112,32 +157,62 @@ describe("Workspace", () => {
 
   it("dragging a divider changes the sizes", () => {
     const w = setup();
+    w.newTab(spec, "two");
     w.split("row");
+    w.resizeGroupDivider([], 0, 0.2);
+    expect(w.groups.kind === "split" && w.groups.sizes[0]).toBeCloseTo(0.7, 9);
+  });
+
+  it("closing the last pane of a tab with several panes only closes that pane", () => {
+    const w = setup();
     const tab = w.activeTab!;
-    w.resizeDivider(tab.id, [], 0, 0.2);
-    expect(tab.root.kind === "split" && tab.root.sizes[0]).toBeCloseTo(0.7, 9);
+    const added = newLeaf(spec, "inner");
+    tab.root = splitPane(tab.root, tab.active, "row", added);
+    tab.active = added.pane_id;
+    w.closeActivePane();
+    expect(w.paneCount(tab)).toBe(1);
+    expect(w.tabs).toHaveLength(1);
   });
 });
 
 describe("Workspace layout saving", () => {
   const spec = { type: "local", shell_id: "x" } as const;
 
-  it("saves and restores tabs, splits, sizes and the active tab", () => {
+  it("saves and restores tabs, panes, sizes and what each pane shows", () => {
     const w = new Workspace();
     w.newTab(spec, "one");
     w.newTab({ type: "wsl", distro: "Ubuntu" }, "two");
     w.split("row");
-    w.resizeDivider(w.activeTab!.id, [], 0, 0.2);
+    w.resizeGroupDivider([], 0, 0.2);
+    w.toggleView("files", "Files");
     w.selectTab(w.tabs[0].id);
 
     const saved = JSON.parse(JSON.stringify(w.toLayout()));
     const again = new Workspace();
     again.restore(saved);
 
-    expect(again.tabs.map((t) => t.title)).toEqual(["one", "two"]);
+    expect(again.tabs.map((t) => t.title)).toEqual(["one", "two", "Files"]);
+    expect(again.tabs[2].view).toBe("files");
+    expect(again.groupCount).toBe(w.groupCount);
+    expect(again.groupTab).toEqual(w.groupTab);
+    expect(again.activeGroup).toBe(w.activeGroup);
     expect(again.activeTabId).toBe(w.tabs[0].id);
-    expect(again.tabs[1].root).toEqual(w.tabs[1].root);
-    expect(again.paneCount(again.tabs[1])).toBe(2);
+    expect(again.groups).toEqual(w.groups);
+  });
+
+  it("a layout from before panes comes back as one pane showing the tab that was in front", () => {
+    const w = new Workspace();
+    w.restore({
+      version: 1,
+      active_tab: "b",
+      tabs: [
+        { id: "a", title: "a", active: "pa", root: { kind: "leaf", pane_id: "pa", title: "a" } },
+        { id: "b", title: "b", active: "pb", root: { kind: "leaf", pane_id: "pb", title: "b" } },
+      ],
+    });
+    expect(w.groupCount).toBe(1);
+    expect(w.activeTabId).toBe("b");
+    expect(w.hiddenTabs.map((t) => t.id)).toEqual(["a"]);
   });
 
   it("a pane saved without a session comes back with none", () => {
@@ -182,24 +257,21 @@ describe("restoring SSH panes", () => {
 });
 
 describe("Workspace.splitWith", () => {
-  it("puts the chosen session in a new pane beside the current one", () => {
+  it("opens the chosen session as a new tab in a new pane beside the current one", () => {
     const w = new Workspace();
     w.newTab({ type: "local", shell_id: "a" }, "A");
     w.splitWith("row", { type: "ssh", saved_session_id: "s1" }, "Server");
     w.splitWith("column", { type: "local", shell_id: "b" }, "B");
-    const tab = w.activeTab!;
-    const specs = leaves(tab.root).map((l) => l.spec);
-    expect(specs).toEqual([
-      { type: "local", shell_id: "a" },
-      { type: "ssh", saved_session_id: "s1" },
-      { type: "local", shell_id: "b" },
-    ]);
-    expect(findLeaf(tab.root, tab.active)?.spec).toEqual({ type: "local", shell_id: "b" });
+    expect(w.groupCount).toBe(3);
+    expect(w.tabs.map((t) => t.title)).toEqual(["A", "Server", "B"]);
+    expect(w.hiddenTabs).toEqual([]);
+    expect(w.activeTab?.title).toBe("B");
   });
 
-  it("opens a tab when there is none to split", () => {
+  it("works with nothing open yet", () => {
     const w = new Workspace();
     w.splitWith("row", { type: "local", shell_id: "a" }, "A");
     expect(w.tabs).toHaveLength(1);
+    expect(w.activeTab?.title).toBe("A");
   });
 });
