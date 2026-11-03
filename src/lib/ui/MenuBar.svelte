@@ -1,6 +1,9 @@
 <script lang="ts">
   // A classic menu bar, so every feature can be found without remembering a shortcut.
 
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { appVersion } from "../backend";
+
   export interface MenuItem {
     label: string;
     /** Shown on the right, such as "Ctrl+Shift+T". */
@@ -17,6 +20,18 @@
   }
 
   let { menus }: Props = $props();
+
+  // The window has no title bar of its own: this bar is dragged to move it, and the buttons at the
+  // right minimize, maximize and close it.
+  const win = getCurrentWindow();
+  let maximized = $state(false);
+  let version = $state("");
+  void appVersion().then((v) => (version = v)).catch(() => {});
+  void win.isMaximized().then((m) => (maximized = m)).catch(() => {});
+  $effect(() => {
+    const stop = win.onResized(() => void win.isMaximized().then((m) => (maximized = m)));
+    return () => void stop.then((off) => off());
+  });
 
   let open = $state<number | null>(null);
   let bar: HTMLElement | undefined = $state();
@@ -81,6 +96,27 @@
       {/if}
     </div>
   {/each}
+  <div class="drag" data-tauri-drag-region title={version}>{version ? `SSH Toolbox ${version}` : ""}</div>
+  <div class="wc">
+    <button class="wc-btn" aria-label="Minimize" title="Minimize" onclick={() => void win.minimize()}>
+      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 5h8" stroke="currentColor" stroke-width="1" fill="none" /></svg>
+    </button>
+    <button
+      class="wc-btn"
+      aria-label={maximized ? "Restore" : "Maximize"}
+      title={maximized ? "Restore" : "Maximize"}
+      onclick={() => void win.toggleMaximize()}
+    >
+      {#if maximized}
+        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2.5 2.5h6v6h-6zM4 2.5V1h5.5v5.5H8" stroke="currentColor" stroke-width="1" fill="none" /></svg>
+      {:else}
+        <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" stroke="currentColor" stroke-width="1" fill="none" /></svg>
+      {/if}
+    </button>
+    <button class="wc-btn wc-close" aria-label="Close" title="Close" onclick={() => void win.close()}>
+      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1" fill="none" /></svg>
+    </button>
+  </div>
 </nav>
 
 <style>
@@ -97,6 +133,44 @@
   }
   .mb-menu {
     position: relative;
+  }
+  .drag {
+    flex: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text-faint);
+    font-size: 11.5px;
+  }
+  .wc {
+    display: flex;
+    align-self: stretch;
+    margin-right: -6px;
+  }
+  .wc-btn {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    min-height: 0;
+    padding: 0;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: default;
+  }
+  .wc-btn:hover {
+    background: var(--bg-2);
+  }
+  .wc-close:hover {
+    color: #fff;
+    background: #e5484d;
   }
   .mb-top {
     height: 24px;
