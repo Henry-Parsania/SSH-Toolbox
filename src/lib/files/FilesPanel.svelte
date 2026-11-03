@@ -11,6 +11,7 @@
     filesOpenSftp,
     filesOpenWsl,
     onDesktopFileDrop,
+    openLocalFile,
     transferAdd,
     transfersSubscribe,
     type OpenedFiles,
@@ -18,6 +19,8 @@
   } from "../backend/files";
   import PromptDialog from "../terminal/PromptDialog.svelte";
   import Icon from "../ui/Icon.svelte";
+  import EditList from "./EditList.svelte";
+  import { edits } from "./edits.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import TransferList from "./TransferList.svelte";
 
@@ -75,6 +78,26 @@
   let message = $state("");
   let jobs = $state<TransferJob[]>([]);
   let question = $state<{ id: string; prompt: Prompt } | null>(null);
+
+  /** A file of the server opens here, and what is saved goes back. */
+  async function openRemoteFile(_entry: unknown, path: string, choose: boolean) {
+    if (!remote) return;
+    message = "";
+    try {
+      await edits.open(remote.id, path, choose);
+    } catch (err) {
+      message = (err as { message?: string }).message ?? "Couldn't open that file.";
+    }
+  }
+
+  async function openHereFile(_entry: unknown, path: string, choose: boolean) {
+    message = "";
+    try {
+      await openLocalFile(path, choose);
+    } catch (err) {
+      message = (err as { message?: string }).message ?? "Couldn't open that file.";
+    }
+  }
 
   onMount(async () => {
     try {
@@ -313,6 +336,7 @@
         transferLabel="Download"
         transferIcon="down"
         ontransfer={(paths) => local && remote && queue(remote.id, paths, local.id, localPath)}
+        onopenfile={openRemoteFile}
       />
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -331,9 +355,12 @@
         transferLabel="Upload"
         transferIcon="up"
         ontransfer={(paths) => local && remote && queue(local.id, paths, remote.id, remotePath)}
+        onopenfile={openHereFile}
       />
     </div>
   </div>
+
+  <EditList />
 
   <TransferList {jobs} />
 

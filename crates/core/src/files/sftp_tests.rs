@@ -371,3 +371,51 @@ async fn a_server_without_sftp_says_so() {
     assert_eq!(err.code, ErrorCode::Unsupported);
     assert!(err.message.contains("SFTP"), "{}", err.message);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_server_file_can_be_edited_here_and_sent_back_over_sftp() {
+    use super::{EditSessions, UploadResult};
+    let w = world().await;
+    std::fs::write(w.root.path().join("compose.yaml"), "services: {}\n").unwrap();
+    let edits_dir = tempfile::tempdir().unwrap();
+    let edits = EditSessions::new(edits_dir.path().join("edits"));
+
+    let info = edits
+        .open(w.sftp.clone(), "/compose.yaml", |_| {})
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&info.local_path).unwrap(),
+        "services: {}\n"
+    );
+
+    std::fs::write(&info.local_path, "services:\n  web:\n    image: nginx\n").unwrap();
+    assert_eq!(edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
+    assert_eq!(
+        std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
+        "services:\n  web:\n    image: nginx\n"
+    );
+
+    // Saving again right after is not mistaken for a change made by someone else.
+    std::fs::write(&info.local_path, "services:\n  web:\n    image: caddy\n").unwrap();
+    assert_eq!(edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
+
+    // Someone else changes the server's file later: nothing is sent unless forced.
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    std::fs::write(w.root.path().join("compose.yaml"), "theirs\n").unwrap();
+    std::fs::write(&info.local_path, "mine\n").unwrap();
+    assert_eq!(
+        edits.upload(&info.id, false).await.unwrap(),
+        UploadResult::RemoteChanged
+    );
+    assert_eq!(
+        std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
+        "theirs\n"
+    );
+    assert_eq!(edits.upload(&info.id, true).await.unwrap(), UploadResult::Uploaded);
+    assert_eq!(
+        std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
+        "mine\n"
+    );
+    edits.stop_all();
+}

@@ -76,12 +76,18 @@ pub fn run() {
         .manage(commands::status::StatsState::default())
         .manage(commands::docker::Engines::default())
         .manage(commands::scan::Scans::default())
+        .manage(commands::edit::Edits::new())
         .manage(commands::agent::Agent::new(&config.join("providers.json")))
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
             commands::platform::app_version,
+            commands::edit::edit_open,
+            commands::edit::edit_upload,
+            commands::edit::edit_reopen,
+            commands::edit::edit_stop,
+            commands::edit::open_local_file,
             commands::x11::x11_status,
             commands::x11::x11_start,
             commands::x11::x11_stop,
@@ -181,6 +187,8 @@ pub fn run() {
             tauri::async_runtime::block_on(terminals.sessions.close_all());
             // An X server the app started goes with it.
             handle.state::<Arc<toolbox_core::x11::X11Local>>().stop_now();
+            // Local copies of server files being edited are deleted.
+            handle.state::<commands::edit::Edits>().0.stop_all();
         }
     });
 }

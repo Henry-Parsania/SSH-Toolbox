@@ -173,3 +173,47 @@ export function transferClear(): Promise<void> {
 export function transferAnswer(jobId: number, choice: OverwriteChoice): Promise<void> {
   return invoke<void>("transfer_answer", { jobId, choice });
 }
+
+export interface EditInfo {
+  id: string;
+  name: string;
+  local_path: string;
+}
+
+/** What the watcher reports about a downloaded copy. */
+export type EditEvent = { type: "changed" } | { type: "gone" };
+
+/**
+ * Downloads a server file, opens it on this computer and watches it. `onEvent` hears each time
+ * it is saved.
+ */
+export function editOpen(
+  fileId: string,
+  path: string,
+  onEvent: (event: EditEvent) => void,
+  choose = false,
+): Promise<EditInfo> {
+  const channel = new Channel<EditEvent>();
+  channel.onmessage = onEvent;
+  return invoke<EditInfo>("edit_open", { fileId, path, choose, onEvent: channel });
+}
+
+/** Sends the edited copy back. "remote_changed" means the server's file changed meanwhile and nothing was sent. */
+export function editUpload(id: string, force: boolean): Promise<"uploaded" | "remote_changed"> {
+  return invoke("edit_upload", { id, force });
+}
+
+/** Opens the local copy again, or asks which program to use. */
+export function editReopen(id: string, choose: boolean): Promise<void> {
+  return invoke<void>("edit_reopen", { id, choose });
+}
+
+/** Stops watching and deletes the local copy. */
+export function editStop(id: string): Promise<void> {
+  return invoke<void>("edit_stop", { id });
+}
+
+/** Opens a file on this computer in the program the system uses for it. */
+export function openLocalFile(path: string, choose = false): Promise<void> {
+  return invoke<void>("open_local_file", { path, choose });
+}

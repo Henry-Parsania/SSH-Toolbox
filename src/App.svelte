@@ -27,6 +27,7 @@
   import AgentPanel from "./lib/agent/AgentPanel.svelte";
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
+  import EditPrompt from "./lib/files/EditPrompt.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
   import { realDeps } from "./lib/agent/deps";
   import Sidebar from "./lib/sessions/Sidebar.svelte";
@@ -540,6 +541,7 @@
   {#if scanner}
     <ScannerDialog initialTab={scanner} onclose={() => (scanner = null)} onnewsession={(host, port) => sessionCommand("ssh", { host, port })} />
   {/if}
+  <EditPrompt />
   {#if xserver}
     <XServerDialog onclose={() => (xserver = false)} />
   {/if}

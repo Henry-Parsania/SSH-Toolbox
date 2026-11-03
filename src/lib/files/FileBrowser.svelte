@@ -23,6 +23,8 @@
     status?: string;
     /** What the transfer button does with the selected paths. */
     ontransfer?: (paths: string[]) => void;
+    /** Opens a file in a program on this computer. `choose` asks which program. */
+    onopenfile?: (entry: FileEntry, path: string, choose: boolean) => void;
     transferLabel?: string;
     transferIcon?: IconName;
     /** The folder being shown, so the other side knows where to put things. */
@@ -41,7 +43,7 @@
     oncopytoterminal?: (text: string) => void;
   }
 
-  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
+  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", onopenfile, path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
 
   let entries = $state<FileEntry[]>([]);
   let loading = $state(false);
@@ -125,6 +127,7 @@
 
   function open(entry: FileEntry) {
     if (entry.kind === "dir" || entry.kind === "symlink") go(joinPath(path, entry.name, sep));
+    else if (entry.kind === "file") onopenfile?.(entry, joinPath(path, entry.name, sep), false);
   }
 
   function pick(entry: FileEntry, e: MouseEvent) {
@@ -480,6 +483,10 @@
     {#if menu.entry && chosen.length > 0}
       {#if one && (one.kind === "dir" || one.kind === "symlink")}
         <li><button onclick={() => { open(one); closeMenu(); }}><Icon name="folder" size={14} /> Open</button></li>
+      {/if}
+      {#if one && one.kind === "file" && onopenfile}
+        <li><button onclick={() => { onopenfile(one, pathOf(one), false); closeMenu(); }}><Icon name="edit" size={14} /> {side === "remote" ? "Open and edit here" : "Open"} <span class="hintkey">(double click)</span></button></li>
+        <li><button onclick={() => { onopenfile(one, pathOf(one), true); closeMenu(); }}><Icon name="edit" size={14} /> Open with…</button></li>
       {/if}
       {#if ontransfer}
         <li><button onclick={() => { transfer(); closeMenu(); }}><Icon name={transferIcon} size={14} /> {transferLabel}</button></li>

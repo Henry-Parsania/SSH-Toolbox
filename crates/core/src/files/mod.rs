@@ -2,6 +2,8 @@
 
 mod answers;
 mod backend;
+mod edit;
+mod open;
 mod ftp;
 #[cfg(test)]
 mod ftp_tests;
@@ -18,6 +20,8 @@ mod sftp_tests;
 mod sudo;
 
 pub use answers::PendingAnswers;
+pub use edit::{EditEvent, EditInfo, EditSessions, MAX_EDIT_BYTES, UploadResult, is_risky_to_open};
+pub use open::{open_default, open_with_dialog};
 pub use backend::{COPY_BUFFER, FileBackend, FileCapabilities, FileEntry, FileKind, Progress};
 pub use ftp::{FtpFiles, FtpOpened, FtpTarget};
 pub use local::LocalFiles;

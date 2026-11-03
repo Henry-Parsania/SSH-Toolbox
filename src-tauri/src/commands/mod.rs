@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod connect;
 pub mod docker;
+pub mod edit;
 pub mod files;
 pub mod forward;
 pub mod keychain;
