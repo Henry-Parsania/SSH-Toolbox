@@ -120,3 +120,31 @@ Build and test against the local test container. This phase also adds SSH to `Se
 - [x] **6.4 Ubuntu pass.** Owner tries the Ubuntu items on the checklist, including keychain behavior when the service is stopped. Fix what's found.
 - [x] **6.5 Finish.** Record the quality target measurements.
 </content>
+
+## Phase 7: More features (added 2026-11-04)
+
+Order is by value. Each item is ticked only when it is built, tested and committed. Anything not tried on a real machine is said so in NOTES.md.
+
+### Everyday features
+- [ ] **7.1 Snippets.** Saved commands, sent to the active tab or to every tab. Stored in a file in the config folder. No secrets are stored there.
+- [ ] **7.2 Quick connect.** Type `user@host:port` in a box and connect without saving a session. Offer to save it afterwards.
+- [ ] **7.3 Command palette (Ctrl+K).** Type to jump to a session, an open tab or a menu action.
+- [ ] **7.4 Auto-reconnect and keep-alive.** A dropped SSH session reconnects by itself (with a back-off and a limit), and a keep-alive stops idle links being cut. Setting to turn it off.
+- [ ] **7.5 Session logging.** Save a tab's output to a file as it runs. Off by default; the user chooses the folder.
+- [ ] **7.6 Back up and restore sessions.** Export the session list to one file with no secrets, and import it on another PC.
+- [ ] **7.7 Known hosts manager.** See the trusted server keys and remove one, inside the app.
+- [ ] **7.8 Startup commands per session.** Commands sent once after a session connects, such as `cd /srv`.
+- [ ] **7.9 Notification when a long command ends** in a background tab (quiet for a while, then the prompt returns).
+- [ ] **7.10 Built-in file editor with a diff view** for server files, instead of opening an outside program.
+- [ ] **7.11 Folder sync.** Compare a local and a remote folder and copy the differences.
+- [ ] **7.12 System tray icon.**
+
+### Docker
+- [ ] **7.13 Compose up and down.** Run the compose file of a project (`up -d`, `down`, `pull`, `restart`) from the project's menu, locally and over SSH.
+- [ ] **7.14 Build an image from a Dockerfile**, with live output.
+- [ ] **7.15 Tag and push images, and registry login.** Passwords are never saved or shown.
+- [ ] **7.16 Container files.** Browse and copy files in and out of a container.
+- [ ] **7.17 Attach to a running container**, not just open a new shell.
+- [ ] **7.18 Create volumes and networks**, and connect a container to a network.
+- [ ] **7.19 Docker contexts.** Switch between engines.
+- [ ] **7.20 Health status** on each container, and a raw inspect view.
