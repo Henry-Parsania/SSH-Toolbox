@@ -310,6 +310,126 @@ impl SessionsFile {
 }
 
 /// What reading the file found.
+/// What a restore from a backup file did.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct MergeResult {
+    pub sessions_added: usize,
+    pub folders_added: usize,
+    /// Sessions in the file that were left out because one with the same ID was already here.
+    pub skipped: usize,
+}
+
+impl SessionsFile {
+    /// The file as text, for a backup.
+    pub fn to_toml(&self) -> Result<String, AppError> {
+        toml::to_string_pretty(self)
+            .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't prepare the backup."))
+    }
+
+    /// Reads and checks a backup. Nothing is trusted: it is validated like any saved file.
+    pub fn from_toml(text: &str) -> Result<Self, AppError> {
+        let file: Self = toml::from_str(text).map_err(|_| {
+            AppError::new(
+                ErrorCode::InvalidInput,
+                "That file isn't a sessions backup from this app.",
+            )
+        })?;
+        file.validate()?;
+        Ok(file)
+    }
+
+    /// Adds what `other` has that this file doesn't (matched by ID), and keeps what is here.
+    /// Pinned FTPS certificates are dropped, so a backup can never make the app trust a
+    /// certificate on its own (SEC8): the user accepts it again on first use.
+    pub fn merge(&mut self, other: SessionsFile) -> MergeResult {
+        let mut result = MergeResult::default();
+        let mut folder_ids: HashSet<String> = self.folders.iter().map(|f| f.id.clone()).collect();
+        let mut taken: HashSet<String> = folder_ids.clone();
+        taken.extend(self.sessions.iter().map(|s| s.id().to_string()));
+
+        // Folders first, in an order where a parent comes before what is inside it.
+        let mut waiting: Vec<Folder> = other
+            .folders
+            .into_iter()
+            .filter(|f| !folder_ids.contains(&f.id) && !taken.contains(&f.id))
+            .collect();
+        loop {
+            let before = waiting.len();
+            let mut later = Vec::new();
+            for f in waiting {
+                if f.parent.is_empty() || folder_ids.contains(&f.parent) {
+                    folder_ids.insert(f.id.clone());
+                    taken.insert(f.id.clone());
+                    self.folders.push(f);
+                    result.folders_added += 1;
+                } else {
+                    later.push(f);
+                }
+            }
+            waiting = later;
+            if waiting.is_empty() || waiting.len() == before {
+                break;
+            }
+        }
+
+        let ssh_ids: HashSet<String> = self
+            .sessions
+            .iter()
+            .filter(|s| matches!(s, SavedSession::Ssh { .. }))
+            .map(|s| s.id().to_string())
+            .collect();
+        let incoming: Vec<SavedSession> = other
+            .sessions
+            .into_iter()
+            .filter(|s| {
+                let fresh = !taken.contains(s.id());
+                if !fresh {
+                    result.skipped += 1;
+                }
+                fresh
+            })
+            .collect();
+        let incoming_ssh: HashSet<String> = incoming
+            .iter()
+            .filter(|s| matches!(s, SavedSession::Ssh { .. }))
+            .map(|s| s.id().to_string())
+            .collect();
+        for mut session in incoming {
+            match &mut session {
+                SavedSession::Ssh { folder, jump, .. } => {
+                    if !folder.is_empty() && !folder_ids.contains(folder.as_str()) {
+                        folder.clear();
+                    }
+                    if !jump.is_empty()
+                        && !ssh_ids.contains(jump.as_str())
+                        && !incoming_ssh.contains(jump.as_str())
+                    {
+                        jump.clear();
+                    }
+                }
+                SavedSession::Serial { folder, .. } => {
+                    if !folder.is_empty() && !folder_ids.contains(folder.as_str()) {
+                        folder.clear();
+                    }
+                }
+                SavedSession::Ftp {
+                    folder,
+                    trusted_cert_sha256,
+                    ..
+                } => {
+                    if !folder.is_empty() && !folder_ids.contains(folder.as_str()) {
+                        folder.clear();
+                    }
+                    trusted_cert_sha256.clear();
+                }
+            }
+            self.sessions.push(session);
+            result.sessions_added += 1;
+        }
+        result
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Loaded {
     pub file: SessionsFile,
@@ -639,5 +759,53 @@ mod tests {
         let mut f = sample();
         f.folders[0].name = "  ".into();
         assert!(f.validate().is_err());
+    }
+
+    #[test]
+    fn restoring_adds_only_what_is_new_and_never_changes_what_is_here() {
+        let mut here = sample();
+        let before = here.clone();
+        let mut backup = sample();
+        // One new session, and a changed copy of one that already exists.
+        backup.sessions.push(ssh("brand-new", "", ""));
+        if let SavedSession::Ssh { host, .. } = &mut backup.sessions[0] {
+            *host = "other.example.com".into();
+        }
+        let result = here.merge(backup);
+        assert_eq!(result.sessions_added, 1);
+        assert_eq!(result.skipped, before.sessions.len());
+        assert_eq!(
+            &here.sessions[..before.sessions.len()],
+            &before.sessions[..]
+        );
+        assert!(here.validate().is_ok());
+    }
+
+    #[test]
+    fn restoring_drops_pinned_certificates_and_dangling_links() {
+        let mut here = SessionsFile::default();
+        let mut backup = SessionsFile::default();
+        backup.sessions.push(SavedSession::Ftp {
+            id: "f1".into(),
+            name: "ftp".into(),
+            folder: "gone".into(),
+            host: "h.example.com".into(),
+            port: 21,
+            user: "u".into(),
+            security: FtpSecurity::Explicit,
+            trusted_cert_sha256: "ab".repeat(32),
+        });
+        backup.sessions.push(ssh("s1", "", "missing-jump"));
+        let result = here.merge(backup);
+        assert_eq!(result.sessions_added, 2);
+        match &here.sessions[0] {
+            SavedSession::Ftp {
+                trusted_cert_sha256,
+                folder,
+                ..
+            } => assert!(trusted_cert_sha256.is_empty() && folder.is_empty()),
+            _ => panic!(),
+        }
+        assert!(here.validate().is_ok(), "{:?}", here.validate());
     }
 }

@@ -167,6 +167,8 @@ pub fn run() {
             commands::sessions::ssh_config_import,
             commands::sessions::ssh_config_preview,
             commands::sessions::sessions_save,
+            commands::sessions::sessions_export,
+            commands::sessions::sessions_import,
             commands::sessions::sessions_set_aside_unreadable,
             commands::settings::settings_get,
             commands::startup::startup_ready,

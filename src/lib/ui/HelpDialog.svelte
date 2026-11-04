@@ -35,6 +35,8 @@
     ["Own window", "Move the active tab into a window of its own; its programs keep running. Terminal menu."],
     ["Search and save", "Search the output of a pane, or save all of it as a text file in Downloads. Terminal menu."],
     ["Type into all panes", "What you type goes to every pane of the tab, such as for several servers at once. Terminal menu."],
+    ["Back up and restore", "File menu: saves your sessions and folders to one file in Downloads (no passwords, no key contents), and adds the sessions of such a file on another computer without changing the ones already there."],
+    ["Reconnect and logs", "A dropped SSH connection is started again by itself (up to 5 tries; Settings turns it off). Settings can also save a plain-text copy of every session in a folder."],
     ["Import", "Bring in hosts from your ~/.ssh/config file. File menu."],
     ["Settings", "Theme, font, scrollback, renderer, server checks and the footer. File menu."],
   ];

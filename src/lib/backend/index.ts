@@ -299,6 +299,22 @@ export function sessionsSave(file: SessionsFile): Promise<void> {
   return invoke<void>("sessions_save", { file });
 }
 
+/** Saves a copy of the sessions to Downloads and returns where it went. No secrets are in it. */
+export function sessionsExport(): Promise<string> {
+  return invoke<string>("sessions_export");
+}
+
+export interface MergeResult {
+  sessions_added: number;
+  folders_added: number;
+  skipped: number;
+}
+
+/** Adds the sessions of a backup file to the saved ones; what is already saved is kept. */
+export function sessionsImport(path: string): Promise<MergeResult> {
+  return invoke<MergeResult>("sessions_import", { path });
+}
+
 export function sessionsSetAsideUnreadable(): Promise<void> {
   return invoke<void>("sessions_set_aside_unreadable");
 }

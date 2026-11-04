@@ -30,6 +30,7 @@
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
   import Palette, { type PaletteItem } from "./lib/palette/Palette.svelte";
   import { parseQuickConnect } from "./lib/palette/parse";
+  import BackupDialog from "./lib/sessions/BackupDialog.svelte";
   import SnippetsDialog from "./lib/snippets/SnippetsDialog.svelte";
   import EditPrompt from "./lib/files/EditPrompt.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
@@ -52,6 +53,7 @@
   let xserver = $state(false);
   let snippets = $state(false);
   let paletteOpen = $state(false);
+  let backupOpen = $state(false);
   function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number; user?: string; connect?: boolean }) {
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1, prefill };
@@ -280,6 +282,7 @@
         { label: "New FTP session…", onselect: () => sessionCommand("ftp") },
         { label: "New serial session…", onselect: () => sessionCommand("serial") },
         { label: "Import from ~/.ssh/config…", onselect: () => sessionCommand("import") },
+        { label: "Back up and restore sessions…", onselect: () => (backupOpen = true) },
         "separator",
         { label: "Settings…", onselect: () => (showSettings = true) },
       ],
@@ -570,6 +573,9 @@
   <EditPrompt />
   {#if xserver}
     <XServerDialog onclose={() => (xserver = false)} />
+  {/if}
+  {#if backupOpen}
+    <BackupDialog {library} onclose={() => (backupOpen = false)} />
   {/if}
   {#if paletteOpen}
     <Palette items={paletteItems} extra={quickConnectItem} onclose={() => (paletteOpen = false)} />
