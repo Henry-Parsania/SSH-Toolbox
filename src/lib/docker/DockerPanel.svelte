@@ -33,6 +33,8 @@
   import { fitMenu } from "../ui/fitMenu";
   import Spark from "./Spark.svelte";
   import { composeCommand, projectOf, type ComposeAction } from "./compose";
+  import DockerCommandDialog, { type CommandKind } from "./DockerCommandDialog.svelte";
+  import { attachCommand } from "./commands";
 
   interface Props {
     library: Library;
@@ -200,6 +202,15 @@
     if (days < 45) return `${Math.round(days)} days ago`;
     if (days < 540) return `${Math.round(days / 30)} months ago`;
     return `${Math.round(days / 365)} years ago`;
+  }
+
+  // The small form for build, tag, push, login and copy, when open.
+  let cmdForm = $state<{ kind: CommandKind; container?: string; image?: string } | null>(null);
+
+  function attach(c: ContainerInfo) {
+    const result = attachCommand(c.name);
+    if ("command" in result) oncompose(wanted ?? LOCAL, result.command, `attach ${c.name}`);
+    else say(result.error);
   }
 
   /** Runs `docker compose` for a project in a terminal tab, where its output can be read. */
@@ -706,6 +717,8 @@
       {/if}
       {#if view === "containers" || view === "images"}
         <button class="btn small" title="Start a new container" onclick={() => startRun()}>Run…</button>
+        <button class="btn small" title="Build an image from a Dockerfile" onclick={() => (cmdForm = { kind: "build" })}>Build…</button>
+        <button class="btn small" title="Log in to an image registry" onclick={() => (cmdForm = { kind: "login" })}>Log in…</button>
       {/if}
       {#if view === "volumes" || view === "networks"}
         <button class="btn small" title="Make an empty {view === 'volumes' ? 'volume' : 'network'}" onclick={() => (creating = { kind: view as "volumes" | "networks", name: "", error: "" })}>
@@ -849,6 +862,17 @@
     </p>
   {/if}
 
+  {#if cmdForm}
+    <DockerCommandDialog
+      kind={cmdForm.kind}
+      container={cmdForm.container}
+      image={cmdForm.image}
+      where={wanted === LOCAL || !wanted ? "this computer" : shownName}
+      onrun={(command, title) => oncompose(wanted ?? LOCAL, command, title)}
+      onclose={() => (cmdForm = null)}
+    />
+  {/if}
+
   {#if question}
     <PromptDialog prompt={question.prompt} onanswer={answer} />
   {/if}
@@ -862,6 +886,11 @@
         {/if}
         <li><button onclick={() => { open("docker_logs", c); closeMenu(); }}><Icon name="log" size={14} /> Show the log</button></li>
         <li><button onclick={() => { void showDetails(c); closeMenu(); }}><Icon name="info" size={14} /> Details</button></li>
+        {#if c.state === "running"}
+          <li><button onclick={() => { attach(c); closeMenu(); }}><Icon name="terminal" size={14} /> Attach to the main process</button></li>
+        {/if}
+        <li><button onclick={() => { cmdForm = { kind: "cp-out", container: c.name }; closeMenu(); }}><Icon name="up" size={14} /> Copy a file out…</button></li>
+        <li><button onclick={() => { cmdForm = { kind: "cp-in", container: c.name }; closeMenu(); }}><Icon name="down" size={14} /> Copy a file in…</button></li>
         <li class="sep" role="separator"></li>
         {#if c.state === "running"}
           <li><button onclick={() => { void act(c, "stop"); closeMenu(); }}><Icon name="stop" size={14} /> Stop</button></li>
@@ -899,6 +928,10 @@
         {@const r = menu.r}
         {#if view === "images"}
           <li><button onclick={() => { startRun(r.name === "(untagged)" ? r.id : r.name); closeMenu(); }}><Icon name="play" size={14} /> Run a container…</button></li>
+        {/if}
+        {#if view === "images" && r.name !== "(untagged)"}
+          <li><button onclick={() => { cmdForm = { kind: "tag", image: r.name }; closeMenu(); }}><Icon name="edit" size={14} /> Tag…</button></li>
+          <li><button onclick={() => { cmdForm = { kind: "push", image: r.name }; closeMenu(); }}><Icon name="up" size={14} /> Push…</button></li>
         {/if}
         <li><button onclick={() => { void showResourceDetails(r); closeMenu(); }}><Icon name="info" size={14} /> Details</button></li>
         <li><button onclick={() => { copy(r.name, "Name"); closeMenu(); }}><Icon name="copy" size={14} /> Copy name</button></li>
