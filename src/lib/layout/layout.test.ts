@@ -317,3 +317,17 @@ describe("Workspace.duplicateTab", () => {
     expect(w.groupCount).toBe(1);
   });
 });
+
+describe("Workspace finished marks", () => {
+  it("marks a tab that isn't showing and clears the mark when it is shown", () => {
+    const w = new Workspace();
+    const a = w.newTab(null, "a");
+    const b = w.newTab(null, "b"); // b is showing; a is not
+    w.markFinished(b.id);
+    expect(w.finished[b.id]).toBeUndefined();
+    w.markFinished(a.id);
+    expect(w.finished[a.id]).toBe(true);
+    w.selectTab(a.id);
+    expect(w.finished[a.id]).toBeUndefined();
+  });
+});

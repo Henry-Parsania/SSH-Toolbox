@@ -36,6 +36,7 @@
   import { parseCwd } from "./cwd";
   import { terminalTheme } from "./themes";
   import { readableOn, sessionColors } from "../sessions/colors.svelte";
+  import { FinishDetector } from "./finish";
 
   interface Props {
     spec: SessionSpec;
@@ -57,6 +58,8 @@
     oncwd?: (path: string) => void;
     /** Told the backend session ID once it is open, and null when it is closed. */
     onsession?: (id: string | null) => void;
+    /** Called when a long burst of output has gone quiet: a long command probably finished. */
+    onfinished?: () => void;
   }
 
   let {
@@ -72,6 +75,7 @@
     broadcasting = false,
     oncwd,
     onsession,
+    onfinished,
   }: Props = $props();
 
   let searching = $state(false);
@@ -382,8 +386,13 @@
     openedCols = term.cols;
     openedRows = term.rows;
 
+    const finish = new FinishDetector();
+    const finishTimer = setInterval(() => {
+      if (finish.check(Date.now())) onfinished?.();
+    }, 1000);
     const onChunk = (chunk: Uint8Array) => {
       reportStartup();
+      finish.chunk(Date.now());
       term.write(chunk, () => {
         if (sessionId) acks.processed(chunk.length);
         else earlyAcks += chunk.length;
@@ -428,6 +437,7 @@
       acks.dispose();
       input.stop();
       unregister();
+      clearInterval(finishTimer);
       dataSub.dispose();
       binarySub.dispose();
       resizeSub.dispose();

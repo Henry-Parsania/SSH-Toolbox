@@ -40,6 +40,13 @@ export class Workspace {
   activeGroup = $state("");
   /** The last tab that was in front, for the side panels that follow the terminal. */
   lastTerminalTabId = $state("");
+  /** Tabs where a long command seems to have finished while they weren't showing. */
+  finished = $state<Record<string, boolean>>({});
+
+  /** Marks a tab whose long-running output has stopped, if it isn't showing in any pane. */
+  markFinished(tabId: string) {
+    if (this.tabs.some((t) => t.id === tabId) && this.groupOf(tabId) === null) this.finished[tabId] = true;
+  }
 
   constructor() {
     this.activeGroup = (this.groups as Extract<PaneNode, { kind: "leaf" }>).pane_id;
@@ -70,6 +77,7 @@ export class Workspace {
         else delete this.groupTab[other];
       }
       this.groupTab[groupId] = tabId;
+      delete this.finished[tabId];
     } else {
       delete this.groupTab[groupId];
     }

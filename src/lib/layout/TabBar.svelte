@@ -160,6 +160,9 @@
         {#if tab.id !== workspace.activeTabId && workspace.groupOf(tab.id) !== null}
           <span class="shown" title="Showing in another pane"></span>
         {/if}
+        {#if workspace.finished[tab.id]}
+          <span class="done" title="Output has stopped: a long command may have finished">✓</span>
+        {/if}
         {#if editing === tab.id}
           <!-- svelte-ignore a11y_autofocus -->
           <input
@@ -472,6 +475,11 @@
   .hintkey {
     color: var(--text-faint);
     font-size: 11px;
+  }
+  .done {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
   }
   .shown {
     flex: none;
