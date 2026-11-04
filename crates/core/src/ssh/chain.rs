@@ -183,6 +183,7 @@ mod tests {
             key_path: String::new(),
             jump: jump.into(),
             x11: false,
+            color: String::new(),
         }
     }
 

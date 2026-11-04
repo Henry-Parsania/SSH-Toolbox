@@ -108,6 +108,7 @@ async fn server_with(w: &World, id: &str, x11: Option<X11Fake>, asked: bool) -> 
         key_path: String::new(),
         jump: String::new(),
         x11: asked,
+        color: String::new(),
     });
     let file = SessionsFile { ..file };
     w.store.save(&file).unwrap();
@@ -312,6 +313,7 @@ async fn closing_a_pane_during_a_question_cancels_it() {
         key_path: String::new(),
         jump: String::new(),
         x11: false,
+        color: String::new(),
     });
     w.store.save(&file).unwrap();
 
@@ -418,6 +420,7 @@ async fn a_session_with_a_jump_host_goes_through_it() {
         key_path: String::new(),
         jump: via.into(),
         x11: false,
+        color: String::new(),
     };
     let mut file = w.store.load().file;
     file.sessions.push(ssh("jump", jump.port, ""));
@@ -490,6 +493,7 @@ async fn a_jump_host_that_refuses_forwarding_gives_a_clear_failure_naming_the_st
         key_path: String::new(),
         jump: via.into(),
         x11: false,
+        color: String::new(),
     };
     let mut file = w.store.load().file;
     file.sessions.push(ssh("jump", jump.port, ""));
@@ -552,6 +556,7 @@ async fn two_jump_hosts_are_used_one_after_the_other() {
         key_path: String::new(),
         jump: via.into(),
         x11: false,
+        color: String::new(),
     };
     let mut file = w.store.load().file;
     file.sessions.push(ssh("first", servers[0].port, ""));

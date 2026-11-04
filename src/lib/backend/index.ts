@@ -245,6 +245,8 @@ export type SavedSession =
       key_path: string;
       jump: string;
       x11: boolean;
+      /** "#rrggbb", or empty to follow the theme. */
+      color?: string;
     }
   | {
       type: "serial";

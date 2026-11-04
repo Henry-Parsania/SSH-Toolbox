@@ -35,6 +35,7 @@
   import { chooseRenderer, webglFailureNotice } from "./renderer";
   import { parseCwd } from "./cwd";
   import { terminalTheme } from "./themes";
+  import { readableOn, sessionColors } from "../sessions/colors.svelte";
 
   interface Props {
     spec: SessionSpec;
@@ -101,10 +102,18 @@
 
   let focusTerminal: () => void = () => {};
   let applyAppearance: () => void = () => {};
+  /** The theme, with the session's own colour (if it has one) in place of the theme's background. */
+  function themeNow() {
+    const base = terminalTheme(settings.theme);
+    const id = spec.type === "ssh" ? spec.saved_session_id : "";
+    const color = id ? sessionColors[id] : undefined;
+    return color ? { ...base, background: color, foreground: readableOn(color), cursor: readableOn(color) } : base;
+  }
   // Font, size, theme and scrollback follow the settings as they change. The renderer is
   // chosen when the terminal opens.
   $effect(() => {
     void [settings.font_family, settings.font_size, settings.theme, settings.scrollback];
+    if (spec.type === "ssh") void sessionColors[spec.saved_session_id];
     applyAppearance();
   });
 
@@ -175,7 +184,7 @@
       scrollback: settings.scrollback,
       fontSize: settings.font_size,
       fontFamily: fontStack(settings.font_family),
-      theme: terminalTheme(settings.theme),
+      theme: themeNow(),
       allowProposedApi: true, // Needed for the Unicode 11 addon.
       cursorBlink: true,
       // Links the program in the terminal marks up itself (OSC 8) follow the same rule as
@@ -246,12 +255,12 @@
     applyAppearance = () => {
       term.options.fontSize = settings.font_size;
       term.options.fontFamily = fontStack(settings.font_family);
-      term.options.theme = terminalTheme(settings.theme);
+      term.options.theme = themeNow();
       term.options.scrollback = settings.scrollback;
-      background = terminalTheme(settings.theme).background;
+      background = themeNow().background;
       fitIfVisible();
     };
-    background = terminalTheme(settings.theme).background;
+    background = themeNow().background;
     focusTerminal = () => term.focus();
 
     const input = new InputSender((data) => terminalWrite(sessionId!, data));

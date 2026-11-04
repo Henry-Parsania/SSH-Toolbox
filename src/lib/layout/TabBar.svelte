@@ -3,6 +3,7 @@
   import { fitMenu } from "../ui/fitMenu";
   import Icon, { type IconName } from "../ui/Icon.svelte";
   import { leaves } from "./panes";
+  import { readableOn, sessionColors } from "../sessions/colors.svelte";
   import type { Tab, Workspace } from "./workspace.svelte";
 
   export interface NewTabOption {
@@ -43,6 +44,12 @@
   let draft = $state("");
   let strip: HTMLDivElement | undefined = $state();
   let dragging = $state<string | null>(null);
+
+  /** The colour chosen for the SSH session a tab was opened from, if any. */
+  function colorOf(tab: Tab): string | undefined {
+    const spec = leaves(tab.root)[0]?.spec;
+    return spec?.type === "ssh" ? sessionColors[spec.saved_session_id] : undefined;
+  }
 
   function startRename(id: string, title: string) {
     editing = id;
@@ -127,6 +134,8 @@
         class:active={tab.id === workspace.activeTabId}
         class:dragging={tab.id === dragging}
         class:elsewhere={tab.id !== workspace.activeTabId && workspace.groupOf(tab.id) !== null}
+        class:colored={!!colorOf(tab)}
+        style={colorOf(tab) ? `--tab-color: ${colorOf(tab)}; --tab-text: ${readableOn(colorOf(tab)!)}` : undefined}
         data-tab={tab.id}
         role="tab"
         tabindex="-1"
@@ -334,6 +343,27 @@
     bottom: -1px;
     height: 2px;
     background: var(--bg-0);
+  }
+  /* A session's own colour replaces the theme's look for its tab. */
+  .tab.colored {
+    background: var(--tab-color);
+    color: var(--tab-text);
+    opacity: 0.8;
+  }
+  .tab.colored.active {
+    opacity: 1;
+    background: var(--tab-color);
+    box-shadow:
+      inset 0 2px 0 var(--tab-text),
+      -1px 0 0 var(--border),
+      1px 0 0 var(--border);
+  }
+  .tab.colored.active::after {
+    background: var(--tab-color);
+  }
+  .tab.colored .kind,
+  .tab.colored.active .kind {
+    color: var(--tab-text);
   }
   .tab.dragging {
     opacity: 0.65;

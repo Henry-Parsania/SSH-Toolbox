@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { keychainSet } from "../backend";
   import type { Library } from "./library.svelte";
+  import { COLOR_CHOICES } from "./colors.svelte";
   import { checkSshForm, folderChoices, newId, type SshSession } from "./tree";
 
   interface Props {
@@ -30,6 +31,7 @@
     folder: editing?.folder ?? folder,
     jump: editing?.jump ?? "",
     x11: editing?.x11 ?? false,
+    color: editing?.color ?? "",
   }));
   let name = $state(start.name);
   let host = $state(start.host);
@@ -41,6 +43,7 @@
   let jump = $state(start.jump);
   let x11 = $state(start.x11);
   let copyKey = $state(false);
+  let color = $state(start.color);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -87,6 +90,7 @@
       key_path: auth === "key" ? keyPath.trim() : "",
       jump,
       x11,
+      color,
     };
     const sessions = editing
       ? library.file.session.map((s) => (s.id === id ? session : s))
@@ -147,6 +151,17 @@
         <option value="agent">SSH agent</option>
       </select>
     </label>
+    <div class="field">
+      Colour
+      <div class="swatches">
+        <button type="button" class="swatch none" class:picked={!color} title="Follow the theme" aria-label="No colour" onclick={() => (color = "")}></button>
+        {#each COLOR_CHOICES as c (c)}
+          <button type="button" class="swatch" class:picked={color === c} style:background={c} title={c} aria-label={c} onclick={() => (color = c)}></button>
+        {/each}
+        <input type="color" value={color || "#1f3f7a"} oninput={(e) => (color = e.currentTarget.value)} title="Pick any colour" aria-label="Custom colour" />
+      </div>
+      <small>Colours this session's tab and terminal background, instead of the theme's. Handy for telling servers apart.</small>
+    </div>
     {#if auth === "password" && onsetupkey}
       <div class="field">
         <label class="check">
@@ -206,6 +221,34 @@
 </div>
 
 <style>
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .swatch.none {
+    background: var(--bg-0);
+    border-color: var(--border);
+  }
+  .swatch.picked {
+    border-color: var(--accent);
+  }
+  .swatches input[type="color"] {
+    width: 34px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
   .port {
     flex: none;
     width: 7em;

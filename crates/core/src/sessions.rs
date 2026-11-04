@@ -84,6 +84,9 @@ pub enum SavedSession {
         /// Show windows of programs run on the server on this computer.
         #[serde(default)]
         x11: bool,
+        /// Tab and terminal colour as "#rrggbb", or empty to follow the theme.
+        #[serde(default)]
+        color: String,
     },
     Serial {
         id: String,
@@ -239,8 +242,15 @@ impl SessionsFile {
                     user,
                     key_path,
                     jump,
+                    color,
                     ..
                 } => {
+                    let hex = color.len() == 7
+                        && color.starts_with('#')
+                        && color[1..].chars().all(|c| c.is_ascii_hexdigit());
+                    if !color.is_empty() && !hex {
+                        return Err(invalid("A session colour must look like #1a2b3c."));
+                    }
                     if host.trim().is_empty()
                         || !clean_text(host)
                         || host.contains(|c: char| c.is_whitespace() || ",[]\"'".contains(c))
@@ -386,6 +396,7 @@ mod tests {
             key_path: "~/.ssh/id_ed25519".into(),
             jump: jump.into(),
             x11: false,
+            color: String::new(),
         }
     }
 
@@ -614,6 +625,16 @@ mod tests {
             *name = "line\nbreak".into();
         }
         assert!(f.validate().is_err());
+
+        let mut f = sample();
+        if let SavedSession::Ssh { color, .. } = &mut f.sessions[0] {
+            *color = "red; background:url(x)".into();
+        }
+        assert!(f.validate().is_err());
+        if let SavedSession::Ssh { color, .. } = &mut f.sessions[0] {
+            *color = "#1a2B3c".into();
+        }
+        assert!(f.validate().is_ok());
 
         let mut f = sample();
         f.folders[0].name = "  ".into();

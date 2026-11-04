@@ -423,6 +423,7 @@ impl Importer<'_> {
             key_path,
             jump,
             x11: false,
+            color: String::new(),
         });
         self.result.added.push(host.alias.clone());
         Ok(id)
