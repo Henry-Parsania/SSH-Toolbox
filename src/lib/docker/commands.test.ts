@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attachCommand, buildCommand, copyInCommand, copyOutCommand, loginCommand, pushCommand, tagCommand } from "./commands";
+import { attachCommand, buildCommand, copyInCommand, copyOutCommand, loginCommand, networkCommand, pushCommand, tagCommand } from "./commands";
 
 const cmd = (c: { command: string } | { error: string }) => ("command" in c ? c.command : "ERROR: " + c.error);
 
@@ -13,6 +13,8 @@ describe("docker commands", () => {
     expect(cmd(pushCommand("reg.example.com/team/app:1"))).toBe("docker push 'reg.example.com/team/app:1'");
     expect(cmd(loginCommand(""))).toBe("docker login");
     expect(cmd(loginCommand("reg.example.com:5000"))).toBe("docker login 'reg.example.com:5000'");
+    expect(cmd(networkCommand("connect", "backend", "web"))).toBe("docker network connect 'backend' 'web'");
+    expect(cmd(networkCommand("disconnect", "backend", "web"))).toBe("docker network disconnect 'backend' 'web'");
     expect(cmd(attachCommand("shop-web-1"))).toBe("docker attach --sig-proxy=false 'shop-web-1'");
     expect(cmd(copyOutCommand("web", "/etc/nginx/nginx.conf", "./nginx.conf"))).toBe("docker cp 'web:/etc/nginx/nginx.conf' './nginx.conf'");
     expect(cmd(copyInCommand("./a.txt", "web", "/tmp/"))).toBe("docker cp './a.txt' 'web:/tmp/'");
@@ -26,6 +28,7 @@ describe("docker commands", () => {
     expect(cmd(pushCommand("-rf"))).toMatch(/^ERROR/);
     expect(cmd(loginCommand("host && calc"))).toMatch(/^ERROR/);
     expect(cmd(attachCommand("web; x"))).toMatch(/^ERROR/);
+    expect(cmd(networkCommand("connect", "a b", "web"))).toMatch(/^ERROR/);
     expect(cmd(copyOutCommand("web", "/a\nb", "./x"))).toMatch(/^ERROR/);
     expect(cmd(copyInCommand("", "web", "/tmp"))).toMatch(/^ERROR/);
   });

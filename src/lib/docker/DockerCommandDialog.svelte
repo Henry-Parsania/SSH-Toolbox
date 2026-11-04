@@ -9,12 +9,13 @@
     copyInCommand,
     copyOutCommand,
     loginCommand,
+    networkCommand,
     pushCommand,
     tagCommand,
     type Checked,
   } from "./commands";
 
-  export type CommandKind = "build" | "tag" | "push" | "login" | "cp-out" | "cp-in";
+  export type CommandKind = "build" | "tag" | "push" | "login" | "cp-out" | "cp-in" | "net-connect" | "net-disconnect";
 
   interface Props {
     kind: CommandKind;
@@ -43,6 +44,8 @@
     login: "Log in to a registry",
     "cp-out": "Copy a file out of a container",
     "cp-in": "Copy a file into a container",
+    "net-connect": "Connect a container to a network",
+    "net-disconnect": "Disconnect a container from a network",
   };
 
   function submit() {
@@ -64,6 +67,11 @@
       case "login":
         result = loginCommand(a);
         title = "docker login";
+        break;
+      case "net-connect":
+      case "net-disconnect":
+        result = networkCommand(kind === "net-connect" ? "connect" : "disconnect", a.trim(), container);
+        title = `${kind === "net-connect" ? "connect" : "disconnect"} ${container}`;
         break;
       case "cp-out":
         result = copyOutCommand(container, a, b);
@@ -115,6 +123,9 @@
         <input type="text" bind:value={a} placeholder="registry.example.com" spellcheck="false" />
         <small>Docker asks for your user name and password in the terminal. They are never typed into this app.</small>
       </label>
+    {:else if kind === "net-connect" || kind === "net-disconnect"}
+      <label class="field">Network name <input type="text" bind:value={a} placeholder="backend" spellcheck="false" /></label>
+      <small>The container {container} {kind === "net-connect" ? "joins" : "leaves"} this network. The Networks tab lists the names.</small>
     {:else if kind === "cp-out"}
       <label class="field">Path in {container} <input type="text" bind:value={a} placeholder="/etc/nginx/nginx.conf" spellcheck="false" /></label>
       <label class="field">Copy it to (on {where}) <input type="text" bind:value={b} placeholder="./nginx.conf" spellcheck="false" /></label>

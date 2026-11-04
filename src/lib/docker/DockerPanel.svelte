@@ -612,6 +612,14 @@
     return c.status.includes("unhealthy");
   }
 
+  /** Docker's health check result, from its own status wording, or null if there is no check. */
+  function health(c: ContainerInfo): string | null {
+    if (c.status.includes("unhealthy")) return "unhealthy";
+    if (c.status.includes("(healthy)")) return "healthy";
+    if (c.status.includes("health: starting")) return "health check starting";
+    return null;
+  }
+
   function dot(state: string): string {
     if (state === "running") return "ok";
     if (state === "paused" || state === "restarting") return "warn";
@@ -810,7 +818,7 @@
         {#each group.items as c (c.id)}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="row" class:dim={c.state !== "running"} ondblclick={() => showDetails(c)} oncontextmenu={(e) => openMenu(e, { kind: "container", c })}>
-            <span class="dot {unhealthy(c) ? 'bad' : dot(c.state)}" title={unhealthy(c) ? "unhealthy" : c.state}></span>
+            <span class="dot {unhealthy(c) ? 'bad' : dot(c.state)}" title={health(c) ? `${c.state}, ${health(c)}` : c.state}></span>
             <div class="what">
               <span class="name">{c.name}</span>
               <span class="sub">{c.image} · {c.status}{c.created ? ` · made ${ago(c.created)}` : ""}</span>
@@ -889,6 +897,8 @@
         {#if c.state === "running"}
           <li><button onclick={() => { attach(c); closeMenu(); }}><Icon name="terminal" size={14} /> Attach to the main process</button></li>
         {/if}
+        <li><button onclick={() => { cmdForm = { kind: "net-connect", container: c.name }; closeMenu(); }}><Icon name="route" size={14} /> Connect to a network…</button></li>
+        <li><button onclick={() => { cmdForm = { kind: "net-disconnect", container: c.name }; closeMenu(); }}><Icon name="route" size={14} /> Disconnect from a network…</button></li>
         <li><button onclick={() => { cmdForm = { kind: "cp-out", container: c.name }; closeMenu(); }}><Icon name="up" size={14} /> Copy a file out…</button></li>
         <li><button onclick={() => { cmdForm = { kind: "cp-in", container: c.name }; closeMenu(); }}><Icon name="down" size={14} /> Copy a file in…</button></li>
         <li class="sep" role="separator"></li>

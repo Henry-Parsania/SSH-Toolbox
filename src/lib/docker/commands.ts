@@ -47,6 +47,12 @@ export function attachCommand(container: string): Checked {
   return { command: `docker attach --sig-proxy=false ${q(container)}` };
 }
 
+export function networkCommand(action: "connect" | "disconnect", network: string, container: string): Checked {
+  if (!CONTAINER.test(network)) return { error: "That network name can't be used." };
+  if (!CONTAINER.test(container)) return { error: "That container name can't be used." };
+  return { command: `docker network ${action} ${q(network)} ${q(container)}` };
+}
+
 export function copyOutCommand(container: string, containerPath: string, destination: string): Checked {
   if (!CONTAINER.test(container)) return { error: "That container name can't be used." };
   if (!path(containerPath) || !path(destination)) return { error: "Both paths are needed, without quotes or special characters." };
