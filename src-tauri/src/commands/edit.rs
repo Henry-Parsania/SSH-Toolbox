@@ -26,7 +26,10 @@ impl Edits {
 /// Opens a file in the program the computer uses for it. Programs and scripts, which opening
 /// could run, are opened by asking which program to use instead.
 fn open_safely(path: &Path, choose: bool) -> Result<(), AppError> {
-    let name = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy())
+        .unwrap_or_default();
     if choose || is_risky_to_open(&name) {
         open_with_dialog(path)
     } else {
@@ -70,7 +73,11 @@ pub async fn edit_upload(
 
 /// Opens the local copy again, or asks which program to open it with.
 #[tauri::command]
-pub async fn edit_reopen(edits: State<'_, Edits>, id: String, choose: bool) -> Result<(), AppError> {
+pub async fn edit_reopen(
+    edits: State<'_, Edits>,
+    id: String,
+    choose: bool,
+) -> Result<(), AppError> {
     let path = edits.0.local_path(&id)?;
     open_safely(&path, choose)
 }

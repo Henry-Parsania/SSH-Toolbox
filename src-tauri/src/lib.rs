@@ -56,7 +56,10 @@ pub fn run() {
                     }
                 });
                 // The title names the exact build, so it is clear which one is running.
-                let _ = window.set_title(&format!("SSH Toolbox {}", commands::platform::version_line()));
+                let _ = window.set_title(&format!(
+                    "SSH Toolbox {}",
+                    commands::platform::version_line()
+                ));
                 // The window starts hidden (tauri.conf.json) so it appears once, already at its
                 // saved size and position, instead of opening and then jumping.
                 if let Some(dir) = toolbox_core::config::config_dir() {
@@ -186,7 +189,9 @@ pub fn run() {
             let terminals = handle.state::<commands::terminal::Terminals>();
             tauri::async_runtime::block_on(terminals.sessions.close_all());
             // An X server the app started goes with it.
-            handle.state::<Arc<toolbox_core::x11::X11Local>>().stop_now();
+            handle
+                .state::<Arc<toolbox_core::x11::X11Local>>()
+                .stop_now();
             // Local copies of server files being edited are deleted.
             handle.state::<commands::edit::Edits>().0.stop_all();
         }

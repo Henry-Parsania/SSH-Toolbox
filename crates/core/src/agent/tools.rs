@@ -41,7 +41,12 @@ pub fn shorten(text: &str) -> String {
     while !text.is_char_boundary(tail) {
         tail += 1;
     }
-    format!("{}\n… ({} bytes left out) …\n{}", &text[..head], tail - head, &text[tail..])
+    format!(
+        "{}\n… ({} bytes left out) …\n{}",
+        &text[..head],
+        tail - head,
+        &text[tail..]
+    )
 }
 
 /// Whether the rules allow running this command. `approved` is the user's say-so, which can allow
@@ -84,9 +89,21 @@ pub async fn run_command(
 /// Paths that hold secrets. Reading or writing them needs the user's say-so.
 pub fn sensitive_path(path: &str) -> bool {
     let p = path.to_ascii_lowercase();
-    ["id_rsa", "id_ed25519", "id_ecdsa", "/etc/shadow", "/.env", ".pem", ".kdbx", ".netrc", ".pgpass", "/.ssh/", "credentials"]
-        .iter()
-        .any(|s| p.contains(s))
+    [
+        "id_rsa",
+        "id_ed25519",
+        "id_ecdsa",
+        "/etc/shadow",
+        "/.env",
+        ".pem",
+        ".kdbx",
+        ".netrc",
+        ".pgpass",
+        "/.ssh/",
+        "credentials",
+    ]
+    .iter()
+    .any(|s| p.contains(s))
 }
 
 fn path_error(message: &str) -> AppError {
@@ -107,7 +124,9 @@ pub async fn read_text_file(
     }
     let entry = backend.stat(path).await?;
     if entry.size.unwrap_or(0) > MAX_FILE {
-        return Err(path_error("That file is too big to read whole. Use head, tail or grep instead."));
+        return Err(path_error(
+            "That file is too big to read whole. Use head, tail or grep instead.",
+        ));
     }
     let mut data: Vec<u8> = Vec::new();
     backend
@@ -143,7 +162,9 @@ pub async fn write_text_file(
         ));
     }
     if !path.starts_with('/') || path.contains('\0') || path.ends_with('/') {
-        return Err(path_error("Use a full path to a file, such as /etc/app/config.yml."));
+        return Err(path_error(
+            "Use a full path to a file, such as /etc/app/config.yml.",
+        ));
     }
     if content.len() as u64 > MAX_FILE {
         return Err(path_error("That is too much text to write in one go."));
@@ -184,11 +205,24 @@ mod tests {
         files.put("/etc/app.conf", b"port=80\nDB_PASSWORD=hunter2\n");
         files.put("/bin/tool", &[1, 2, 0, 3]);
         files.put("/home/me/.ssh/id_ed25519", b"x");
-        let text = read_text_file(&files, "/etc/app.conf", false).await.unwrap();
-        assert!(text.contains("port=80") && !text.contains("hunter2"), "{text}");
+        let text = read_text_file(&files, "/etc/app.conf", false)
+            .await
+            .unwrap();
+        assert!(
+            text.contains("port=80") && !text.contains("hunter2"),
+            "{text}"
+        );
         assert!(read_text_file(&files, "/bin/tool", false).await.is_err());
-        assert!(read_text_file(&files, "/home/me/.ssh/id_ed25519", false).await.is_err());
-        assert!(read_text_file(&files, "/home/me/.ssh/id_ed25519", true).await.is_ok());
+        assert!(
+            read_text_file(&files, "/home/me/.ssh/id_ed25519", false)
+                .await
+                .is_err()
+        );
+        assert!(
+            read_text_file(&files, "/home/me/.ssh/id_ed25519", true)
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -198,7 +232,14 @@ mod tests {
         assert!(write_text_file(&files, "a.txt", "x", true).await.is_err());
         assert!(write_text_file(&files, "/dir/", "x", true).await.is_err());
         files.put_dir("/etc");
-        write_text_file(&files, "/etc/new.conf", "hello", true).await.unwrap();
-        assert_eq!(read_text_file(&files, "/etc/new.conf", false).await.unwrap(), "hello");
+        write_text_file(&files, "/etc/new.conf", "hello", true)
+            .await
+            .unwrap();
+        assert_eq!(
+            read_text_file(&files, "/etc/new.conf", false)
+                .await
+                .unwrap(),
+            "hello"
+        );
     }
 }

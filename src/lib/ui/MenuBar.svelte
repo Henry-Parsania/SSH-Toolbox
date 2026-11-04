@@ -1,7 +1,7 @@
 <script lang="ts">
   // A classic menu bar, so every feature can be found without remembering a shortcut.
 
-  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { appWindow } from "../backend/window";
   import { appVersion } from "../backend";
 
   export interface MenuItem {
@@ -23,7 +23,7 @@
 
   // The window has no title bar of its own: this bar is dragged to move it, and the buttons at the
   // right minimize, maximize and close it.
-  const win = getCurrentWindow();
+  const win = appWindow();
   let maximized = $state(false);
   let version = $state("");
   void appVersion().then((v) => (version = v)).catch(() => {});

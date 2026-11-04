@@ -16,7 +16,10 @@ pub fn find_executable() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         let mut places = Vec::new();
-        if let Some(dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(Path::to_path_buf))
+        {
             places.push(dir.join("x-server").join("vcxsrv.exe"));
         }
         for var in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {

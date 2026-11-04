@@ -99,7 +99,11 @@ pub fn build(spec: &RunSpec) -> Result<(Option<String>, Value), AppError> {
         if port.host == 0 || port.container == 0 {
             return Err(invalid("Ports are numbers from 1 to 65535."));
         }
-        let key = format!("{}/{}", port.container, if port.udp { "udp" } else { "tcp" });
+        let key = format!(
+            "{}/{}",
+            port.container,
+            if port.udp { "udp" } else { "tcp" }
+        );
         exposed.insert(key.clone(), json!({}));
         let entry = bindings.entry(key).or_insert_with(|| json!([]));
         let host_ip = if spec.localhost_only { "127.0.0.1" } else { "" };
@@ -113,7 +117,9 @@ pub fn build(spec: &RunSpec) -> Result<(Option<String>, Value), AppError> {
     for volume in &spec.volumes {
         let target = volume.target.trim();
         if !target.starts_with('/') || !plain(target) || target == "/" {
-            return Err(invalid("Inside the container, use a full path such as /data."));
+            return Err(invalid(
+                "Inside the container, use a full path such as /data.",
+            ));
         }
         let source = volume.source.trim();
         let kind = if is_host_path(source) && plain(source) {
@@ -142,7 +148,9 @@ pub fn build(spec: &RunSpec) -> Result<(Option<String>, Value), AppError> {
                 .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
             && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
         if !ok {
-            return Err(invalid("Variables are written NAME=value, one for each line."));
+            return Err(invalid(
+                "Variables are written NAME=value, one for each line.",
+            ));
         }
     }
 
@@ -243,11 +251,23 @@ mod tests {
         RunSpec {
             image: "nginx:1.27".into(),
             name: "web".into(),
-            ports: vec![PortSpec { host: 8080, container: 80, udp: false }],
+            ports: vec![PortSpec {
+                host: 8080,
+                container: 80,
+                udp: false,
+            }],
             localhost_only: true,
             volumes: vec![
-                VolumeSpec { source: "/srv/site".into(), target: "/usr/share/nginx/html".into(), read_only: true },
-                VolumeSpec { source: "cache".into(), target: "/cache".into(), read_only: false },
+                VolumeSpec {
+                    source: "/srv/site".into(),
+                    target: "/usr/share/nginx/html".into(),
+                    read_only: true,
+                },
+                VolumeSpec {
+                    source: "cache".into(),
+                    target: "/cache".into(),
+                    read_only: false,
+                },
             ],
             env: vec!["MODE=prod".into()],
             restart: "unless-stopped".into(),
@@ -259,12 +279,21 @@ mod tests {
         let (name, body) = build(&spec()).unwrap();
         assert_eq!(name.as_deref(), Some("web"));
         assert_eq!(body["Image"], "nginx:1.27");
-        assert_eq!(body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostIp"], "127.0.0.1");
-        assert_eq!(body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostPort"], "8080");
+        assert_eq!(
+            body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostIp"],
+            "127.0.0.1"
+        );
+        assert_eq!(
+            body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostPort"],
+            "8080"
+        );
         assert_eq!(body["HostConfig"]["Mounts"][0]["Type"], "bind");
         assert_eq!(body["HostConfig"]["Mounts"][0]["ReadOnly"], true);
         assert_eq!(body["HostConfig"]["Mounts"][1]["Type"], "volume");
-        assert_eq!(body["HostConfig"]["RestartPolicy"]["Name"], "unless-stopped");
+        assert_eq!(
+            body["HostConfig"]["RestartPolicy"]["Name"],
+            "unless-stopped"
+        );
         assert_eq!(body["Env"][0], "MODE=prod");
         let parsed: Result<ContainerCreateBody, _> = serde_json::from_value(body);
         assert!(parsed.is_ok());
@@ -275,11 +304,15 @@ mod tests {
         let mut s = spec();
         s.localhost_only = false;
         let (_, body) = build(&s).unwrap();
-        assert_eq!(body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostIp"], "");
+        assert_eq!(
+            body["HostConfig"]["PortBindings"]["80/tcp"][0]["HostIp"],
+            ""
+        );
     }
 
     #[test]
     fn anything_that_is_not_what_it_says_is_refused() {
+        #[allow(clippy::type_complexity)]
         let cases: Vec<Box<dyn Fn(&mut RunSpec)>> = vec![
             Box::new(|s| s.image = "--privileged".into()),
             Box::new(|s| s.image = "nginx x".into()),
@@ -327,7 +360,11 @@ mod engine_tests {
         let spec = RunSpec {
             image: "nginx".into(),
             name: "web".into(),
-            ports: vec![PortSpec { host: 8080, container: 80, udp: false }],
+            ports: vec![PortSpec {
+                host: 8080,
+                container: 80,
+                udp: false,
+            }],
             localhost_only: true,
             volumes: vec![],
             env: vec!["A=1".into()],
@@ -336,7 +373,11 @@ mod engine_tests {
         let id = run(&docker, &spec).await.unwrap();
         assert_eq!(id, "abc123");
         let seen = seen.lock().unwrap().join("\n");
-        assert!(seen.contains("POST /v1.52/containers/create?name=web") || seen.contains("/containers/create?name=web"), "{seen}");
+        assert!(
+            seen.contains("POST /v1.52/containers/create?name=web")
+                || seen.contains("/containers/create?name=web"),
+            "{seen}"
+        );
         assert!(seen.contains(r#""HostPort":"8080""#), "{seen}");
         assert!(seen.contains("/containers/abc123/start"), "{seen}");
     }

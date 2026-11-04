@@ -189,7 +189,12 @@ mod tests {
             (256, "host", "1", [2u8; 16]),
         ] {
             bytes.extend_from_slice(&family.to_be_bytes());
-            for part in [address.as_bytes(), number.as_bytes(), COOKIE_PROTOCOL.as_bytes(), &data] {
+            for part in [
+                address.as_bytes(),
+                number.as_bytes(),
+                COOKIE_PROTOCOL.as_bytes(),
+                &data,
+            ] {
                 bytes.extend_from_slice(&(part.len() as u16).to_be_bytes());
                 bytes.extend_from_slice(part);
             }

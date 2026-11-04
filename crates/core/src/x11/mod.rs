@@ -92,8 +92,8 @@ impl X11Local {
                 "There is no X display on this computer (DISPLAY isn't set).",
             ));
         };
-        found.cookie = display::default_authority()
-            .and_then(|file| display::read_cookie(&file, found.number));
+        found.cookie =
+            display::default_authority().and_then(|file| display::read_cookie(&file, found.number));
         Ok(found)
     }
 
@@ -128,9 +128,14 @@ impl X11Local {
         }
         #[cfg(unix)]
         {
-            let ok = display::parse_display(&std::env::var("DISPLAY").unwrap_or_default()).is_some();
+            let ok =
+                display::parse_display(&std::env::var("DISPLAY").unwrap_or_default()).is_some();
             X11Status {
-                state: if ok { X11State::Running } else { X11State::Missing },
+                state: if ok {
+                    X11State::Running
+                } else {
+                    X11State::Missing
+                },
                 detail: if ok {
                     "This desktop's X display is used.".into()
                 } else {
@@ -212,8 +217,11 @@ where
     else {
         return;
     };
-    let Some(first) = setup::rewrite(&packet, &forward.fake_cookie, forward.local.cookie.as_deref())
-    else {
+    let Some(first) = setup::rewrite(
+        &packet,
+        &forward.fake_cookie,
+        forward.local.cookie.as_deref(),
+    ) else {
         return; // Without our cookie the program is not let in.
     };
     match &forward.local.endpoint {

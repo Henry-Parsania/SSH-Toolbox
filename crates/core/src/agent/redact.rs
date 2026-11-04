@@ -7,8 +7,18 @@ const HIDDEN: &str = "[hidden]";
 
 /// Words in a name that mark its value as secret.
 const SECRET_NAMES: [&str; 12] = [
-    "password", "passwd", "passphrase", "secret", "token", "api_key", "apikey", "api-key",
-    "access_key", "private_key", "authorization", "credential",
+    "password",
+    "passwd",
+    "passphrase",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "access_key",
+    "private_key",
+    "authorization",
+    "credential",
 ];
 
 fn is_word_char(c: char) -> bool {
@@ -135,9 +145,18 @@ mod tests {
     #[test]
     fn values_of_secret_names_are_hidden_but_the_names_stay() {
         assert_eq!(redact("DB_PASSWORD=hunter2"), "DB_PASSWORD= [hidden]");
-        assert_eq!(redact("  \"api_key\": \"abc123\","), "  \"api_key\": [hidden],");
-        assert_eq!(redact("Authorization: Bearer abc.def"), "Authorization: [hidden]");
-        assert_eq!(redact("curl -H 'x: y' Bearer zzz"), "curl -H 'x: y' Bearer [hidden]");
+        assert_eq!(
+            redact("  \"api_key\": \"abc123\","),
+            "  \"api_key\": [hidden],"
+        );
+        assert_eq!(
+            redact("Authorization: Bearer abc.def"),
+            "Authorization: [hidden]"
+        );
+        assert_eq!(
+            redact("curl -H 'x: y' Bearer zzz"),
+            "curl -H 'x: y' Bearer [hidden]"
+        );
         assert!(!redact("export GITHUB_TOKEN=abc").contains("abc"));
     }
 
@@ -159,11 +178,17 @@ mod tests {
     #[test]
     fn known_token_shapes_are_hidden_anywhere() {
         let ghp = format!("ghp_{}", "a1".repeat(20));
-        assert_eq!(redact(&format!("pushed with {ghp} ok")), "pushed with [hidden] ok");
+        assert_eq!(
+            redact(&format!("pushed with {ghp} ok")),
+            "pushed with [hidden] ok"
+        );
         assert_eq!(redact("key AKIAABCDEFGHIJKLMNOP end"), "key [hidden] end");
         assert_eq!(redact("sk-abcdefghijklmnopqrstuvwxyz1234"), "[hidden]");
         let jwt = format!("eyJhbGciOiJIUzI1NiJ9.{}.{}", "a".repeat(30), "b".repeat(30));
         assert_eq!(redact(&jwt), "[hidden]");
-        assert!(!redact("root:$6$saltsaltsalt$abcdefghijklmnopqrstuvwxyz:19000:0").contains("abcdefghij"));
+        assert!(
+            !redact("root:$6$saltsaltsalt$abcdefghijklmnopqrstuvwxyz:19000:0")
+                .contains("abcdefghij")
+        );
     }
 }

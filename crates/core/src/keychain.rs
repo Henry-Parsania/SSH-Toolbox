@@ -26,7 +26,12 @@ pub enum SecretKind {
 }
 
 impl SecretKind {
-    const ALL: [SecretKind; 4] = [Self::Password, Self::Passphrase, Self::FtpPassword, Self::ApiKey];
+    const ALL: [SecretKind; 4] = [
+        Self::Password,
+        Self::Passphrase,
+        Self::FtpPassword,
+        Self::ApiKey,
+    ];
 
     fn as_str(self) -> &'static str {
         match self {

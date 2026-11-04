@@ -11,10 +11,10 @@ use super::testing::{Accepts, KEY_A, ServerHandle, X11Fake, key, public_of, spaw
 use crate::error::ErrorCode;
 use crate::keychain::{Keychain, SecretStore};
 use crate::prompt::PromptBroker;
-use crate::x11::X11Local;
 use crate::sessions::{SavedSession, SessionStore, SessionsFile, SshAuth};
 use crate::terminal::testing::{RecordingSink, Sent};
 use crate::terminal::{SessionRegistry, TermSize, TerminalStatus};
+use crate::x11::X11Local;
 
 use super::testing::MemoryStore;
 
@@ -36,7 +36,6 @@ fn world() -> World {
 }
 
 fn world_in(dir: tempfile::TempDir, x11: Arc<X11Local>) -> World {
-
     let secrets = Arc::new(MemoryStore::default());
     let dyn_secrets: Arc<dyn SecretStore> = secrets.clone();
     let sessions_file = dir.path().join("sessions.toml");
@@ -585,7 +584,9 @@ struct LocalX {
 }
 
 async fn local_x() -> LocalX {
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .unwrap();
     let port = listener.local_addr().unwrap().port();
     let cookies: Arc<std::sync::Mutex<Vec<Vec<u8>>>> = Arc::default();
     let seen = cookies.clone();
@@ -654,7 +655,10 @@ async fn a_program_with_the_wrong_cookie_is_not_let_in() {
     })
     .await;
     assert!(server.stats.x11_answers.lock().unwrap()[0].is_empty());
-    assert!(local.cookies.lock().unwrap().is_empty(), "never reached the local server");
+    assert!(
+        local.cookies.lock().unwrap().is_empty(),
+        "never reached the local server"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -667,7 +671,10 @@ async fn a_server_that_refuses_x11_is_explained_in_the_terminal() {
         text(&sink).contains("X11 forwarding is off: the server refused it")
     })
     .await;
-    assert!(text(&sink).contains("welcome-banner"), "the shell still opened");
+    assert!(
+        text(&sink).contains("welcome-banner"),
+        "the shell still opened"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

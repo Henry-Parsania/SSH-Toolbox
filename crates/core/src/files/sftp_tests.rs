@@ -390,7 +390,10 @@ async fn a_server_file_can_be_edited_here_and_sent_back_over_sftp() {
     );
 
     std::fs::write(&info.local_path, "services:\n  web:\n    image: nginx\n").unwrap();
-    assert_eq!(edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
+    assert_eq!(
+        edits.upload(&info.id, false).await.unwrap(),
+        UploadResult::Uploaded
+    );
     assert_eq!(
         std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
         "services:\n  web:\n    image: nginx\n"
@@ -398,7 +401,10 @@ async fn a_server_file_can_be_edited_here_and_sent_back_over_sftp() {
 
     // Saving again right after is not mistaken for a change made by someone else.
     std::fs::write(&info.local_path, "services:\n  web:\n    image: caddy\n").unwrap();
-    assert_eq!(edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
+    assert_eq!(
+        edits.upload(&info.id, false).await.unwrap(),
+        UploadResult::Uploaded
+    );
 
     // Someone else changes the server's file later: nothing is sent unless forced.
     tokio::time::sleep(Duration::from_millis(1200)).await;
@@ -412,7 +418,10 @@ async fn a_server_file_can_be_edited_here_and_sent_back_over_sftp() {
         std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
         "theirs\n"
     );
-    assert_eq!(edits.upload(&info.id, true).await.unwrap(), UploadResult::Uploaded);
+    assert_eq!(
+        edits.upload(&info.id, true).await.unwrap(),
+        UploadResult::Uploaded
+    );
     assert_eq!(
         std::fs::read_to_string(w.root.path().join("compose.yaml")).unwrap(),
         "mine\n"

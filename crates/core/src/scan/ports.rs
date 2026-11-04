@@ -5,12 +5,14 @@ use crate::error::{AppError, ErrorCode};
 /// What a quick look at a network tries: the services people usually run on their own machines.
 pub const COMMON: &[u16] = &[
     21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 389, 443, 445, 465, 587, 631, 993, 995, 1433,
-    1521, 2049, 2375, 3000, 3306, 3389, 5000, 5432, 5900, 5985, 6379, 8000, 8080, 8443, 9000,
-    9090, 9200, 27017,
+    1521, 2049, 2375, 3000, 3306, 3389, 5000, 5432, 5900, 5985, 6379, 8000, 8080, 8443, 9000, 9090,
+    9200, 27017,
 ];
 
 /// Enough to tell that a computer is there, and what kind: used to find hosts on a network.
-pub const DISCOVERY: &[u16] = &[22, 80, 443, 445, 139, 135, 3389, 5900, 21, 23, 8080, 53, 631, 62078];
+pub const DISCOVERY: &[u16] = &[
+    22, 80, 443, 445, 139, 135, 3389, 5900, 21, 23, 8080, 53, 631, 62078,
+];
 
 /// Most ports one scan may cover.
 pub const MAX_PORTS: usize = 65_535;
@@ -75,7 +77,10 @@ pub fn service_name(port: u16) -> Option<&'static str> {
 pub fn parse(text: &str) -> Result<Vec<u16>, AppError> {
     let invalid = |m: String| AppError::new(ErrorCode::InvalidInput, m);
     let mut out: Vec<u16> = Vec::new();
-    for part in text.split(|c: char| c == ',' || c == ';' || c.is_whitespace()).filter(|p| !p.is_empty()) {
+    for part in text
+        .split(|c: char| c == ',' || c == ';' || c.is_whitespace())
+        .filter(|p| !p.is_empty())
+    {
         match part.to_ascii_lowercase().as_str() {
             "common" => out.extend_from_slice(COMMON),
             "all" => out.extend(1..=65535u16),
@@ -83,7 +88,9 @@ pub fn parse(text: &str) -> Result<Vec<u16>, AppError> {
                 let number = |s: &str| -> Result<u16, AppError> {
                     match s.parse::<u32>() {
                         Ok(n @ 1..=65535) => Ok(n as u16),
-                        _ => Err(invalid(format!("“{s}” isn't a port. Ports are numbers from 1 to 65535."))),
+                        _ => Err(invalid(format!(
+                            "“{s}” isn't a port. Ports are numbers from 1 to 65535."
+                        ))),
                     }
                 };
                 match part.split_once('-') {
@@ -102,7 +109,9 @@ pub fn parse(text: &str) -> Result<Vec<u16>, AppError> {
     out.sort_unstable();
     out.dedup();
     if out.is_empty() {
-        return Err(invalid("Enter ports such as 22,80,443 or 1-1024, or the word common.".into()));
+        return Err(invalid(
+            "Enter ports such as 22,80,443 or 1-1024, or the word common.".into(),
+        ));
     }
     Ok(out)
 }
@@ -133,6 +142,9 @@ mod tests {
         assert_eq!(service_name(3389), Some("Remote Desktop"));
         assert_eq!(service_name(5901), Some("VNC"));
         assert_eq!(service_name(40000), None);
-        assert!(COMMON.iter().all(|p| service_name(*p).is_some()), "every common port is named");
+        assert!(
+            COMMON.iter().all(|p| service_name(*p).is_some()),
+            "every common port is named"
+        );
     }
 }

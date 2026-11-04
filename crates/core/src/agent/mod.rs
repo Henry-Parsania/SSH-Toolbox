@@ -6,8 +6,8 @@
 pub mod llm;
 pub mod policy;
 pub mod providers;
-pub mod tools;
 pub mod redact;
+pub mod tools;
 
 #[cfg(test)]
 mod llm_tests;

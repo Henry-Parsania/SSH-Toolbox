@@ -21,13 +21,78 @@ pub enum Risk {
 
 /// Commands that only look. Each is checked further below for flags that make them do more.
 const READ_ONLY: &[&str] = &[
-    "ls", "cat", "head", "tail", "df", "du", "ps", "free", "uptime", "uname", "whoami", "id", "pwd",
-    "grep", "egrep", "fgrep", "stat", "wc", "date", "hostname", "hostnamectl", "lsblk", "lscpu",
-    "lsmod", "lspci", "lsusb", "env", "printenv", "which", "whereis", "type", "file", "sort", "uniq",
-    "cut", "tr", "nl", "less", "more", "basename", "dirname", "realpath", "readlink", "echo",
-    "journalctl", "dmesg", "ss", "netstat", "ip", "ping", "dig", "nslookup", "last", "who", "w",
-    "top", "vmstat", "iostat", "tree", "md5sum", "sha256sum", "sha1sum", "find", "docker",
-    "systemctl", "git", "uptime", "nproc", "arch", "locale", "lsof", "pgrep",
+    "ls",
+    "cat",
+    "head",
+    "tail",
+    "df",
+    "du",
+    "ps",
+    "free",
+    "uptime",
+    "uname",
+    "whoami",
+    "id",
+    "pwd",
+    "grep",
+    "egrep",
+    "fgrep",
+    "stat",
+    "wc",
+    "date",
+    "hostname",
+    "hostnamectl",
+    "lsblk",
+    "lscpu",
+    "lsmod",
+    "lspci",
+    "lsusb",
+    "env",
+    "printenv",
+    "which",
+    "whereis",
+    "type",
+    "file",
+    "sort",
+    "uniq",
+    "cut",
+    "tr",
+    "nl",
+    "less",
+    "more",
+    "basename",
+    "dirname",
+    "realpath",
+    "readlink",
+    "echo",
+    "journalctl",
+    "dmesg",
+    "ss",
+    "netstat",
+    "ip",
+    "ping",
+    "dig",
+    "nslookup",
+    "last",
+    "who",
+    "w",
+    "top",
+    "vmstat",
+    "iostat",
+    "tree",
+    "md5sum",
+    "sha256sum",
+    "sha1sum",
+    "find",
+    "docker",
+    "systemctl",
+    "git",
+    "uptime",
+    "nproc",
+    "arch",
+    "locale",
+    "lsof",
+    "pgrep",
 ];
 
 /// Parts of a command that always make it risky, wherever they appear.
@@ -45,10 +110,33 @@ fn blocked(command: &str) -> bool {
         match rm {
             Some(at) => {
                 let args = &words[at + 1..];
-                let recursive = args.iter().any(|a| a.starts_with('-') && (a.contains('r') || a.contains('R')) || *a == "--recursive");
+                let recursive = args.iter().any(|a| {
+                    a.starts_with('-') && (a.contains('r') || a.contains('R'))
+                        || *a == "--recursive"
+                });
                 let target_root = args.iter().any(|a| {
-                    matches!(*a, "/" | "/*" | "~" | "~/" | "~/*" | "$home" | "$home/" | "$home/*" | "/home" | "/home/*" | "/etc" | "/etc/*" | "/usr" | "/usr/*" | "/var" | "/var/*" | "/boot" | "/bin" | "/lib" | "/root")
-                        || *a == "--no-preserve-root"
+                    matches!(
+                        *a,
+                        "/" | "/*"
+                            | "~"
+                            | "~/"
+                            | "~/*"
+                            | "$home"
+                            | "$home/"
+                            | "$home/*"
+                            | "/home"
+                            | "/home/*"
+                            | "/etc"
+                            | "/etc/*"
+                            | "/usr"
+                            | "/usr/*"
+                            | "/var"
+                            | "/var/*"
+                            | "/boot"
+                            | "/bin"
+                            | "/lib"
+                            | "/root"
+                    ) || *a == "--no-preserve-root"
                 });
                 recursive && target_root
             }
@@ -62,7 +150,12 @@ fn blocked(command: &str) -> bool {
         || has("> /dev/nvme")
         || has(":(){")
         || has("chmod -r 777 /")
-        || has("chown -r") && has(" /")  && !has(" /home/") && !has(" /srv/") && !has(" /var/www") && !has(" /opt/")
+        || has("chown -r")
+            && has(" /")
+            && !has(" /home/")
+            && !has(" /srv/")
+            && !has(" /var/www")
+            && !has(" /opt/")
         || has("shred ") && has("/dev/")
         || has("wipefs")
         || has("rm -rf --no-preserve-root")
@@ -76,39 +169,104 @@ fn base_name(word: &str) -> &str {
 /// Whether one part of a pipeline (a single command) only looks at things.
 fn part_is_read_only(part: &str) -> bool {
     let words: Vec<&str> = part.split_whitespace().collect();
-    let Some(first) = words.first() else { return false };
+    let Some(first) = words.first() else {
+        return false;
+    };
     let name = base_name(first);
     if !READ_ONLY.contains(&name) {
         return false;
     }
     let args = &words[1..];
-    let has_arg = |a: &str| args.iter().any(|x| *x == a);
+    let has_arg = |a: &str| args.contains(&a);
     let starts = |p: &str| args.iter().any(|x| x.starts_with(p));
     match name {
         // These can run or delete things.
-        "find" => !(starts("-exec") || starts("-ok") || has_arg("-delete") || starts("-fprint") || starts("-fls")),
+        "find" => {
+            !(starts("-exec")
+                || starts("-ok")
+                || has_arg("-delete")
+                || starts("-fprint")
+                || starts("-fls"))
+        }
         "sort" => !(starts("-o") || starts("--output")),
         "less" | "more" | "top" => false, // interactive programs can't be used without a screen
         // `env NAME=value command` runs a command.
         "env" => args.is_empty(),
         "tree" => !starts("-o"),
-        "ip" => !args.iter().any(|a| matches!(*a, "add" | "del" | "delete" | "set" | "flush" | "replace" | "change")),
+        "ip" => !args.iter().any(|a| {
+            matches!(
+                *a,
+                "add" | "del" | "delete" | "set" | "flush" | "replace" | "change"
+            )
+        }),
         "ping" => has_arg("-c") || starts("-c"),
-        "systemctl" => args
-            .iter()
-            .find(|a| !a.starts_with('-'))
-            .is_some_and(|a| matches!(*a, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "show" | "cat")),
-        "docker" => args
-            .iter()
-            .find(|a| !a.starts_with('-'))
-            .is_some_and(|a| matches!(*a, "ps" | "images" | "logs" | "inspect" | "stats" | "version" | "info" | "volume" | "network" | "compose"))
-            && !args.iter().any(|a| matches!(*a, "rm" | "prune" | "create" | "up" | "down" | "start" | "stop" | "restart" | "kill" | "run" | "exec" | "pull" | "build")),
-        "git" => args
-            .iter()
-            .find(|a| !a.starts_with('-'))
-            .is_some_and(|a| matches!(*a, "status" | "log" | "diff" | "show" | "branch" | "remote" | "describe" | "rev-parse" | "ls-files"))
-            && !args.iter().any(|a| matches!(*a, "-D" | "-d" | "--delete" | "-m" | "-M" | "-c" | "-C")),
-        "journalctl" => !starts("--vacuum") && !starts("--rotate") && !starts("--flush") && !starts("--sync"),
+        "systemctl" => args.iter().find(|a| !a.starts_with('-')).is_some_and(|a| {
+            matches!(
+                *a,
+                "status"
+                    | "is-active"
+                    | "is-enabled"
+                    | "is-failed"
+                    | "list-units"
+                    | "list-unit-files"
+                    | "list-timers"
+                    | "show"
+                    | "cat"
+            )
+        }),
+        "docker" => {
+            args.iter().find(|a| !a.starts_with('-')).is_some_and(|a| {
+                matches!(
+                    *a,
+                    "ps" | "images"
+                        | "logs"
+                        | "inspect"
+                        | "stats"
+                        | "version"
+                        | "info"
+                        | "volume"
+                        | "network"
+                        | "compose"
+                )
+            }) && !args.iter().any(|a| {
+                matches!(
+                    *a,
+                    "rm" | "prune"
+                        | "create"
+                        | "up"
+                        | "down"
+                        | "start"
+                        | "stop"
+                        | "restart"
+                        | "kill"
+                        | "run"
+                        | "exec"
+                        | "pull"
+                        | "build"
+                )
+            })
+        }
+        "git" => {
+            args.iter().find(|a| !a.starts_with('-')).is_some_and(|a| {
+                matches!(
+                    *a,
+                    "status"
+                        | "log"
+                        | "diff"
+                        | "show"
+                        | "branch"
+                        | "remote"
+                        | "describe"
+                        | "rev-parse"
+                        | "ls-files"
+                )
+            }) && !args
+                .iter()
+                .any(|a| matches!(*a, "-D" | "-d" | "--delete" | "-m" | "-M" | "-c" | "-C"))
+        }
+        "journalctl" => {
+            !starts("--vacuum") && !starts("--rotate") && !starts("--flush") && !starts("--sync")
+        }
         "dmesg" => !(has_arg("-c") || has_arg("-C") || starts("--clear") || starts("--console")),
         "date" => !(has_arg("-s") || starts("--set")),
         "hostname" => args.is_empty() || args.iter().all(|a| a.starts_with('-') && *a != "-b"),
@@ -136,13 +294,27 @@ pub fn classify(command: &str) -> Risk {
     }
     // Looking at files that hold secrets is allowed, but only with the user's say-so.
     let lower = command.to_ascii_lowercase();
-    if ["id_rsa", "id_ed25519", "id_ecdsa", "/etc/shadow", ".env", ".pem", ".kdbx", "credentials", ".netrc", ".pgpass"]
-        .iter()
-        .any(|s| lower.contains(s))
+    if [
+        "id_rsa",
+        "id_ed25519",
+        "id_ecdsa",
+        "/etc/shadow",
+        ".env",
+        ".pem",
+        ".kdbx",
+        "credentials",
+        ".netrc",
+        ".pgpass",
+    ]
+    .iter()
+    .any(|s| lower.contains(s))
     {
         return Risk::Changes;
     }
-    if command.split('|').all(|part| part_is_read_only(part.trim())) {
+    if command
+        .split('|')
+        .all(|part| part_is_read_only(part.trim()))
+    {
         Risk::ReadOnly
     } else {
         Risk::Changes

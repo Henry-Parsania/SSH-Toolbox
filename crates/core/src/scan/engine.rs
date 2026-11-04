@@ -100,7 +100,12 @@ fn tidy(bytes: &[u8]) -> Option<String> {
     (text.trim().chars().count() >= 3).then(|| text.trim().to_string())
 }
 
-async fn probe(addr: SocketAddr, timeout: Duration, banner: bool, cancel: &CancellationToken) -> Probe {
+async fn probe(
+    addr: SocketAddr,
+    timeout: Duration,
+    banner: bool,
+    cancel: &CancellationToken,
+) -> Probe {
     let connect = tokio::time::timeout(timeout, TcpStream::connect(addr));
     let connected = tokio::select! {
         _ = cancel.cancelled() => return Probe::Silent,
@@ -142,7 +147,10 @@ pub async fn run(
     }
     let timeout = Duration::from_millis(request.timeout_ms.clamp(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS));
     let total = hosts.len() * ports.len();
-    emit(ScanEvent::Started { hosts: hosts.len(), ports: ports.len() });
+    emit(ScanEvent::Started {
+        hosts: hosts.len(),
+        ports: ports.len(),
+    });
 
     let emit = Arc::new(emit);
     let permits = Arc::new(Semaphore::new(CONCURRENCY));
@@ -165,8 +173,13 @@ pub async fn run(
             for port in ports {
                 let (permits, cancel) = (permits.clone(), cancel.clone());
                 probes.spawn(async move {
-                    let Ok(_permit) = permits.acquire_owned().await else { return (port, Probe::Silent) };
-                    (port, probe(SocketAddr::new(ip, port), timeout, banners, &cancel).await)
+                    let Ok(_permit) = permits.acquire_owned().await else {
+                        return (port, Probe::Silent);
+                    };
+                    (
+                        port,
+                        probe(SocketAddr::new(ip, port), timeout, banners, &cancel).await,
+                    )
                 });
             }
             let mut open = Vec::new();
@@ -185,15 +198,28 @@ pub async fn run(
                 let mut last = last_progress.lock().unwrap();
                 if last.elapsed() >= Duration::from_millis(150) {
                     *last = Instant::now();
-                    emit(ScanEvent::Progress { done: finished, total });
+                    emit(ScanEvent::Progress {
+                        done: finished,
+                        total,
+                    });
                 }
             }
             open.sort_by_key(|p| p.port);
-            HostResult { ip: ip.to_string(), alive: !open.is_empty() || closed > 0, open, closed }
+            HostResult {
+                ip: ip.to_string(),
+                alive: !open.is_empty() || closed > 0,
+                open,
+                closed,
+            }
         });
     }
 
-    let mut summary = Summary { hosts: hosts.len(), up: 0, open_ports: 0, cancelled: false };
+    let mut summary = Summary {
+        hosts: hosts.len(),
+        up: 0,
+        open_ports: 0,
+        cancelled: false,
+    };
     while let Some(Ok(result)) = set.join_next().await {
         summary.up += usize::from(result.alive);
         summary.open_ports += result.open.len();
@@ -210,7 +236,7 @@ pub async fn run(
 /// private IPv4 networks are listed.
 pub fn local_networks() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for (_, data) in sysinfo::Networks::new_with_refreshed_list().iter() {
+    for data in sysinfo::Networks::new_with_refreshed_list().values() {
         for net in data.ip_networks() {
             let IpAddr::V4(ip) = net.addr else { continue };
             if !ip.is_private() || ip.is_loopback() || ip.is_link_local() {
@@ -237,10 +263,19 @@ mod tests {
     use tokio::net::TcpListener;
 
     fn request(targets: &str, ports: &str) -> ScanRequest {
-        ScanRequest { targets: targets.into(), ports: ports.into(), timeout_ms: 500, banners: false, only_alive: false }
+        ScanRequest {
+            targets: targets.into(),
+            ports: ports.into(),
+            timeout_ms: 500,
+            banners: false,
+            only_alive: false,
+        }
     }
 
-    async fn collect(request: ScanRequest, cancel: CancellationToken) -> (Summary, Vec<HostResult>) {
+    async fn collect(
+        request: ScanRequest,
+        cancel: CancellationToken,
+    ) -> (Summary, Vec<HostResult>) {
         let hosts = Arc::new(Mutex::new(Vec::new()));
         let sink = hosts.clone();
         let summary = run(&request, cancel, move |e| {
@@ -263,9 +298,16 @@ mod tests {
             let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
             l.local_addr().unwrap().port()
         };
-        let (summary, hosts) = collect(request("127.0.0.1", &format!("{open_port},{closed_port}")), CancellationToken::new()).await;
+        let (summary, hosts) = collect(
+            request("127.0.0.1", &format!("{open_port},{closed_port}")),
+            CancellationToken::new(),
+        )
+        .await;
         assert_eq!((summary.hosts, summary.up, summary.open_ports), (1, 1, 1));
-        assert_eq!(hosts[0].open.iter().map(|p| p.port).collect::<Vec<_>>(), [open_port]);
+        assert_eq!(
+            hosts[0].open.iter().map(|p| p.port).collect::<Vec<_>>(),
+            [open_port]
+        );
         // Linux answers a closed port at once. Windows takes about two seconds to give up on one,
         // longer than the wait used here, so there it simply counts as no answer.
         if !cfg!(windows) {
@@ -286,9 +328,16 @@ mod tests {
         let mut req = request("127.0.0.1", &port.to_string());
         req.banners = true;
         let (_, hosts) = collect(req, CancellationToken::new()).await;
-        assert_eq!(hosts[0].open[0].banner.as_deref(), Some("SSH-2.0-OpenSSH_9.6[31m"));
+        assert_eq!(
+            hosts[0].open[0].banner.as_deref(),
+            Some("SSH-2.0-OpenSSH_9.6[31m")
+        );
         // Without the option nothing is read.
-        let (_, hosts) = collect(request("127.0.0.1", &port.to_string()), CancellationToken::new()).await;
+        let (_, hosts) = collect(
+            request("127.0.0.1", &port.to_string()),
+            CancellationToken::new(),
+        )
+        .await;
         assert_eq!(hosts[0].open[0].banner, None);
     }
 
@@ -312,15 +361,40 @@ mod tests {
 
     #[tokio::test]
     async fn too_big_a_scan_is_refused_before_it_starts() {
-        let err = run(&request("10.0.0.0/20", "1-200"), CancellationToken::new(), |_| {}).await.unwrap_err();
+        let err = run(
+            &request("10.0.0.0/20", "1-200"),
+            CancellationToken::new(),
+            |_| {},
+        )
+        .await
+        .unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidInput);
-        assert!(run(&request("nonsense!", "80"), CancellationToken::new(), |_| {}).await.is_err());
-        assert!(run(&request("127.0.0.1", "99999"), CancellationToken::new(), |_| {}).await.is_err());
+        assert!(
+            run(
+                &request("nonsense!", "80"),
+                CancellationToken::new(),
+                |_| {}
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            run(
+                &request("127.0.0.1", "99999"),
+                CancellationToken::new(),
+                |_| {}
+            )
+            .await
+            .is_err()
+        );
     }
 
     #[test]
     fn greetings_lose_control_characters_and_junk() {
-        assert_eq!(tidy(b"220 mail ready\r\nmore").as_deref(), Some("220 mail ready"));
+        assert_eq!(
+            tidy(b"220 mail ready\r\nmore").as_deref(),
+            Some("220 mail ready")
+        );
         assert_eq!(tidy(&[0, 1, 2, 0xff, 0xfe]), None);
         assert_eq!(tidy(b"ab"), None);
     }

@@ -56,9 +56,7 @@ async fn server(home: &std::path::Path, sh: String) -> Arc<SharedConnection> {
         Arc::new(RecordingSink::default()),
         CancellationToken::new(),
     );
-    let mut connection = connect("127.0.0.1", port, known, prompter)
-        .await
-        .unwrap();
+    let mut connection = connect("127.0.0.1", port, known, prompter).await.unwrap();
     assert!(
         connection
             .authenticate_password(USER, PASSWORD)
@@ -82,7 +80,11 @@ async fn commands_follow_the_rules_and_their_output_loses_its_secrets() {
     let out = run_command(connection, "echo DB_PASSWORD=hunter2", false)
         .await
         .unwrap();
-    assert!(out.output.contains("[hidden]") && !out.output.contains("hunter2"), "{}", out.output);
+    assert!(
+        out.output.contains("[hidden]") && !out.output.contains("hunter2"),
+        "{}",
+        out.output
+    );
 
     // A change needs approval; with it, it runs.
     let made = home.path().join("made.txt");
@@ -117,7 +119,13 @@ async fn files_are_written_after_approval_and_read_back_without_secrets() {
         .await
         .unwrap();
     let on_disk = std::fs::read_to_string(home.path().join("app.conf")).unwrap();
-    assert!(on_disk.contains("abc123"), "the real file keeps its content");
+    assert!(
+        on_disk.contains("abc123"),
+        "the real file keeps its content"
+    );
     let seen = read_text_file(&files, path, false).await.unwrap();
-    assert!(seen.contains("port=80") && !seen.contains("abc123"), "{seen}");
+    assert!(
+        seen.contains("port=80") && !seen.contains("abc123"),
+        "{seen}"
+    );
 }

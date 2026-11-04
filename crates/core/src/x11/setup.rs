@@ -76,7 +76,11 @@ pub fn rewrite(packet: &[u8], fake: &[u8], real: Option<&[u8]>) -> Option<Vec<u8
 
     let size = |n: usize| {
         let n = n as u16;
-        if big { n.to_be_bytes() } else { n.to_le_bytes() }
+        if big {
+            n.to_be_bytes()
+        } else {
+            n.to_le_bytes()
+        }
     };
     let mut out = packet[..6].to_vec();
     out.extend_from_slice(&size(COOKIE_PROTOCOL.len()));
@@ -93,10 +97,18 @@ pub fn rewrite(packet: &[u8], fake: &[u8], real: Option<&[u8]>) -> Option<Vec<u8
 pub(crate) fn request(big: bool, cookie: &[u8]) -> Vec<u8> {
     let size = |n: usize| {
         let n = n as u16;
-        if big { n.to_be_bytes() } else { n.to_le_bytes() }
+        if big {
+            n.to_be_bytes()
+        } else {
+            n.to_le_bytes()
+        }
     };
     let mut p = vec![if big { b'B' } else { b'l' }, 0];
-    p.extend_from_slice(&if big { 11u16.to_be_bytes() } else { 11u16.to_le_bytes() });
+    p.extend_from_slice(&if big {
+        11u16.to_be_bytes()
+    } else {
+        11u16.to_le_bytes()
+    });
     p.extend_from_slice(&[0, 0]);
     p.extend_from_slice(&size(COOKIE_PROTOCOL.len()));
     p.extend_from_slice(&size(cookie.len()));

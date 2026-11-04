@@ -48,14 +48,20 @@ fn explain(stderr: &str) -> AppError {
             "This server wants a password for sudo. Enter it and try again.",
         )
     } else if text.contains("incorrect password") || text.contains("try again") {
-        AppError::new(ErrorCode::PermissionDenied, "That sudo password wasn't right.")
+        AppError::new(
+            ErrorCode::PermissionDenied,
+            "That sudo password wasn't right.",
+        )
     } else if text.contains("not in the sudoers") || text.contains("not allowed") {
         AppError::new(
             ErrorCode::PermissionDenied,
             "This user isn't allowed to use sudo on the server.",
         )
     } else if text.contains("sudo") && text.contains("not found") {
-        AppError::new(ErrorCode::Unsupported, "sudo isn't installed on this server.")
+        AppError::new(
+            ErrorCode::Unsupported,
+            "sudo isn't installed on this server.",
+        )
     } else {
         AppError::new(ErrorCode::Internal, "The server couldn't delete that.")
     }
@@ -97,7 +103,9 @@ mod tests {
 
     #[test]
     fn the_top_folder_and_tricky_paths_are_refused() {
-        for bad in ["/", "//", "/.", "/home/..", "relative", "/a\nb", "/a\0b", ""] {
+        for bad in [
+            "/", "//", "/.", "/home/..", "relative", "/a\nb", "/a\0b", "",
+        ] {
             assert!(command(bad, false).is_err(), "{bad:?}");
         }
         assert!(command("/home/me/old", false).is_ok());
@@ -105,9 +113,21 @@ mod tests {
 
     #[test]
     fn server_wording_is_turned_into_fixed_messages() {
-        assert!(explain("sudo: a password is required").message.contains("wants a password"));
-        assert!(explain("Sorry, try again.").message.contains("wasn't right"));
-        assert!(explain("me is not in the sudoers file").message.contains("isn't allowed"));
+        assert!(
+            explain("sudo: a password is required")
+                .message
+                .contains("wants a password")
+        );
+        assert!(
+            explain("Sorry, try again.")
+                .message
+                .contains("wasn't right")
+        );
+        assert!(
+            explain("me is not in the sudoers file")
+                .message
+                .contains("isn't allowed")
+        );
         let other = explain("rm: cannot remove 'secret-name': Device busy");
         assert!(!other.message.contains("secret-name"));
     }

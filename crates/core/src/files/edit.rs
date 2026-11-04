@@ -62,9 +62,36 @@ pub struct EditSessions {
 /// Programs and scripts that opening could run. These are not opened with the default action.
 pub fn is_risky_to_open(name: &str) -> bool {
     const RISKY: &[&str] = &[
-        "exe", "com", "bat", "cmd", "scr", "msi", "msp", "pif", "ps1", "psm1", "vbs", "vbe", "js",
-        "jse", "wsf", "wsh", "hta", "cpl", "msc", "lnk", "reg", "dll", "jar", "url", "scf", "inf",
-        "application", "gadget", "desktop", "appimage",
+        "exe",
+        "com",
+        "bat",
+        "cmd",
+        "scr",
+        "msi",
+        "msp",
+        "pif",
+        "ps1",
+        "psm1",
+        "vbs",
+        "vbe",
+        "js",
+        "jse",
+        "wsf",
+        "wsh",
+        "hta",
+        "cpl",
+        "msc",
+        "lnk",
+        "reg",
+        "dll",
+        "jar",
+        "url",
+        "scf",
+        "inf",
+        "application",
+        "gadget",
+        "desktop",
+        "appimage",
     ];
     name.rsplit_once('.')
         .is_some_and(|(_, ext)| RISKY.contains(&ext.to_ascii_lowercase().as_str()))
@@ -120,7 +147,12 @@ impl EditSessions {
             .unwrap()
             .get(id)
             .cloned()
-            .ok_or_else(|| AppError::new(ErrorCode::NotFound, "That file isn't being edited any more."))
+            .ok_or_else(|| {
+                AppError::new(
+                    ErrorCode::NotFound,
+                    "That file isn't being edited any more.",
+                )
+            })
     }
 
     /// Downloads `remote` and starts watching the copy. `notify` is called from a background task
@@ -148,7 +180,8 @@ impl EditSessions {
         let id = uuid::Uuid::new_v4().to_string();
         let name = safe_name(remote);
         let folder = self.root.join(&id);
-        std::fs::create_dir_all(&folder).map_err(|_| internal("Couldn't make a place for the file."))?;
+        std::fs::create_dir_all(&folder)
+            .map_err(|_| internal("Couldn't make a place for the file."))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -165,7 +198,9 @@ impl EditSessions {
             backend
                 .read_to(remote, &mut out, &|_| {}, CancellationToken::new())
                 .await?;
-            out.flush().await.map_err(|_| internal("Couldn't save the file here."))?;
+            out.flush()
+                .await
+                .map_err(|_| internal("Couldn't save the file here."))?;
             Ok::<(), AppError>(())
         }
         .await;
@@ -181,7 +216,10 @@ impl EditSessions {
             remote_modified: Mutex::new(info.modified),
             cancel: CancellationToken::new(),
         });
-        self.entries.lock().unwrap().insert(id.clone(), entry.clone());
+        self.entries
+            .lock()
+            .unwrap()
+            .insert(id.clone(), entry.clone());
         tokio::spawn(watch(entry, notify));
         Ok(EditInfo {
             id,
@@ -195,9 +233,7 @@ impl EditSessions {
     pub async fn upload(&self, id: &str, force: bool) -> Result<UploadResult, AppError> {
         let entry = self.entry(id)?;
         let known = *entry.remote_modified.lock().unwrap();
-        if !force
-            && let Some(known) = known
-        {
+        if !force && let Some(known) = known {
             let now = entry.backend.stat(&entry.remote).await?;
             if now.modified.is_some_and(|m| m != known) {
                 return Ok(UploadResult::RemoteChanged);
@@ -277,10 +313,25 @@ mod tests {
 
     #[test]
     fn programs_and_scripts_are_not_opened_directly() {
-        for name in ["a.exe", "B.BAT", "x.ps1", "run.js", "l.lnk", "x.desktop", "a.AppImage"] {
+        for name in [
+            "a.exe",
+            "B.BAT",
+            "x.ps1",
+            "run.js",
+            "l.lnk",
+            "x.desktop",
+            "a.AppImage",
+        ] {
             assert!(is_risky_to_open(name), "{name}");
         }
-        for name in ["compose.yaml", "notes.txt", "a.sh", "Makefile", "x.json", "exe"] {
+        for name in [
+            "compose.yaml",
+            "notes.txt",
+            "a.sh",
+            "Makefile",
+            "x.json",
+            "exe",
+        ] {
             assert!(!is_risky_to_open(name), "{name}");
         }
     }
@@ -318,11 +369,15 @@ mod tests {
     async fn open(w: &World) -> EditInfo {
         let changed = w.changed.clone();
         w.edits
-            .open(w.backend.clone(), &w.server_file.display().to_string(), move |e| {
-                if e == EditEvent::Changed {
-                    changed.fetch_add(1, Ordering::SeqCst);
-                }
-            })
+            .open(
+                w.backend.clone(),
+                &w.server_file.display().to_string(),
+                move |e| {
+                    if e == EditEvent::Changed {
+                        changed.fetch_add(1, Ordering::SeqCst);
+                    }
+                },
+            )
             .await
             .unwrap()
     }
@@ -341,7 +396,10 @@ mod tests {
     async fn a_saved_change_is_reported_once_and_can_be_sent_back() {
         let w = world("services: {}\n");
         let info = open(&w).await;
-        assert_eq!(std::fs::read_to_string(&info.local_path).unwrap(), "services: {}\n");
+        assert_eq!(
+            std::fs::read_to_string(&info.local_path).unwrap(),
+            "services: {}\n"
+        );
         assert_eq!(info.name, "compose.yaml");
 
         // Nothing is reported until the file is saved.
@@ -349,18 +407,33 @@ mod tests {
         assert_eq!(w.changed.load(Ordering::SeqCst), 0);
 
         std::fs::write(&info.local_path, "services:\n  web: {}\n").unwrap();
-        until("the save is reported", || w.changed.load(Ordering::SeqCst) == 1).await;
+        until("the save is reported", || {
+            w.changed.load(Ordering::SeqCst) == 1
+        })
+        .await;
         tokio::time::sleep(Duration::from_millis(1000)).await;
         assert_eq!(w.changed.load(Ordering::SeqCst), 1, "reported once");
 
-        assert_eq!(w.edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
-        assert_eq!(std::fs::read_to_string(&w.server_file).unwrap(), "services:\n  web: {}\n");
+        assert_eq!(
+            w.edits.upload(&info.id, false).await.unwrap(),
+            UploadResult::Uploaded
+        );
+        assert_eq!(
+            std::fs::read_to_string(&w.server_file).unwrap(),
+            "services:\n  web: {}\n"
+        );
 
         // A second save is reported again.
         std::fs::write(&info.local_path, "services:\n  db: {}\n").unwrap();
         until("the second save", || w.changed.load(Ordering::SeqCst) == 2).await;
-        assert_eq!(w.edits.upload(&info.id, false).await.unwrap(), UploadResult::Uploaded);
-        assert_eq!(std::fs::read_to_string(&w.server_file).unwrap(), "services:\n  db: {}\n");
+        assert_eq!(
+            w.edits.upload(&info.id, false).await.unwrap(),
+            UploadResult::Uploaded
+        );
+        assert_eq!(
+            std::fs::read_to_string(&w.server_file).unwrap(),
+            "services:\n  db: {}\n"
+        );
         w.edits.stop_all();
     }
 
@@ -379,7 +452,10 @@ mod tests {
             UploadResult::RemoteChanged
         );
         assert_eq!(std::fs::read_to_string(&w.server_file).unwrap(), "theirs\n");
-        assert_eq!(w.edits.upload(&info.id, true).await.unwrap(), UploadResult::Uploaded);
+        assert_eq!(
+            w.edits.upload(&info.id, true).await.unwrap(),
+            UploadResult::Uploaded
+        );
         assert_eq!(std::fs::read_to_string(&w.server_file).unwrap(), "mine\n");
         w.edits.stop_all();
     }
@@ -400,7 +476,10 @@ mod tests {
         let dir = w.server_file.parent().unwrap().display().to_string();
         let refused = w.edits.open(w.backend.clone(), &dir, |_| {}).await;
         assert_eq!(refused.unwrap_err().code, ErrorCode::InvalidInput);
-        let missing = w.edits.open(w.backend.clone(), "/no/such/file", |_| {}).await;
+        let missing = w
+            .edits
+            .open(w.backend.clone(), "/no/such/file", |_| {})
+            .await;
         assert!(missing.is_err());
     }
 

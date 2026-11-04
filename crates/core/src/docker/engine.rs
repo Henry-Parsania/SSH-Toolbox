@@ -5,7 +5,8 @@
 use bollard::Docker;
 use bollard::query_parameters::{
     InspectContainerOptionsBuilder, KillContainerOptions, ListContainersOptionsBuilder,
-    RemoveContainerOptionsBuilder, RenameContainerOptionsBuilder, RestartContainerOptions, StartContainerOptions, StopContainerOptions,
+    RemoveContainerOptionsBuilder, RenameContainerOptionsBuilder, RestartContainerOptions,
+    StartContainerOptions, StopContainerOptions,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -221,7 +222,10 @@ pub async fn act(docker: &Docker, id: &str, action: Action) -> Result<(), AppErr
 pub(super) fn check_name(name: &str) -> Result<(), AppError> {
     let ok = !name.is_empty()
         && name.len() <= 128
-        && name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphanumeric())
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));

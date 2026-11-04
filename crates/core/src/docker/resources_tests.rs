@@ -105,7 +105,12 @@ async fn details_come_as_plain_lines() {
     let volume = super::resources::inspect(&docker, Kind::Volumes, "data")
         .await
         .unwrap();
-    assert!(volume.lines.join("\n").contains("Mounted at: /var/lib/docker"));
+    assert!(
+        volume
+            .lines
+            .join("\n")
+            .contains("Mounted at: /var/lib/docker")
+    );
 }
 
 #[tokio::test]
@@ -114,9 +119,15 @@ async fn clearing_out_counts_what_went() {
     let (docker, _) = engine().await;
     let p = prune(&docker, PruneKind::Containers).await.unwrap();
     assert_eq!((p.removed, p.bytes), (2, 2048));
-    assert_eq!(prune(&docker, PruneKind::Images).await.unwrap().bytes, 5_000_000);
+    assert_eq!(
+        prune(&docker, PruneKind::Images).await.unwrap().bytes,
+        5_000_000
+    );
     assert_eq!(prune(&docker, PruneKind::Volumes).await.unwrap().removed, 1);
-    assert_eq!(prune(&docker, PruneKind::Networks).await.unwrap().removed, 3);
+    assert_eq!(
+        prune(&docker, PruneKind::Networks).await.unwrap().removed,
+        3
+    );
 }
 
 #[tokio::test]
@@ -126,7 +137,11 @@ async fn pulling_waits_and_checks_the_name() {
     pull(&docker, "nginx:1.27", |_| {}).await.unwrap();
     assert!(seen.lock().unwrap().join("\n").contains("fromImage=nginx"));
     for bad in ["", "-rm", "a b", "x?y=1", "a;b"] {
-        assert_eq!(pull(&docker, bad, |_| {}).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
+        assert_eq!(
+            pull(&docker, bad, |_| {}).await.unwrap_err().code,
+            ErrorCode::InvalidInput,
+            "{bad}"
+        );
     }
 }
 
@@ -136,7 +151,9 @@ async fn pulling_reports_how_far_it_has_got_and_ends_complete() {
     use std::sync::Mutex;
     let (docker, _) = engine().await;
     let seen = Mutex::new(Vec::new());
-    pull(&docker, "nginx", |p| seen.lock().unwrap().push(p)).await.unwrap();
+    pull(&docker, "nginx", |p| seen.lock().unwrap().push(p))
+        .await
+        .unwrap();
     let seen = seen.into_inner().unwrap();
     let last = seen.last().expect("at least the final report");
     assert_eq!((last.done, last.total), (100, 100));
@@ -160,13 +177,22 @@ async fn lists_say_which_containers_use_what_and_how_big_volumes_are() {
     let networks = list(&docker, Kind::Networks).await.unwrap();
     let shop = networks.iter().find(|n| n.name == "shop_default").unwrap();
     assert_eq!(shop.used_by, vec!["web"]);
-    assert!(networks.iter().find(|n| n.name == "bridge").unwrap().used_by.is_empty());
+    assert!(
+        networks
+            .iter()
+            .find(|n| n.name == "bridge")
+            .unwrap()
+            .used_by
+            .is_empty()
+    );
 }
 
 #[tokio::test]
 async fn a_volume_s_details_include_who_uses_it() {
     let (docker, _) = engine().await;
-    let d = super::resources::inspect(&docker, Kind::Volumes, "data").await.unwrap();
+    let d = super::resources::inspect(&docker, Kind::Volumes, "data")
+        .await
+        .unwrap();
     let text = d.lines.join("\n");
     assert!(text.contains("In use by: web"), "{text}");
     assert!(text.contains("Size: 2.0 MB"), "{text}");
@@ -179,9 +205,16 @@ async fn volumes_and_networks_can_be_made_with_checked_names() {
     create(&docker, Kind::Volumes, "backup-1").await.unwrap();
     create(&docker, Kind::Networks, "shop_net").await.unwrap();
     for bad in ["", "a/b", "../x", "-x", "a b"] {
-        assert_eq!(create(&docker, Kind::Volumes, bad).await.unwrap_err().code, ErrorCode::InvalidInput, "{bad}");
+        assert_eq!(
+            create(&docker, Kind::Volumes, bad).await.unwrap_err().code,
+            ErrorCode::InvalidInput,
+            "{bad}"
+        );
     }
-    assert_eq!(create(&docker, Kind::Images, "x").await.unwrap_err().code, ErrorCode::InvalidInput);
+    assert_eq!(
+        create(&docker, Kind::Images, "x").await.unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
     let seen = seen.lock().unwrap().join("\n");
     assert!(seen.contains("POST /volumes/create"), "{seen}");
     assert!(seen.contains("/networks/create"), "{seen}");

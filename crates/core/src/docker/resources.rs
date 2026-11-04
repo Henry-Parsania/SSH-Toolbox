@@ -4,8 +4,7 @@
 use bollard::Docker;
 use bollard::query_parameters::{
     ListContainersOptionsBuilder, ListImagesOptionsBuilder, ListNetworksOptions,
-    ListVolumesOptionsBuilder,
-    RemoveImageOptionsBuilder, RemoveVolumeOptionsBuilder,
+    ListVolumesOptionsBuilder, RemoveImageOptionsBuilder, RemoveVolumeOptionsBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -131,7 +130,9 @@ pub async fn list(docker: &Docker, kind: Kind) -> Result<Vec<Resource>, AppError
 
     // Which containers use what. If this can't be read the lists are still shown, just without it.
     if let Ok(containers) = docker
-        .list_containers(Some(ListContainersOptionsBuilder::default().all(true).build()))
+        .list_containers(Some(
+            ListContainersOptionsBuilder::default().all(true).build(),
+        ))
         .await
         .map(|c| serde_json::to_value(c).unwrap_or(Value::Null))
     {
@@ -166,14 +167,10 @@ fn users_of(kind: Kind, resource: &Resource, containers: &Value) -> Vec<String> 
             all.iter()
                 .filter(|c| match kind {
                     Kind::Images => c.get("ImageID").and_then(Value::as_str) == Some(&resource.id),
-                    Kind::Volumes => c
-                        .get("Mounts")
-                        .and_then(Value::as_array)
-                        .is_some_and(|m| {
-                            m.iter().any(|m| {
-                                m.get("Name").and_then(Value::as_str) == Some(&resource.id)
-                            })
-                        }),
+                    Kind::Volumes => c.get("Mounts").and_then(Value::as_array).is_some_and(|m| {
+                        m.iter()
+                            .any(|m| m.get("Name").and_then(Value::as_str) == Some(&resource.id))
+                    }),
                     Kind::Networks => c
                         .pointer("/NetworkSettings/Networks")
                         .and_then(Value::as_object)
@@ -199,11 +196,8 @@ async fn volume_sizes(docker: &Docker) -> std::collections::HashMap<String, u64>
     let options = bollard::query_parameters::DataUsageOptionsBuilder::new()
         .verbose(true)
         .build();
-    let answer = tokio::time::timeout(
-        std::time::Duration::from_secs(8),
-        docker.df(Some(options)),
-    )
-    .await;
+    let answer =
+        tokio::time::timeout(std::time::Duration::from_secs(8), docker.df(Some(options))).await;
     let mut sizes = std::collections::HashMap::new();
     if let Ok(Ok(answer)) = answer
         && let Ok(value) = serde_json::to_value(&answer)
@@ -419,7 +413,11 @@ pub async fn inspect(docker: &Docker, kind: Kind, id: &str) -> Result<ResourceDe
                 "Entry point",
                 list_at(&value, "/Config/Entrypoint"),
             );
-            add(&mut lines, "Working folder", at(&value, "/Config/WorkingDir"));
+            add(
+                &mut lines,
+                "Working folder",
+                at(&value, "/Config/WorkingDir"),
+            );
             add(&mut lines, "User", at(&value, "/Config/User"));
             if let Some(ports) = value
                 .pointer("/Config/ExposedPorts")
@@ -466,7 +464,9 @@ pub async fn inspect(docker: &Docker, kind: Kind, id: &str) -> Result<ResourceDe
     }
     // What the lists know: who uses it, and how big it is.
     if let Ok(all) = list(docker, kind).await
-        && let Some(me) = all.iter().find(|r| r.id == id || r.id.trim_start_matches("sha256:") == id.trim_start_matches("sha256:"))
+        && let Some(me) = all.iter().find(|r| {
+            r.id == id || r.id.trim_start_matches("sha256:") == id.trim_start_matches("sha256:")
+        })
     {
         if kind == Kind::Volumes {
             add(&mut lines, "Size", me.size.map(megabytes));
@@ -613,8 +613,12 @@ pub async fn pull(
             let value = serde_json::to_value(&step).map_err(internal)?;
             status = text(&value, "status");
             if let Some(id) = value.get("id").and_then(Value::as_str) {
-                let current = value.pointer("/progressDetail/current").and_then(Value::as_u64);
-                let total = value.pointer("/progressDetail/total").and_then(Value::as_u64);
+                let current = value
+                    .pointer("/progressDetail/current")
+                    .and_then(Value::as_u64);
+                let total = value
+                    .pointer("/progressDetail/total")
+                    .and_then(Value::as_u64);
                 let entry = layers.entry(clean(id)).or_insert((0, 0));
                 if let (Some(c), Some(t)) = (current, total) {
                     *entry = (c.min(t), t);
@@ -633,7 +637,11 @@ pub async fn pull(
             }
         }
         let total = layers.values().map(|l| l.1).sum();
-        on_progress(PullProgress { done: total, total, status });
+        on_progress(PullProgress {
+            done: total,
+            total,
+            status,
+        });
         Ok(())
     };
     tokio::time::timeout(std::time::Duration::from_secs(900), work)

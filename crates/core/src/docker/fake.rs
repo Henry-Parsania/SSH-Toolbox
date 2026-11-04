@@ -195,18 +195,44 @@ async fn serve(mut socket: TcpStream, record: Requests) {
                 "application/json",
                 r#"{"VolumeUsage":{"ActiveCount":1,"TotalCount":1,"Items":[{"Name":"data","Driver":"local","Mountpoint":"/x","Labels":{},"Scope":"local","Options":{},"UsageData":{"Size":2048000,"RefCount":1}}]}}"#,
             )
-        } else if method == "POST" && (path.ends_with("/volumes/create") || path.ends_with("/networks/create")) {
-            reply("201 Created", "application/json", r#"{"Name":"made","Driver":"local","Mountpoint":"/x","Labels":{},"Scope":"local","Options":{},"Id":"cc33","Warning":""}"#)
+        } else if method == "POST"
+            && (path.ends_with("/volumes/create") || path.ends_with("/networks/create"))
+        {
+            reply(
+                "201 Created",
+                "application/json",
+                r#"{"Name":"made","Driver":"local","Mountpoint":"/x","Labels":{},"Scope":"local","Options":{},"Id":"cc33","Warning":""}"#,
+            )
         } else if method == "POST" && path.ends_with("/containers/create") {
-            reply("201 Created", "application/json", r#"{"Id":"abc123","Warnings":[]}"#)
+            reply(
+                "201 Created",
+                "application/json",
+                r#"{"Id":"abc123","Warnings":[]}"#,
+            )
         } else if method == "POST" && path.ends_with("/containers/prune") {
-            reply("200 OK", "application/json", r#"{"ContainersDeleted":["aa","bb"],"SpaceReclaimed":2048}"#)
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"ContainersDeleted":["aa","bb"],"SpaceReclaimed":2048}"#,
+            )
         } else if method == "POST" && path.ends_with("/images/prune") {
-            reply("200 OK", "application/json", r#"{"ImagesDeleted":[{"Deleted":"sha256:x"}],"SpaceReclaimed":5000000}"#)
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"ImagesDeleted":[{"Deleted":"sha256:x"}],"SpaceReclaimed":5000000}"#,
+            )
         } else if method == "POST" && path.ends_with("/volumes/prune") {
-            reply("200 OK", "application/json", r#"{"VolumesDeleted":["old"],"SpaceReclaimed":10}"#)
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"VolumesDeleted":["old"],"SpaceReclaimed":10}"#,
+            )
         } else if method == "POST" && path.ends_with("/networks/prune") {
-            reply("200 OK", "application/json", r#"{"NetworksDeleted":["n1","n2","n3"]}"#)
+            reply(
+                "200 OK",
+                "application/json",
+                r#"{"NetworksDeleted":["n1","n2","n3"]}"#,
+            )
         } else if method == "POST" && path.ends_with("/images/create") {
             reply(
                 "200 OK",

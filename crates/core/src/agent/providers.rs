@@ -34,13 +34,19 @@ pub fn validate(p: &Provider) -> Result<(), AppError> {
         return Err(invalid("Give the provider a short name."));
     }
     let model = p.model.trim();
-    if model.is_empty() || model.len() > 120 || model.chars().any(|c| c.is_control() || c.is_whitespace()) {
+    if model.is_empty()
+        || model.len() > 120
+        || model.chars().any(|c| c.is_control() || c.is_whitespace())
+    {
         return Err(invalid("Enter the model's name, for example gpt-4.1."));
     }
-    let url = url::Url::parse(p.base_url.trim())
-        .map_err(|_| invalid("The address isn't valid. It should look like https://api.example.com/v1."))?;
+    let url = url::Url::parse(p.base_url.trim()).map_err(|_| {
+        invalid("The address isn't valid. It should look like https://api.example.com/v1.")
+    })?;
     if !url.username().is_empty() || url.password().is_some() {
-        return Err(invalid("Don't put a name or password in the address. The key is entered separately."));
+        return Err(invalid(
+            "Don't put a name or password in the address. The key is entered separately.",
+        ));
     }
     if url.query().is_some() || url.fragment().is_some() {
         return Err(invalid("The address shouldn't have a ? or # part."));
@@ -50,7 +56,9 @@ pub fn validate(p: &Provider) -> Result<(), AppError> {
     match url.scheme() {
         "https" => Ok(()),
         "http" if local => Ok(()),
-        "http" => Err(invalid("Use https:// so the key and your data are encrypted. Plain http:// is only allowed for a service on this computer.")),
+        "http" => Err(invalid(
+            "Use https:// so the key and your data are encrypted. Plain http:// is only allowed for a service on this computer.",
+        )),
         _ => Err(invalid("The address must start with https://.")),
     }
 }
@@ -70,7 +78,10 @@ impl ProviderStore {
             }),
             Err(_) => Vec::new(),
         };
-        Self { path: path.to_path_buf(), items: Mutex::new(items) }
+        Self {
+            path: path.to_path_buf(),
+            items: Mutex::new(items),
+        }
     }
 
     pub fn list(&self) -> Vec<Provider> {
@@ -78,7 +89,12 @@ impl ProviderStore {
     }
 
     pub fn get(&self, id: &str) -> Option<Provider> {
-        self.items.lock().unwrap().iter().find(|p| p.id == id).cloned()
+        self.items
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
     }
 
     /// Adds a provider, or replaces the one with the same ID.
@@ -94,7 +110,10 @@ impl ProviderStore {
         } else if let Some(slot) = items.iter_mut().find(|p| p.id == provider.id) {
             *slot = provider.clone();
         } else {
-            return Err(AppError::new(ErrorCode::NotFound, "That provider no longer exists."));
+            return Err(AppError::new(
+                ErrorCode::NotFound,
+                "That provider no longer exists.",
+            ));
         }
         self.write(&items)?;
         Ok(provider)

@@ -52,14 +52,18 @@ pub struct ToolResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "role", rename_all = "snake_case")]
 pub enum Message {
-    User { text: String },
+    User {
+        text: String,
+    },
     Assistant {
         #[serde(default)]
         text: String,
         #[serde(default)]
         tool_calls: Vec<ToolCall>,
     },
-    ToolResults { results: Vec<ToolResult> },
+    ToolResults {
+        results: Vec<ToolResult>,
+    },
 }
 
 /// A tool the model may use.
@@ -93,7 +97,12 @@ pub struct Reply {
 
 // ---- Anthropic ---------------------------------------------------------------------------
 
-pub fn anthropic_request(model: &str, system: &str, messages: &[Message], tools: &[ToolDef]) -> Value {
+pub fn anthropic_request(
+    model: &str,
+    system: &str,
+    messages: &[Message],
+    tools: &[ToolDef],
+) -> Value {
     let messages: Vec<Value> = messages
         .iter()
         .map(|m| match m {
@@ -147,8 +156,16 @@ pub fn parse_anthropic(value: &Value) -> Result<Reply, AppError> {
         match block.get("type").and_then(Value::as_str) {
             Some("text") => text.push_str(block.get("text").and_then(Value::as_str).unwrap_or("")),
             Some("tool_use") => tool_calls.push(ToolCall {
-                id: block.get("id").and_then(Value::as_str).unwrap_or("").to_string(),
-                name: block.get("name").and_then(Value::as_str).unwrap_or("").to_string(),
+                id: block
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                name: block
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
                 input: block.get("input").cloned().unwrap_or(Value::Null),
             }),
             _ => {}
@@ -164,8 +181,14 @@ pub fn parse_anthropic(value: &Value) -> Result<Reply, AppError> {
         text,
         tool_calls,
         stop,
-        input_tokens: value.pointer("/usage/input_tokens").and_then(Value::as_u64).unwrap_or(0),
-        output_tokens: value.pointer("/usage/output_tokens").and_then(Value::as_u64).unwrap_or(0),
+        input_tokens: value
+            .pointer("/usage/input_tokens")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        output_tokens: value
+            .pointer("/usage/output_tokens")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
     })
 }
 
@@ -194,7 +217,9 @@ pub fn openai_request(model: &str, system: &str, messages: &[Message], tools: &[
             }
             Message::ToolResults { results } => {
                 for r in results {
-                    out.push(json!({"role": "tool", "tool_call_id": r.call_id, "content": r.content}));
+                    out.push(
+                        json!({"role": "tool", "tool_call_id": r.call_id, "content": r.content}),
+                    );
                 }
             }
         }
@@ -214,7 +239,11 @@ pub fn openai_request(model: &str, system: &str, messages: &[Message], tools: &[
 pub fn parse_openai(value: &Value) -> Result<Reply, AppError> {
     let choice = value.pointer("/choices/0").ok_or_else(odd_answer)?;
     let message = choice.get("message").ok_or_else(odd_answer)?;
-    let text = message.get("content").and_then(Value::as_str).unwrap_or("").to_string();
+    let text = message
+        .get("content")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     let tool_calls: Vec<ToolCall> = message
         .get("tool_calls")
         .and_then(Value::as_array)
@@ -232,8 +261,16 @@ pub fn parse_openai(value: &Value) -> Result<Reply, AppError> {
                         None => json!({}),
                     };
                     ToolCall {
-                        id: c.get("id").and_then(Value::as_str).unwrap_or("").to_string(),
-                        name: c.pointer("/function/name").and_then(Value::as_str).unwrap_or("").to_string(),
+                        id: c
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
+                        name: c
+                            .pointer("/function/name")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
                         input,
                     }
                 })
@@ -250,8 +287,14 @@ pub fn parse_openai(value: &Value) -> Result<Reply, AppError> {
         text,
         tool_calls,
         stop,
-        input_tokens: value.pointer("/usage/prompt_tokens").and_then(Value::as_u64).unwrap_or(0),
-        output_tokens: value.pointer("/usage/completion_tokens").and_then(Value::as_u64).unwrap_or(0),
+        input_tokens: value
+            .pointer("/usage/prompt_tokens")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        output_tokens: value
+            .pointer("/usage/completion_tokens")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
     })
 }
 
@@ -284,15 +327,30 @@ fn friendly(status: StatusCode, body: &Value) -> AppError {
         .pointer("/error/message")
         .or_else(|| body.get("message"))
         .and_then(Value::as_str)
-        .map(|m| crate::docker::engine::clean(m))
+        .map(crate::docker::engine::clean)
         .map(|m| m.chars().take(MAX_ERROR_TEXT).collect::<String>())
         .filter(|m| !m.is_empty());
     let (code, base) = match status.as_u16() {
-        401 | 403 => (ErrorCode::PermissionDenied, "The provider didn't accept the API key."),
-        404 => (ErrorCode::NotFound, "The provider doesn't know that model or address."),
-        408 | 504 => (ErrorCode::ConnectionFailed, "The provider took too long to answer."),
-        429 => (ErrorCode::ConnectionFailed, "The provider says there have been too many requests, or the credit has run out."),
-        500..=599 => (ErrorCode::ConnectionFailed, "The provider had a problem. Try again in a moment."),
+        401 | 403 => (
+            ErrorCode::PermissionDenied,
+            "The provider didn't accept the API key.",
+        ),
+        404 => (
+            ErrorCode::NotFound,
+            "The provider doesn't know that model or address.",
+        ),
+        408 | 504 => (
+            ErrorCode::ConnectionFailed,
+            "The provider took too long to answer.",
+        ),
+        429 => (
+            ErrorCode::ConnectionFailed,
+            "The provider says there have been too many requests, or the credit has run out.",
+        ),
+        500..=599 => (
+            ErrorCode::ConnectionFailed,
+            "The provider had a problem. Try again in a moment.",
+        ),
         _ => (ErrorCode::InvalidInput, "The provider refused the request."),
     };
     AppError::new(
@@ -346,7 +404,10 @@ pub async fn complete(
     };
     let response = sent.map_err(|e| {
         if e.is_timeout() {
-            AppError::new(ErrorCode::ConnectionFailed, "The provider took too long to answer.")
+            AppError::new(
+                ErrorCode::ConnectionFailed,
+                "The provider took too long to answer.",
+            )
         } else {
             AppError::new(
                 ErrorCode::ConnectionFailed,

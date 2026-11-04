@@ -83,9 +83,9 @@ impl SshBackend {
         }
         let chain = resolve_chain(&loaded.file, saved_session_id)?;
         let wants_x11 = !self.monitor
-            && loaded.file.sessions.iter().any(|s| {
-                matches!(s, SavedSession::Ssh { id, x11: true, .. } if id == saved_session_id)
-            });
+            && loaded.file.sessions.iter().any(
+                |s| matches!(s, SavedSession::Ssh { id, x11: true, .. } if id == saved_session_id),
+            );
         let prompter = Prompter::new(services.broker.clone(), sink.clone(), self.cancel.clone());
         let shared = services
             .pool

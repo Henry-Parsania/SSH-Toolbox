@@ -382,7 +382,11 @@ mod group_tests {
                 sizes: vec![0.4, 0.6],
                 children: vec![leaf("g1"), leaf("g2")],
             }),
-            group_tabs: [("g1".to_string(), "a".to_string()), ("g2".to_string(), "f".to_string())].into(),
+            group_tabs: [
+                ("g1".to_string(), "a".to_string()),
+                ("g2".to_string(), "f".to_string()),
+            ]
+            .into(),
             active_group: "g2".into(),
         };
         save(&path, &layout).unwrap();
