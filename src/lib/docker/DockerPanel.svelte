@@ -1247,9 +1247,15 @@
   }
   .bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px 8px;
     margin: 2px 12px 6px;
+  }
+  /* Buttons keep their words on one line; a crowded row wraps to the next line instead. */
+  .bar .btn {
+    flex: none;
+    white-space: nowrap;
   }
   .bar input {
     flex: 1;

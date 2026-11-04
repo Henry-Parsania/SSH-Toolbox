@@ -18,6 +18,13 @@ export interface Stats {
   disk_total: number;
   load: string | null;
   uptime_secs: number | null;
+  /** Bytes received and sent since the computer started (all connections but the loopback). */
+  net_rx_bytes: number | null;
+  net_tx_bytes: number | null;
+  /** The busiest graphics card's share in use, and the memory of all cards. NVIDIA only. */
+  gpu_percent: number | null;
+  gpu_mem_used: number | null;
+  gpu_mem_total: number | null;
 }
 
 /** Tries a quick connection to the port of each saved server. */

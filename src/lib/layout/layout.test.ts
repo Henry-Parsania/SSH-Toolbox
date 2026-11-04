@@ -13,6 +13,18 @@ const key = (code: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+describe("zoom shortcuts", () => {
+  const ctrl = (code: string, shift = false) => ({ type: "keydown", ctrlKey: true, shiftKey: shift, altKey: false, metaKey: false, code }) as Parameters<typeof shortcutFor>[0];
+
+  it("maps Ctrl with plus, minus and zero", () => {
+    expect(shortcutFor(ctrl("Equal"))).toEqual({ type: "zoom", change: "in" });
+    expect(shortcutFor(ctrl("Equal", true))).toEqual({ type: "zoom", change: "in" });
+    expect(shortcutFor(ctrl("Minus"))).toEqual({ type: "zoom", change: "out" });
+    expect(shortcutFor(ctrl("Digit0"))).toEqual({ type: "zoom", change: "reset" });
+    expect(shortcutFor(ctrl("Numpad0"))).toEqual({ type: "zoom", change: "reset" });
+  });
+});
+
 describe("shortcutFor", () => {
   it("maps the documented shortcuts", () => {
     expect(shortcutFor(key("KeyT"))).toEqual({ type: "new-tab" });

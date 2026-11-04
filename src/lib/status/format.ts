@@ -12,6 +12,11 @@ export function bytes(n: number): string {
   return `${value >= 100 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${UNITS[unit]}`;
 }
 
+/** A speed, such as "1.2 MB/s". */
+export function rate(bytesPerSecond: number): string {
+  return `${bytes(bytesPerSecond)}/s`;
+}
+
 export function percent(used: number, total: number): number {
   return total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 0;
 }

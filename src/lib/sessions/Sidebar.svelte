@@ -73,6 +73,19 @@
     });
   });
 
+  /** Saves a copy of a session next to it. Saved passwords stay with the original: the copy asks. */
+  async function duplicate(session: SavedSession) {
+    const copy = { ...session, id: newId(), name: `${session.name} (copy)` };
+    const at = library.file.session.findIndex((s) => s.id === session.id);
+    const sessions = [...library.file.session];
+    sessions.splice(at + 1, 0, copy);
+    try {
+      await library.save({ ...library.file, session: sessions });
+    } catch {
+      /* The sessions list shows its own error if saving fails. */
+    }
+  }
+
   function describe(session: SavedSession): string {
     if (session.type === "ssh") return `${session.user}@${session.host}`;
     if (session.type === "serial") return session.port;
@@ -277,6 +290,7 @@
             })}><Icon name="edit" size={14} /> Edit</button
         >
       </li>
+      <li><button onclick={() => act(() => void duplicate(sess))}><Icon name="copy" size={14} /> Duplicate</button></li>
       <li><button onclick={() => act(() => (confirm = { kind: "session", id: sess.id, name: sess.name }))}><Icon name="trash" size={14} /> Delete</button></li>
     {/if}
   </ul>

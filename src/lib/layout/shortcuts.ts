@@ -9,7 +9,8 @@ export type ShortcutAction =
   | { type: "move-focus"; move: "left" | "right" | "up" | "down" }
   | { type: "search" }
   | { type: "broadcast" }
-  | { type: "palette" };
+  | { type: "palette" }
+  | { type: "zoom"; change: "in" | "out" | "reset" };
 
 type KeyInfo = Pick<KeyboardEvent, "type" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "code">;
 
@@ -23,6 +24,13 @@ const ARROWS = {
 /** The action for a key press, or `null` if it belongs to the program in the pane. */
 export function shortcutFor(e: KeyInfo): ShortcutAction | null {
   if (e.type !== "keydown" || !e.ctrlKey || e.altKey || e.metaKey) return null;
+
+  // Ctrl and plus, minus or zero change the terminal text size, as in a browser.
+  if (!e.shiftKey || e.code === "Equal" || e.code === "NumpadAdd") {
+    if (e.code === "Equal" || e.code === "NumpadAdd") return { type: "zoom", change: "in" };
+    if (e.code === "Minus" || e.code === "NumpadSubtract") return { type: "zoom", change: "out" };
+    if (e.code === "Digit0" || e.code === "Numpad0") return { type: "zoom", change: "reset" };
+  }
 
   if (e.code === "Tab") return { type: e.shiftKey ? "previous-tab" : "next-tab" };
   if (!e.shiftKey) return null;

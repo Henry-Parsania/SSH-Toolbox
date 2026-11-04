@@ -124,3 +124,6 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - Found and fixed while testing: the palette did not take the keyboard from the terminal behind it (typing went to the shell). It now focuses its box itself.
 - Known gap: Escape does not close a dialog while the keyboard is still in the terminal behind it. Clicking Cancel works. The session form's buttons now stay in view on a tall form.
 - Docker contexts (7.19) are not needed: each saved SSH session already is a Docker target.
+- Version 1.1.0 (2026-11-04): phase 7 first shipped under 1.0.0 by mistake. From now on the version goes up whenever features are added (minor) or only fixes are made (patch), in package.json, package-lock.json, tauri.conf.json and both Cargo.toml files, before the build.
+- Footer trends: CPU, memory, network speed and GPU have small graphs (last 60 readings). Network and GPU are new readings: the network is the sum of all connections except the loopback (from /proc/net/dev on a server, from sysinfo here), and the GPU comes from `nvidia-smi` (NVIDIA only; here it is asked once and given up on if it isn't there). Not tried on a real server, and GPU not tried on a machine with a card.
+- Also added: Ctrl plus, Ctrl minus and Ctrl 0 change the terminal text size; Duplicate in a session's right-click menu; the Docker button rows wrap instead of squashing.

@@ -472,6 +472,11 @@
         case "palette":
           paletteOpen = !paletteOpen;
           break;
+        case "zoom": {
+          const size = action.change === "reset" ? 14 : Math.min(48, Math.max(8, settings.font_size + (action.change === "in" ? 1 : -1)));
+          if (size !== settings.font_size) void saveSettings({ ...settings, font_size: size }).catch(() => {});
+          break;
+        }
       }
     };
     window.addEventListener("keydown", onKey, true);

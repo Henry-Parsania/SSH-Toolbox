@@ -54,6 +54,7 @@
     ["Ctrl+Shift+F", "Search the output"],
     ["Ctrl+Shift+S", "Save the output to Downloads"],
     ["Ctrl+Shift+B", "Type into all panes"],
+    ["Ctrl + / Ctrl - / Ctrl 0", "Make the terminal text bigger, smaller, or back to the normal size"],
     ["Ctrl+Shift+P", "Command palette: jump to a session, tab or command, or type user@host to connect"],
     ["Ctrl+Shift+C / V", "Copy and paste"],
   ];
