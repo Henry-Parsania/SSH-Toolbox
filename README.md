@@ -4,6 +4,8 @@ A lightweight, personal desktop app in the style of MobaXterm, for Windows 11 an
 
 It is a personal project: builds are for the owner's own machines, with no code signing or auto-update.
 
+![SSH Toolbox: sessions list, Docker, Files and the Agent panel](docs/images/screenshot.jpg)
+
 ## What it does
 
 - **Terminals and tabs.** Local shells (PowerShell, cmd, Git Bash, WSL, or the default shell on Linux) in tabs. The window can be split into panes; click a pane and pick which open tab it shows, or start a new terminal or saved session in it. Right-click a tab to duplicate its connection to the right or below, rename it, or move it to its own window. The layout comes back on the next start.
