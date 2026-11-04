@@ -30,6 +30,7 @@
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
   import Palette, { type PaletteItem } from "./lib/palette/Palette.svelte";
   import { parseQuickConnect } from "./lib/palette/parse";
+  import KnownHostsDialog from "./lib/sessions/KnownHostsDialog.svelte";
   import BackupDialog from "./lib/sessions/BackupDialog.svelte";
   import SnippetsDialog from "./lib/snippets/SnippetsDialog.svelte";
   import EditPrompt from "./lib/files/EditPrompt.svelte";
@@ -54,6 +55,7 @@
   let snippets = $state(false);
   let paletteOpen = $state(false);
   let backupOpen = $state(false);
+  let knownHostsOpen = $state(false);
   function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number; user?: string; connect?: boolean }) {
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1, prefill };
@@ -338,6 +340,7 @@
         { label: "Network scanner…", onselect: () => (scanner = "network") },
         { label: "Port scanner…", onselect: () => (scanner = "ports") },
         { label: "X server…", onselect: () => (xserver = true) },
+        { label: "Trusted servers (known hosts)…", onselect: () => (knownHostsOpen = true) },
       ],
     },
     {
@@ -573,6 +576,9 @@
   <EditPrompt />
   {#if xserver}
     <XServerDialog onclose={() => (xserver = false)} />
+  {/if}
+  {#if knownHostsOpen}
+    <KnownHostsDialog onclose={() => (knownHostsOpen = false)} />
   {/if}
   {#if backupOpen}
     <BackupDialog {library} onclose={() => (backupOpen = false)} />

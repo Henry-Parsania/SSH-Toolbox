@@ -9,6 +9,7 @@ pub mod forward;
 pub mod hostkeys;
 pub mod install;
 pub mod keygen;
+pub mod known_hosts_list;
 pub mod pool;
 #[cfg(test)]
 pub(crate) mod testing;

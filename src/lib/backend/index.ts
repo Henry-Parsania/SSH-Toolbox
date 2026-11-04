@@ -304,6 +304,24 @@ export function sessionsExport(): Promise<string> {
   return invoke<string>("sessions_export");
 }
 
+export interface KnownHost {
+  line: number;
+  hosts: string;
+  algorithm: string;
+  fingerprint: string;
+  marker: string;
+}
+
+/** The servers whose keys are trusted (`~/.ssh/known_hosts`). */
+export function knownHostsList(): Promise<KnownHost[]> {
+  return invoke<KnownHost[]>("known_hosts_list");
+}
+
+/** Stops trusting one entry; the next connection to that server asks again. */
+export function knownHostsRemove(line: number, fingerprint: string): Promise<void> {
+  return invoke<void>("known_hosts_remove", { line, fingerprint });
+}
+
 export interface MergeResult {
   sessions_added: number;
   folders_added: number;

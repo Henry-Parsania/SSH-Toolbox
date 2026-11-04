@@ -95,3 +95,29 @@ pub async fn key_setup_cancel(
     }
     Ok(())
 }
+
+fn known_hosts_file() -> Result<std::path::PathBuf, AppError> {
+    default_known_hosts()
+        .ok_or_else(|| AppError::new(ErrorCode::Internal, "Couldn't find your .ssh folder."))
+}
+
+/// The servers whose keys are trusted, from `~/.ssh/known_hosts`.
+#[tauri::command]
+pub async fn known_hosts_list()
+-> Result<Vec<toolbox_core::ssh::known_hosts_list::KnownHostEntry>, AppError> {
+    let file = known_hosts_file()?;
+    tokio::task::spawn_blocking(move || toolbox_core::ssh::known_hosts_list::list(&file))
+        .await
+        .map_err(|_| task_failed())?
+}
+
+/// Stops trusting one entry. The next connection to that server asks again.
+#[tauri::command]
+pub async fn known_hosts_remove(line: usize, fingerprint: String) -> Result<(), AppError> {
+    let file = known_hosts_file()?;
+    tokio::task::spawn_blocking(move || {
+        toolbox_core::ssh::known_hosts_list::remove(&file, line, &fingerprint)
+    })
+    .await
+    .map_err(|_| task_failed())?
+}
