@@ -35,6 +35,8 @@ pub type Slot = Arc<Mutex<Option<Arc<Forward>>>>;
 pub struct X11Local {
     /// A server to use instead of looking for one (tests).
     fixed: Option<LocalDisplay>,
+    /// Only used where the app starts the X server itself (not on Unix).
+    #[cfg_attr(unix, allow(dead_code))]
     folder: PathBuf,
     managed: tokio::sync::Mutex<server::Managed>,
 }
