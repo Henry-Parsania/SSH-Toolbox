@@ -290,6 +290,7 @@ fn save_session(w: &World, id: &str, port: u16) {
         jump: String::new(),
         x11: false,
         color: String::new(),
+        startup: String::new(),
     });
     store.save(&file).unwrap();
     w.secrets

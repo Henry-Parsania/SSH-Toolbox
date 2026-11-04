@@ -87,6 +87,9 @@ pub enum SavedSession {
         /// Tab and terminal colour as "#rrggbb", or empty to follow the theme.
         #[serde(default)]
         color: String,
+        /// Commands typed once when the shell is ready, one per line. Not for secrets.
+        #[serde(default)]
+        startup: String,
     },
     Serial {
         id: String,
@@ -243,8 +246,18 @@ impl SessionsFile {
                     key_path,
                     jump,
                     color,
+                    startup,
                     ..
                 } => {
+                    if startup.len() > 2000
+                        || startup
+                            .chars()
+                            .any(|c| c.is_control() && c != '\n' && c != '\t')
+                    {
+                        return Err(invalid(
+                            "The startup commands must be plain text, up to 2000 characters.",
+                        ));
+                    }
                     let hex = color.len() == 7
                         && color.starts_with('#')
                         && color[1..].chars().all(|c| c.is_ascii_hexdigit());
@@ -517,6 +530,7 @@ mod tests {
             jump: jump.into(),
             x11: false,
             color: String::new(),
+            startup: String::new(),
         }
     }
 
@@ -755,6 +769,16 @@ mod tests {
             *color = "#1a2B3c".into();
         }
         assert!(f.validate().is_ok());
+
+        let mut f = sample();
+        if let SavedSession::Ssh { startup, .. } = &mut f.sessions[0] {
+            *startup = "cd /srv\ndocker compose ps".into();
+        }
+        assert!(f.validate().is_ok());
+        if let SavedSession::Ssh { startup, .. } = &mut f.sessions[0] {
+            *startup = "echo \u{1b}[31m".into();
+        }
+        assert!(f.validate().is_err());
 
         let mut f = sample();
         f.folders[0].name = "  ".into();

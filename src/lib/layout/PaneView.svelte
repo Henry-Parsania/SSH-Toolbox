@@ -2,6 +2,9 @@
   import type { PlatformInfo, TerminalStatus } from "../backend";
   import { settings } from "../settings.svelte";
   import { nextRetryDelay } from "./autoReconnect";
+  import { sessionStartup } from "../sessions/colors.svelte";
+  import { sendToPane } from "../terminal/broadcast";
+  import { snippetBytes } from "../snippets/send";
   import { serialSendBreak, serialSetControl } from "../backend/serial";
   import TerminalView from "../terminal/TerminalView.svelte";
   import Icon from "../ui/Icon.svelte";
@@ -95,6 +98,9 @@
     if (status.type === "connected") {
       wasConnected = true;
       retries = 0;
+      // The session's own startup commands, typed once the shell has had a moment to start.
+      const startup = node.spec?.type === "ssh" && !node.spec.monitor ? sessionStartup(node.spec.saved_session_id) : undefined;
+      if (startup) setTimeout(() => sendToPane(tabId, node.pane_id, snippetBytes({ text: startup, run: true })), 400);
     }
     if (status.type === "exited") {
       ended = status.code === null ? "Session ended." : `Session ended (code ${status.code}).`;

@@ -184,6 +184,7 @@ mod tests {
             jump: jump.into(),
             x11: false,
             color: String::new(),
+            startup: String::new(),
         }
     }
 

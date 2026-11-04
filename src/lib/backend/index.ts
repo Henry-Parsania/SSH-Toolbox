@@ -251,6 +251,8 @@ export type SavedSession =
       x11: boolean;
       /** "#rrggbb", or empty to follow the theme. */
       color?: string;
+      /** Commands typed once when the shell is ready. */
+      startup?: string;
     }
   | {
       type: "serial";

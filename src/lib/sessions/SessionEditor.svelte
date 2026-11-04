@@ -34,6 +34,7 @@
     jump: editing?.jump ?? "",
     x11: editing?.x11 ?? false,
     color: editing?.color ?? "",
+    startup: editing?.startup ?? "",
   }));
   let name = $state(start.name);
   let host = $state(start.host);
@@ -46,6 +47,7 @@
   let x11 = $state(start.x11);
   let copyKey = $state(false);
   let color = $state(start.color);
+  let startup = $state(start.startup);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -93,6 +95,7 @@
       jump,
       x11,
       color,
+      startup,
     };
     const sessions = editing
       ? library.file.session.map((s) => (s.id === id ? session : s))
@@ -153,6 +156,11 @@
         <option value="key">Private key file</option>
         <option value="agent">SSH agent</option>
       </select>
+    </label>
+    <label class="field">
+      Commands to run after connecting (optional)
+      <textarea rows="3" bind:value={startup} spellcheck="false" placeholder="cd /srv/app"></textarea>
+      <small>Typed once, one line at a time, when the shell is ready. Don't put passwords here: this is saved as plain text.</small>
     </label>
     <div class="field">
       Colour
@@ -224,6 +232,10 @@
 </div>
 
 <style>
+  textarea {
+    font: 13px var(--mono);
+    resize: vertical;
+  }
   .swatches {
     display: flex;
     flex-wrap: wrap;

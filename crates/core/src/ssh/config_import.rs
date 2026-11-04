@@ -424,6 +424,7 @@ impl Importer<'_> {
             jump,
             x11: false,
             color: String::new(),
+            startup: String::new(),
         });
         self.result.added.push(host.alias.clone());
         Ok(id)
