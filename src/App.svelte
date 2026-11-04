@@ -28,6 +28,7 @@
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
   import { setSessionColors } from "./lib/sessions/colors.svelte";
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
+  import SnippetsDialog from "./lib/snippets/SnippetsDialog.svelte";
   import EditPrompt from "./lib/files/EditPrompt.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
   import { realDeps } from "./lib/agent/deps";
@@ -47,6 +48,7 @@
   // The network tools window, when it is open.
   let scanner = $state<"network" | "ports" | null>(null);
   let xserver = $state(false);
+  let snippets = $state(false);
   function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number }) {
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1, prefill };
@@ -313,6 +315,7 @@
         { label: "Close pane", hint: "Ctrl+Shift+W", onselect: () => workspace.closeActivePane() },
         { label: "Move this tab to its own window", disabled: workspace.tabs.length === 0, onselect: detachActiveTab },
         "separator",
+        { label: "Snippets…", disabled: workspace.tabs.length === 0, onselect: () => (snippets = true) },
         { label: "Search the output", hint: "Ctrl+Shift+F", onselect: () => workspace.requestSearch() },
         { label: "Save the output to Downloads", hint: "Ctrl+Shift+S", onselect: () => workspace.requestSave() },
         {
@@ -534,6 +537,9 @@
   <EditPrompt />
   {#if xserver}
     <XServerDialog onclose={() => (xserver = false)} />
+  {/if}
+  {#if snippets && workspace.activeTab}
+    <SnippetsDialog tabId={workspace.activeTab.id} paneId={workspace.activeTab.active} onclose={() => (snippets = false)} />
   {/if}
   {#if help}
     <HelpDialog page={help} onclose={() => (help = null)} />

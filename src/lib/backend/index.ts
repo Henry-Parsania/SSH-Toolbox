@@ -458,3 +458,19 @@ export function forwardStopSession(savedSessionId: string): Promise<void> {
 export function forwardList(): Promise<ForwardInfo[]> {
   return invoke<ForwardInfo[]>("forward_list");
 }
+
+export interface Snippet {
+  id: string;
+  name: string;
+  text: string;
+  /** Press Enter after the text. */
+  run: boolean;
+}
+
+export function snippetsGet(): Promise<{ version: number; snippet: Snippet[] }> {
+  return invoke("snippets_get");
+}
+
+export function snippetsSet(snippets: Snippet[]): Promise<void> {
+  return invoke("snippets_set", { snippets: { version: 1, snippet: snippets } });
+}

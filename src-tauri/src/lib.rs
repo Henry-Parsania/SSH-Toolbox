@@ -159,6 +159,8 @@ pub fn run() {
             commands::keychain::keychain_delete_secret,
             commands::layout::layout_get,
             commands::layout::layout_set,
+            commands::snippets::snippets_get,
+            commands::snippets::snippets_set,
             commands::link::open_link,
             commands::prompt::prompt_respond,
             commands::sessions::sessions_get,

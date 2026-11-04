@@ -24,3 +24,29 @@ export function broadcastInput(tabId: string, fromPane: string, data: Uint8Array
     if (paneId !== fromPane) receive(data);
   }
 }
+
+/** Sends input to one pane. Returns false if that pane isn't open. */
+export function sendToPane(tabId: string, paneId: string, data: Uint8Array): boolean {
+  const receive = receivers.get(tabId)?.get(paneId);
+  receive?.(data);
+  return !!receive;
+}
+
+/** Sends input to every pane of a tab. Returns how many received it. */
+export function sendToTab(tabId: string, data: Uint8Array): number {
+  const panes = receivers.get(tabId);
+  panes?.forEach((receive) => receive(data));
+  return panes?.size ?? 0;
+}
+
+/** Sends input to every open pane of every tab. Returns how many received it. */
+export function sendToEverything(data: Uint8Array): number {
+  let count = 0;
+  for (const tab of receivers.values()) {
+    for (const receive of tab.values()) {
+      receive(data);
+      count++;
+    }
+  }
+  return count;
+}

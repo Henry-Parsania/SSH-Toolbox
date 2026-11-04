@@ -16,6 +16,7 @@ pub mod secret;
 pub mod serial;
 pub mod sessions;
 pub mod settings;
+pub mod snippets;
 pub mod ssh;
 pub mod stats;
 pub mod terminal;

@@ -7,6 +7,7 @@ pub mod forward;
 pub mod keychain;
 pub mod keys;
 pub mod layout;
+pub mod snippets;
 pub mod link;
 pub mod platform;
 pub mod prompt;
