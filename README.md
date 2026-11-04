@@ -55,6 +55,16 @@ Installers are built by CI.
 - `src`: the Svelte interface
 - `docs`: [plan](docs/PLAN.md), [requirements](docs/REQUIREMENTS.md), [interfaces](docs/INTERFACES.md), [tasks](docs/TASKS.md); decisions are in [NOTES.md](NOTES.md)
 
+## Contributing
+
+This is a personal project and I decide what goes into it. Feature requests and bug reports are welcome as GitHub issues. If you want to send a change, open an issue first so we can agree on it before you write code. Pull requests are merged at my discretion, and by sending one you agree it can be released under the licence below. Please don't include secrets, passwords or keys in issues or code.
+
+Security problems: please report them privately (GitHub's "Report a vulnerability" on the Security tab) rather than in a public issue.
+
+## Licence
+
+[Apache License 2.0](LICENSE). You may use, copy and modify it, including commercially, under the terms of that licence. The software comes with no warranty.
+
 ## Status
 
 Windows is the tested platform. The Ubuntu rendering check has not been run yet, and macOS is untested.

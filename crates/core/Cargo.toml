@@ -1,6 +1,7 @@
 [package]
 name = "toolbox-core"
 version = "1.0.0"
+license = "Apache-2.0"
 description = "SSH Toolbox backend logic. Must not depend on Tauri."
 edition = "2024"
 rust-version = "1.90"
