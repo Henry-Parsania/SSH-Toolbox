@@ -1,6 +1,6 @@
 [package]
 name = "toolbox-core"
-version = "0.1.0"
+version = "1.0.0"
 description = "SSH Toolbox backend logic. Must not depend on Tauri."
 edition = "2024"
 rust-version = "1.90"
