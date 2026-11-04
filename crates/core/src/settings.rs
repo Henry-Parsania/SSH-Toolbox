@@ -53,6 +53,8 @@ pub struct Settings {
     pub webkit_workaround: WebkitWorkaround,
     pub default_shell: String,
     pub restore_layout: bool,
+    /// A folder to save a text copy of every terminal session in, or empty for no logging.
+    pub log_folder: String,
     /// Start an SSH session again by itself when its connection drops (a few tries, then it asks).
     pub auto_reconnect: bool,
     /// Whether the saved sessions are checked for being reachable (a quick TCP connect).
@@ -76,6 +78,7 @@ impl Default for Settings {
             webkit_workaround: WebkitWorkaround::Off,
             default_shell: String::new(),
             restore_layout: true,
+            log_folder: String::new(),
             auto_reconnect: true,
             reachability_enabled: true,
             reachability_interval_secs: 60,
@@ -109,6 +112,9 @@ impl Settings {
         if !(MIN_STATS_INTERVAL..=MAX_STATS_INTERVAL).contains(&self.stats_interval_secs) {
             return Err(invalid("Refresh the footer every 2 to 300 seconds."));
         }
+        if self.log_folder.len() > 500 || self.log_folder.chars().any(|c| c.is_control()) {
+            return Err(invalid("That log folder isn't valid."));
+        }
         if self.font_family.len() > 200 || self.font_family.chars().any(|c| c.is_control()) {
             return Err(invalid("That font name isn't valid."));
         }
@@ -127,6 +133,9 @@ impl Settings {
         self.stats_interval_secs = self
             .stats_interval_secs
             .clamp(MIN_STATS_INTERVAL, MAX_STATS_INTERVAL);
+        if self.log_folder.len() > 500 || self.log_folder.chars().any(|c| c.is_control()) {
+            self.log_folder.clear();
+        }
         if self.font_family.trim().is_empty() || self.font_family.chars().any(|c| c.is_control()) {
             self.font_family = Settings::default().font_family;
         }

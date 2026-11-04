@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   default_shell: "",
   restore_layout: true,
   auto_reconnect: true,
+  log_folder: "",
   reachability_enabled: true,
   reachability_interval_secs: 60,
   stats_enabled: true,

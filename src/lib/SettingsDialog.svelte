@@ -106,6 +106,15 @@
       Reconnect an SSH session by itself when its connection drops (up to 5 tries)
     </label>
 
+    <label class="field">
+      Save a text copy of every terminal session in this folder (empty = don't)
+      <input type="text" bind:value={draft.log_folder} placeholder="a folder for terminal logs" spellcheck="false" />
+      <small>
+        One file per session, with colours and cursor codes removed. A file holds everything the
+        session showed, so keep the folder private. It applies to sessions opened after saving.
+      </small>
+    </label>
+
     <h3 class="group">Server status</h3>
     <label class="check">
       <input type="checkbox" bind:checked={draft.reachability_enabled} />

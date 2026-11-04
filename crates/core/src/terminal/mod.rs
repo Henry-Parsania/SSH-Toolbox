@@ -2,6 +2,7 @@
 
 mod backend;
 mod local;
+pub mod log;
 mod open;
 mod pump;
 mod registry;

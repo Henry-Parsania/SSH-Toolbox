@@ -6,6 +6,7 @@ use toolbox_core::docker;
 use toolbox_core::serial::{self, PortInfo, SerialConfig};
 use toolbox_core::sessions::SessionStore;
 use toolbox_core::ssh::{self, backend::SshServices};
+use toolbox_core::terminal::log::{LogSink, log_path, utc_stamp};
 use toolbox_core::terminal::{
     self, OutputSink, PortControl, SessionRegistry, SessionSpec, Shell, SwitchSink, TerminalStatus,
     checked_size,
@@ -46,6 +47,65 @@ impl OutputSink for ChannelSink {
     }
 }
 
+/// If the user chose a log folder, wraps `sink` so a plain-text copy of the session is saved
+/// there. Any problem with the folder or file just means no log: the terminal still opens.
+async fn logged(
+    sink: Arc<SwitchSink>,
+    spec: &SessionSpec,
+    sessions_file: &std::path::Path,
+) -> Arc<dyn OutputSink> {
+    let plain: Arc<dyn OutputSink> = sink;
+    if matches!(spec, SessionSpec::Ssh { monitor: true, .. }) {
+        return plain;
+    }
+    let Some(dir) = toolbox_core::config::config_dir() else {
+        return plain;
+    };
+    let settings = toolbox_core::settings::load(&dir.join("settings.toml"));
+    if settings.log_folder.trim().is_empty() {
+        return plain;
+    }
+    let folder = std::path::PathBuf::from(settings.log_folder.trim());
+    let saved_id = match spec {
+        SessionSpec::Ssh {
+            saved_session_id, ..
+        }
+        | SessionSpec::Serial { saved_session_id } => Some(saved_session_id.clone()),
+        _ => None,
+    };
+    let fallback = match spec {
+        SessionSpec::Local { shell_id } => shell_id.clone(),
+        SessionSpec::Wsl { distro } => distro.clone(),
+        SessionSpec::Ssh { .. } => "ssh".into(),
+        SessionSpec::Serial { .. } => "serial".into(),
+        _ => "docker".into(),
+    };
+    let sessions_file = sessions_file.to_path_buf();
+    let wrapped = plain.clone();
+    let made = tokio::task::spawn_blocking(move || {
+        let name = saved_id
+            .and_then(|id| {
+                SessionStore::new(sessions_file)
+                    .load()
+                    .file
+                    .sessions
+                    .iter()
+                    .find(|s| s.id() == id)
+                    .map(|s| s.name().to_string())
+            })
+            .unwrap_or(fallback);
+        let path = log_path(&folder, &name, &utc_stamp()).ok()?;
+        LogSink::new(wrapped, &path)
+            .ok()
+            .map(|l| Arc::new(l) as Arc<dyn OutputSink>)
+    })
+    .await;
+    match made {
+        Ok(Some(logging)) => logging,
+        _ => plain,
+    }
+}
+
 #[tauri::command]
 pub async fn list_shells() -> Result<Vec<Shell>, AppError> {
     tokio::task::spawn_blocking(terminal::list_shells)
@@ -78,7 +138,7 @@ pub async fn terminal_open(
         output: on_output,
         status: on_status,
     })));
-    let sink = switch.clone();
+    let sink = logged(switch.clone(), &spec, &services.sessions_file).await;
     let id = match spec {
         SessionSpec::Ssh {
             saved_session_id,

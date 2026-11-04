@@ -179,6 +179,8 @@ export interface Settings {
   restore_layout: boolean;
   /** Start an SSH session again by itself when its connection drops. */
   auto_reconnect: boolean;
+  /** A folder for text copies of every session, or empty for none. */
+  log_folder: string;
   reachability_enabled: boolean;
   /** 0 means only at start and when the list changes. */
   reachability_interval_secs: number;

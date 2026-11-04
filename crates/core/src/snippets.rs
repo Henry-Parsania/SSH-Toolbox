@@ -59,10 +59,15 @@ impl Snippets {
                 return Err(invalid("A snippet needs a short one-line name."));
             }
             if s.text.is_empty() || s.text.len() > MAX_TEXT {
-                return Err(invalid("A snippet needs some text, up to 10,000 characters."));
+                return Err(invalid(
+                    "A snippet needs some text, up to 10,000 characters.",
+                ));
             }
             // A stray control character (such as Escape) could do surprising things in a terminal.
-            if s.text.chars().any(|c| c.is_control() && !matches!(c, '\n' | '\t')) {
+            if s.text
+                .chars()
+                .any(|c| c.is_control() && !matches!(c, '\n' | '\t'))
+            {
                 return Err(invalid("A snippet can't contain control characters."));
             }
         }
