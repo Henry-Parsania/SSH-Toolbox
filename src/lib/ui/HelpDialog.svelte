@@ -27,6 +27,8 @@
     ["Network tools", "Tools menu: a network scanner that finds the computers on a network (192.168.1.0/24, ranges or addresses) and the services they offer, with a button to add an SSH session, and a port scanner that shows which ports of one computer are open, with the greeting each service sends."],
     ["Edit server files", "Double-click a file in the server's file list to open it on this computer in your usual program. When you save it, the app offers to send it back (or does it by itself if you choose). If the file changed on the server meanwhile, it asks before replacing it. The copy is deleted when you stop editing or quit. Programs and scripts ask which program to use. Right-click, Open with, lets you pick the program."],
     ["X11 windows", "Tick \"Show windows of programs on the server (X11)\" in a session to run programs with windows on the server and see them here. On Windows the app starts VcXsrv for this when it is installed; Tools, X server shows its state."],
+    ["Snippets", "Saved commands. Terminal menu, Snippets: send one to this pane, every pane of the tab or every open pane. Stored as plain text, so no passwords in them."],
+    ["Command palette and quick connect", "Ctrl+Shift+P opens a box where you type to jump to a saved session, an open tab or any menu command. Typing something like pi@10.0.0.5:22 offers to connect to it: the new session form opens filled in, and saving it connects."],
     ["Agent", "An assistant for the SSH server in the active tab (the sparkle button, or View menu). It can read the terminal and files and run commands; anything that changes something is shown to you first. Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model: set one up with the gear in the panel."],
     ["Serial ports", "Open a serial device with its settings, and set DTR, RTS or send a break. File menu."],
     ["Footer", "CPU, memory and disk of this computer or of the active SSH server. Settings."],
@@ -47,6 +49,7 @@
     ["Ctrl+Shift+F", "Search the output"],
     ["Ctrl+Shift+S", "Save the output to Downloads"],
     ["Ctrl+Shift+B", "Type into all panes"],
+    ["Ctrl+Shift+P", "Command palette: jump to a session, tab or command, or type user@host to connect"],
     ["Ctrl+Shift+C / V", "Copy and paste"],
   ];
 </script>

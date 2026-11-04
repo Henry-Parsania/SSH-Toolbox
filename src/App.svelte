@@ -28,6 +28,8 @@
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
   import { setSessionColors } from "./lib/sessions/colors.svelte";
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
+  import Palette, { type PaletteItem } from "./lib/palette/Palette.svelte";
+  import { parseQuickConnect } from "./lib/palette/parse";
   import SnippetsDialog from "./lib/snippets/SnippetsDialog.svelte";
   import EditPrompt from "./lib/files/EditPrompt.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
@@ -44,12 +46,13 @@
   let showSettings = $state(false);
   let help = $state<"features" | "shortcuts" | "about" | null>(null);
   // Menu commands the sessions list carries out. The number makes a repeated command count.
-  let sidebarCommand = $state<{ name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number } } | null>(null);
+  let sidebarCommand = $state<{ name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null>(null);
   // The network tools window, when it is open.
   let scanner = $state<"network" | "ports" | null>(null);
   let xserver = $state(false);
   let snippets = $state(false);
-  function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number }) {
+  let paletteOpen = $state(false);
+  function sessionCommand(name: "ssh" | "ftp" | "serial" | "import", prefill?: { host: string; port: number; user?: string; connect?: boolean }) {
     sidebarOpen = true;
     sidebarCommand = { name, n: (sidebarCommand?.n ?? 0) + 1, prefill };
   }
@@ -385,6 +388,33 @@
     return () => clearTimeout(timer);
   });
 
+  // Everything the command palette can jump to: saved sessions, open tabs and menu actions.
+  const paletteItems = $derived<PaletteItem[]>([
+    ...library.file.session.map((s) => ({
+      group: "Session",
+      label: s.name,
+      hint: s.type === "ssh" ? `${s.user}@${s.host}` : s.type,
+      run: () => openSaved(s),
+    })),
+    ...workspace.tabs.map((t) => ({ group: "Tab", label: t.title, run: () => workspace.selectTab(t.id) })),
+    ...menus.flatMap((m) =>
+      m.items.flatMap((i) => (i === "separator" || i.disabled ? [] : [{ group: m.label, label: i.label, hint: i.hint, run: i.onselect }])),
+    ),
+  ]);
+
+  /** Typing user@host:port offers to connect to it, through the new session form. */
+  function quickConnectItem(query: string): PaletteItem | null {
+    const target = parseQuickConnect(query);
+    if (!target) return null;
+    const label = `${target.user ? target.user + "@" : ""}${target.host}${target.port === 22 ? "" : ":" + target.port}`;
+    return {
+      group: "Connect",
+      label: `Connect to ${label}`,
+      hint: "opens the session form",
+      run: () => sessionCommand("ssh", { host: target.host, port: target.port, user: target.user, connect: true }),
+    };
+  }
+
   // Runs before the terminal sees the key, so shortcuts never reach the program in the pane.
   $effect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -416,6 +446,9 @@
           break;
         case "broadcast":
           workspace.broadcast = !workspace.broadcast;
+          break;
+        case "palette":
+          paletteOpen = !paletteOpen;
           break;
       }
     };
@@ -537,6 +570,9 @@
   <EditPrompt />
   {#if xserver}
     <XServerDialog onclose={() => (xserver = false)} />
+  {/if}
+  {#if paletteOpen}
+    <Palette items={paletteItems} extra={quickConnectItem} onclose={() => (paletteOpen = false)} />
   {/if}
   {#if snippets && workspace.activeTab}
     <SnippetsDialog tabId={workspace.activeTab.id} paneId={workspace.activeTab.active} onclose={() => (snippets = false)} />

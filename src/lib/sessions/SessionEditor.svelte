@@ -12,20 +12,22 @@
     /** The folder a new session starts in. */
     folder?: string;
     /** An address to start a new session with, such as one found by the network scanner. */
-    prefill?: { host: string; port: number };
+    prefill?: { host: string; port: number; user?: string; connect?: boolean };
     onclose: () => void;
     /** Opens the "set up key login" dialog for a saved session. */
     onsetupkey?: (session: SshSession) => void;
+    /** Called with the saved session when the form was started by quick connect. */
+    onsaved?: (session: SshSession) => void;
   }
 
-  let { library, editing, folder = "", prefill, onclose, onsetupkey }: Props = $props();
+  let { library, editing, folder = "", prefill, onclose, onsetupkey, onsaved }: Props = $props();
 
   // The form starts from the session being edited, and doesn't follow later changes to it.
   const start = untrack(() => ({
     name: editing?.name ?? prefill?.host ?? "",
     host: editing?.host ?? prefill?.host ?? "",
     port: editing?.port ?? prefill?.port ?? 22,
-    user: editing?.user ?? "",
+    user: editing?.user ?? prefill?.user ?? "",
     auth: editing?.auth ?? ("password" as const),
     keyPath: editing?.key_path ?? "",
     folder: editing?.folder ?? folder,
@@ -107,6 +109,7 @@
       passphrase = "";
       onclose();
       if (copyKey && auth === "password") onsetupkey?.(session);
+      else if (prefill?.connect && !editing) onsaved?.(session);
     } catch (err) {
       error = (err as { message?: string }).message ?? "Couldn't save the session.";
     } finally {

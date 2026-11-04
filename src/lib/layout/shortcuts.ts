@@ -8,7 +8,8 @@ export type ShortcutAction =
   | { type: "split"; direction: "row" | "column" }
   | { type: "move-focus"; move: "left" | "right" | "up" | "down" }
   | { type: "search" }
-  | { type: "broadcast" };
+  | { type: "broadcast" }
+  | { type: "palette" };
 
 type KeyInfo = Pick<KeyboardEvent, "type" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "code">;
 
@@ -39,6 +40,8 @@ export function shortcutFor(e: KeyInfo): ShortcutAction | null {
       return { type: "search" };
     case "KeyB":
       return { type: "broadcast" };
+    case "KeyP":
+      return { type: "palette" };
   }
   if (e.code in ARROWS) return { type: "move-focus", move: ARROWS[e.code as keyof typeof ARROWS] };
   return null;

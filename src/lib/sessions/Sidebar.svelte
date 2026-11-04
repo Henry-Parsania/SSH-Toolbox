@@ -23,7 +23,7 @@
     /** Each time this goes up, the editor for a new session opens. */
     newSessionSignal?: number;
     /** A request from the menu bar. Each one has its own number, so the same command can repeat. */
-    command?: { name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number } } | null;
+    command?: { name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null;
     /** Which servers answer, shown as a dot beside each one. */
     reach?: Reachability;
   }
@@ -32,7 +32,7 @@
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
-  let editor = $state<{ editing?: SshSession; folder?: string; prefill?: { host: string; port: number } } | null>(null);
+  let editor = $state<{ editing?: SshSession; folder?: string; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null>(null);
   let confirm = $state<{ kind: "session" | "folder"; id: string; name: string } | null>(null);
   let ftpEditor = $state<{ editing?: FtpSession; folder?: string } | null>(null);
   let serialEditor = $state<{ editing?: SerialSession; folder?: string } | null>(null);
@@ -354,7 +354,7 @@
 </aside>
 
 {#if editor}
-  <SessionEditor {library} editing={editor.editing} folder={editor.folder} prefill={editor.prefill} onclose={() => (editor = null)} onsetupkey={(s) => (keySetupFor = s)} />
+  <SessionEditor {library} editing={editor.editing} folder={editor.folder} prefill={editor.prefill} onclose={() => (editor = null)} onsetupkey={(s) => (keySetupFor = s)} onsaved={onopen} />
 {/if}
 
 {#if serialEditor}
