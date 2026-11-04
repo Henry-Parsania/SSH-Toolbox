@@ -181,6 +181,10 @@ export interface Settings {
   auto_reconnect: boolean;
   /** A folder for text copies of every session, or empty for none. */
   log_folder: string;
+  /** Show an icon in the system tray (after a restart). */
+  tray_icon: boolean;
+  /** Closing the window hides it to the tray. */
+  close_to_tray: boolean;
   reachability_enabled: boolean;
   /** 0 means only at start and when the list changes. */
   reachability_interval_secs: number;

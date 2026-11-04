@@ -100,6 +100,18 @@
       Bring back tabs and splits when the app starts
     </label>
 
+    <h3 class="group">Window</h3>
+    <label class="check">
+      <input type="checkbox" bind:checked={draft.tray_icon} />
+      Show an icon in the system tray (after a restart)
+    </label>
+    {#if draft.tray_icon}
+      <label class="check">
+        <input type="checkbox" bind:checked={draft.close_to_tray} />
+        Closing the window keeps the app running in the tray
+      </label>
+    {/if}
+
     <h3 class="group">Connections</h3>
     <label class="check">
       <input type="checkbox" bind:checked={draft.auto_reconnect} />

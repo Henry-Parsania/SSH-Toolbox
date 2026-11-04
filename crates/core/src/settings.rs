@@ -55,6 +55,10 @@ pub struct Settings {
     pub restore_layout: bool,
     /// A folder to save a text copy of every terminal session in, or empty for no logging.
     pub log_folder: String,
+    /// Show an icon in the system tray (takes effect after a restart).
+    pub tray_icon: bool,
+    /// Closing the window hides it to the tray instead of quitting. Only with the tray icon on.
+    pub close_to_tray: bool,
     /// Start an SSH session again by itself when its connection drops (a few tries, then it asks).
     pub auto_reconnect: bool,
     /// Whether the saved sessions are checked for being reachable (a quick TCP connect).
@@ -79,6 +83,8 @@ impl Default for Settings {
             default_shell: String::new(),
             restore_layout: true,
             log_folder: String::new(),
+            tray_icon: false,
+            close_to_tray: false,
             auto_reconnect: true,
             reachability_enabled: true,
             reachability_interval_secs: 60,

@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: Settings = {
   restore_layout: true,
   auto_reconnect: true,
   log_folder: "",
+  tray_icon: false,
+  close_to_tray: false,
   reachability_enabled: true,
   reachability_interval_secs: 60,
   stats_enabled: true,

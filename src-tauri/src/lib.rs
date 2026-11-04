@@ -1,4 +1,5 @@
 mod commands;
+mod tray;
 mod window_state;
 
 use std::path::PathBuf;
@@ -28,6 +29,18 @@ fn apply_webkit_workaround() {
 #[cfg(not(target_os = "linux"))]
 fn apply_webkit_workaround() {}
 
+/// (tray icon on, closing hides to the tray), from the saved settings.
+fn tray_wanted() -> (bool, bool) {
+    let Some(dir) = toolbox_core::config::config_dir() else {
+        return (false, false);
+    };
+    let settings = toolbox_core::settings::load(&dir.join("settings.toml"));
+    (
+        settings.tray_icon,
+        settings.tray_icon && settings.close_to_tray,
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     apply_webkit_workaround();
@@ -50,10 +63,15 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 // Closing the main window ends the app, and with it any other windows.
                 let handle = app.handle().clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Destroyed = event {
-                        handle.exit(0);
+                let hide_target = window.clone();
+                window.on_window_event(move |event| match event {
+                    tauri::WindowEvent::Destroyed => handle.exit(0),
+                    // With the tray icon and "keep running" on, closing only hides the window.
+                    tauri::WindowEvent::CloseRequested { api, .. } if tray_wanted().1 => {
+                        api.prevent_close();
+                        let _ = hide_target.hide();
                     }
+                    _ => {}
                 });
                 // The title names the exact build, so it is clear which one is running.
                 let _ = window.set_title(&format!(
@@ -66,6 +84,9 @@ pub fn run() {
                     window_state::install(window.clone(), dir.join("window.json"));
                 }
                 let _ = window.show();
+            }
+            if tray_wanted().0 {
+                tray::install(app)?;
             }
             Ok(())
         })
