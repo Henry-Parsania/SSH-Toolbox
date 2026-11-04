@@ -21,6 +21,7 @@
   import Icon from "../ui/Icon.svelte";
   import EditList from "./EditList.svelte";
   import TextEditor from "./TextEditor.svelte";
+  import SyncDialog from "./SyncDialog.svelte";
   import { edits } from "./edits.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import TransferList from "./TransferList.svelte";
@@ -79,6 +80,9 @@
   let message = $state("");
   let jobs = $state<TransferJob[]>([]);
   let question = $state<{ id: string; prompt: Prompt } | null>(null);
+
+  // The folder comparison, when open.
+  let comparing = $state(false);
 
   // The built-in editor, when a file is open in it.
   let editing = $state<{ fileId: string; path: string } | null>(null);
@@ -357,6 +361,12 @@
         files={local}
         status="Opening…"
         bind:path={localPath}
+        extra={{
+          icon: "refresh",
+          title: "Compare this folder with the server's and copy what is missing or newer",
+          disabled: !remote || !localPath || !remotePath,
+          onclick: () => (comparing = true),
+        }}
         transferLabel="Upload"
         transferIcon="up"
         ontransfer={(paths) => local && remote && queue(local.id, paths, remote.id, remotePath)}
@@ -367,6 +377,9 @@
   </div>
 
   <EditList />
+  {#if comparing && local && remote}
+    <SyncDialog {local} {remote} {localPath} {remotePath} onclose={() => (comparing = false)} />
+  {/if}
   {#if editing}
     <TextEditor fileId={editing.fileId} path={editing.path} onclose={() => (editing = null)} />
   {/if}
