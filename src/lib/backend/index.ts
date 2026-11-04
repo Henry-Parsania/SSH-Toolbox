@@ -177,6 +177,8 @@ export interface Settings {
   webkit_workaround: "off" | "disable_dmabuf" | "disable_compositing";
   default_shell: string;
   restore_layout: boolean;
+  /** Start an SSH session again by itself when its connection drops. */
+  auto_reconnect: boolean;
   reachability_enabled: boolean;
   /** 0 means only at start and when the list changes. */
   reachability_interval_secs: number;

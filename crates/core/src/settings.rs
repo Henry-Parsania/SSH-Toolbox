@@ -53,6 +53,8 @@ pub struct Settings {
     pub webkit_workaround: WebkitWorkaround,
     pub default_shell: String,
     pub restore_layout: bool,
+    /// Start an SSH session again by itself when its connection drops (a few tries, then it asks).
+    pub auto_reconnect: bool,
     /// Whether the saved sessions are checked for being reachable (a quick TCP connect).
     pub reachability_enabled: bool,
     /// Seconds between checks, or 0 to check only at start and when the list changes.
@@ -74,6 +76,7 @@ impl Default for Settings {
             webkit_workaround: WebkitWorkaround::Off,
             default_shell: String::new(),
             restore_layout: true,
+            auto_reconnect: true,
             reachability_enabled: true,
             reachability_interval_secs: 60,
             stats_enabled: true,

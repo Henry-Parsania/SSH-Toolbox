@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { PlatformInfo, TerminalStatus } from "../backend";
+  import { settings } from "../settings.svelte";
+  import { nextRetryDelay } from "./autoReconnect";
   import { serialSendBreak, serialSetControl } from "../backend/serial";
   import TerminalView from "../terminal/TerminalView.svelte";
   import Icon from "../ui/Icon.svelte";
@@ -25,6 +27,21 @@
   let attempt = $state(0);
   let connecting = $state(false);
 
+  // Auto-reconnect: only for an SSH session that was working and then lost its connection. A
+  // session that never connected (wrong password, refused) or that ended on purpose is left alone.
+  let wasConnected = false;
+  let retries = 0;
+  let retryIn = $state<number | null>(null);
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let countdown: ReturnType<typeof setInterval> | undefined;
+
+  function stopRetry() {
+    clearTimeout(retryTimer);
+    clearInterval(countdown);
+    retryIn = null;
+  }
+  $effect(() => stopRetry);
+
   // The serial lines are shown as the user last set them. Devices start with both low.
   let dtr = $state(false);
   let rts = $state(false);
@@ -41,6 +58,7 @@
   }
 
   function reconnect() {
+    stopRetry();
     dtr = false;
     rts = false;
     ended = null;
@@ -74,10 +92,27 @@
 
   function onstatus(status: TerminalStatus) {
     connecting = status.type === "connecting";
+    if (status.type === "connected") {
+      wasConnected = true;
+      retries = 0;
+    }
     if (status.type === "exited") {
       ended = status.code === null ? "Session ended." : `Session ended (code ${status.code}).`;
     } else if (status.type === "failed") {
       ended = status.error.message;
+      const delay = nextRetryDelay({
+        enabled: settings.auto_reconnect,
+        isSsh: node.spec?.type === "ssh" && !node.spec.monitor,
+        wasConnected,
+        lost: status.error.code === "connection_lost",
+        retries,
+      });
+      if (delay !== null) {
+        retries++;
+        retryIn = delay;
+        countdown = setInterval(() => (retryIn = Math.max(0, (retryIn ?? 1) - 1)), 1000);
+        retryTimer = setTimeout(reconnect, delay * 1000);
+      }
     }
   }
 </script>
@@ -156,7 +191,7 @@
   {/if}
   {#if ended}
     <div class="ended" role="alert">
-      <span class="text">{ended}</span>
+      <span class="text">{ended}{#if retryIn !== null} Reconnecting in {retryIn} s (press R to reconnect now, or C to cancel).{/if}</span>
       <span class="actions">
         {#if node.spec?.type === "ssh" || node.spec?.type === "serial"}
           <button class="btn small primary" title="Press R" onclick={reconnect}>

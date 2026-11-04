@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   webkit_workaround: "off",
   default_shell: "",
   restore_layout: true,
+  auto_reconnect: true,
   reachability_enabled: true,
   reachability_interval_secs: 60,
   stats_enabled: true,

@@ -100,6 +100,12 @@
       Bring back tabs and splits when the app starts
     </label>
 
+    <h3 class="group">Connections</h3>
+    <label class="check">
+      <input type="checkbox" bind:checked={draft.auto_reconnect} />
+      Reconnect an SSH session by itself when its connection drops (up to 5 tries)
+    </label>
+
     <h3 class="group">Server status</h3>
     <label class="check">
       <input type="checkbox" bind:checked={draft.reachability_enabled} />
