@@ -24,6 +24,12 @@
   let showDiff = $state(false);
   let conflict = $state(false);
   let leaving = $state(false);
+  let area = $state<HTMLTextAreaElement>();
+
+  // The editor takes the keyboard once the text is loaded (the terminal behind may hold it).
+  $effect(() => {
+    if (loaded && !showDiff && area) setTimeout(() => area?.focus(), 0);
+  });
 
   const dirty = $derived(loaded !== null && text !== original);
   const diff = $derived(showDiff ? diffLines(original, text) : []);
@@ -112,8 +118,7 @@
           {/each}
         </div>
       {:else}
-        <!-- svelte-ignore a11y_autofocus -->
-        <textarea bind:value={text} onkeydown={tab} spellcheck="false" autofocus wrap="off" aria-label="File text"></textarea>
+        <textarea bind:this={area} bind:value={text} onkeydown={tab} spellcheck="false" wrap="off" aria-label="File text"></textarea>
       {/if}
 
       {#if conflict}

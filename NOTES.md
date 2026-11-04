@@ -111,3 +111,16 @@ Decisions the builder made on its own, and anything blocked. Newest last.
 - Not built: dragging a tab onto a pane, dragging panes around.
 - Duplicate (2026-11-03): right-click a tab, Duplicate to the right / below (also in the Terminal menu for the front tab) opens a new tab with the same session spec (same saved SSH session, shell or WSL distro) in a new pane next to that tab's pane. A new connection or shell, nothing copied, so a local shell starts in its default folder. The right mouse button no longer selects a tab; it only opens the tab menu (Duplicate, Rename, Move to its own window, Close).
 - Keys on an ended session (2026-11-03): when a pane's session ends or fails, the banner shows Reconnect [R] and Close [C]; pressing R (SSH and serial only) starts it again and C closes the pane (and the tab if it was the last pane). Only the pane that has the keyboard listens, and not while a question box is open or while typing in a text box. While a session is still connecting, Esc cancels it (a letter was not used, because someone typing ahead would close the tab by accident).
+
+## Phase 7: more features (2026-11-04)
+- Built and tested with unit tests, and the new screens were opened in the running app over DevTools (palette, quick connect form, trusted servers, backup, snippets, settings). Not tried against a real server: auto-reconnect, session logging, startup commands, the built-in editor on a server file, folder compare, and every Docker command (compose, build, tag, push, login, attach, copy, networks). The Ubuntu side is untested.
+- Decision: Docker compose, build, tag, push, login, attach, copy and network commands are typed into a new terminal tab (local PowerShell, or the SSH session of the server shown). The user sees the real output, a registry password is typed in the terminal and never reaches this app, and no new Rust is needed. Every value is checked against a strict character set first because it ends up inside single quotes in a shell the app does not control.
+- Decision: quick connect opens the new-session form filled in (saving it connects) instead of connecting without saving, because the backend only connects saved sessions.
+- Decision: the palette is Ctrl+Shift+P (Ctrl+K is "delete to end of line" in a shell).
+- Decision: auto-reconnect only after a session that worked and then lost its connection; a wrong password or a refusal is never retried.
+- Decision: restoring a sessions backup drops pinned FTPS certificates (SEC8) and never changes sessions that exist already.
+- Decision: a log folder is plain text; the file can hold anything the server printed, so Settings says to keep it private.
+- Decision: the tray icon and keep-running-on-close are off by default (GNOME needs an extension to show tray icons).
+- Found and fixed while testing: the palette did not take the keyboard from the terminal behind it (typing went to the shell). It now focuses its box itself.
+- Known gap: Escape does not close a dialog while the keyboard is still in the terminal behind it. Clicking Cancel works. The session form's buttons now stay in view on a tall form.
+- Docker contexts (7.19) are not needed: each saved SSH session already is a Docker target.

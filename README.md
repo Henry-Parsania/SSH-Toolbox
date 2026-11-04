@@ -11,16 +11,18 @@ It is a personal project: builds are for the owner's own machines, with no code 
 - **Terminals and tabs.** Local shells (PowerShell, cmd, Git Bash, WSL, or the default shell on Linux) in tabs. The window can be split into panes; click a pane and pick which open tab it shows, or start a new terminal or saved session in it. Right-click a tab to duplicate its connection to the right or below, rename it, or move it to its own window. The layout comes back on the next start.
 - **SSH sessions.** Saved in folders, with password, key or agent login, jump hosts (up to 3 hops) and a status dot that shows which servers answer. Host keys are checked against `known_hosts`. Give a session a colour and its tab and terminal background use it instead of the theme.
 - **Key setup.** Make or pick a key and install it on a server (like `ssh-copy-id`), from the new-session window or the session's menu. Saved secrets go in the OS keychain, never in files.
-- **Reconnect.** When a session ends, press `R` to reconnect or `C` to close it.
-- **Files.** Browse and copy between this computer and a server over SFTP, FTP or FTPS. Double-click a file to edit it locally; saving sends it back.
+- **Reconnect.** A dropped SSH connection reconnects by itself (up to 5 tries). When a session has ended, press `R` to reconnect or `C` to close it.
+- **Command palette.** `Ctrl+Shift+P` jumps to any session, tab or command; type `user@host:port` to connect to a new address.
+- **Snippets, startup commands and logs.** Saved commands you can send to one pane, a tab or every pane; commands a session runs after connecting; optional plain-text logs of every session.
+- **Files.** Browse and copy between this computer and a server over SFTP, FTP or FTPS. Edit a text file in the built-in editor (with a diff view) or in your own program, and compare a local folder with a server folder.
 - **Port forwarding.** Local, remote and SOCKS forwards per session.
 - **X11.** Show windows of programs run on the server (Windows uses VcXsrv, installed separately).
-- **Docker.** Containers, images, volumes, networks, logs and shells, on this computer or over SSH.
+- **Docker.** Containers, images, volumes, networks, logs and shells, on this computer or over SSH, plus Compose up/down/pull/restart/logs, build, tag, push, registry login, attach, file copy and network connect.
 - **Process monitor.** Opens btop, htop or top for a session.
 - **Network tools.** Network scanner and port scanner.
 - **Serial ports.** Open a device with its settings.
 - **Agent.** An optional assistant for the active SSH server; anything that changes something is shown first.
-- **Also:** search and save terminal output, type into all panes at once, import from `~/.ssh/config`, a footer with CPU, memory and disk, and a Help window listing every feature and shortcut.
+- **Also:** search and save terminal output, type into all panes at once, import from `~/.ssh/config`, back up and restore sessions, a trusted-servers (known hosts) manager, an optional tray icon, a check mark on a background tab when a long command goes quiet, a footer with CPU, memory and disk, and a Help window listing every feature and shortcut.
 
 ## Keyboard shortcuts
 
@@ -34,6 +36,7 @@ It is a personal project: builds are for the owner's own machines, with no code 
 | Ctrl+Shift+F | Search the output |
 | Ctrl+Shift+S | Save the output to Downloads |
 | Ctrl+Shift+B | Type into all panes |
+| Ctrl+Shift+P | Command palette |
 | Ctrl+Shift+C / V | Copy and paste |
 
 ## Running and building

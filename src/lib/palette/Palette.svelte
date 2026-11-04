@@ -2,7 +2,7 @@
   // Ctrl+Shift+P: type to jump to a saved session, an open tab or a menu action. Text such as
   // pi@10.0.0.5:22 offers to connect straight to that address.
 
-  import { tick } from "svelte";
+  import { onMount, tick } from "svelte";
   import { matchesQuery } from "./parse";
 
   export interface PaletteItem {
@@ -25,6 +25,14 @@
   let query = $state("");
   let index = $state(0);
   let list = $state<HTMLElement>();
+  let box = $state<HTMLInputElement>();
+
+  // The terminal behind has the keyboard when the palette opens, so the box must take it.
+  onMount(() => {
+    box?.focus();
+    const timer = setTimeout(() => box?.focus(), 50);
+    return () => clearTimeout(timer);
+  });
 
   const shown = $derived.by(() => {
     const found = items.filter((i) => matchesQuery(query, `${i.group} ${i.label}`)).slice(0, 60);
@@ -52,10 +60,9 @@
 
 <div class="modal-backdrop top" onpointerdown={(e) => e.target === e.currentTarget && onclose()} role="presentation">
   <div class="palette" role="dialog" aria-label="Command palette" tabindex="-1">
-    <!-- svelte-ignore a11y_autofocus -->
     <input
       type="text"
-      autofocus
+      bind:this={box}
       placeholder="Type a session, a tab, a command, or user@host:port"
       bind:value={query}
       oninput={() => (index = 0)}
