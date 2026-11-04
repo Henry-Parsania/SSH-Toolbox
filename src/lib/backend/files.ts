@@ -217,3 +217,30 @@ export function editStop(id: string): Promise<void> {
 export function openLocalFile(path: string, choose = false): Promise<void> {
   return invoke<void>("open_local_file", { path, choose });
 }
+
+export interface TextFile {
+  /** With \n line ends. */
+  text: string;
+  crlf: boolean;
+  modified: number | null;
+  size: number;
+}
+
+export type SaveOutcome = { result: "saved"; modified: number | null } | { result: "remote_changed" };
+
+/** Reads a small UTF-8 text file for the built-in editor. */
+export function filesReadText(id: string, path: string): Promise<TextFile> {
+  return invoke<TextFile>("files_read_text", { fileId: id, path });
+}
+
+/** Saves the editor's text. Unless `force`, a file changed since it was opened is left alone. */
+export function filesWriteText(
+  id: string,
+  path: string,
+  text: string,
+  crlf: boolean,
+  openedModified: number | null,
+  force: boolean,
+): Promise<SaveOutcome> {
+  return invoke<SaveOutcome>("files_write_text", { fileId: id, path, text, crlf, openedModified, force });
+}

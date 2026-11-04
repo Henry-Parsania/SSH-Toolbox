@@ -448,3 +448,38 @@ pub async fn transfer_answer(
 ) -> Result<(), AppError> {
     files.answers.respond(job_id, choice)
 }
+
+/// Reads a small text file for the built-in editor.
+#[tauri::command]
+pub async fn files_read_text(
+    files: State<'_, Files>,
+    file_id: String,
+    path: String,
+) -> Result<toolbox_core::files::text::TextFile, AppError> {
+    let backend = files.backend(&file_id)?;
+    toolbox_core::files::text::read_text(backend.as_ref(), &path).await
+}
+
+/// Saves the built-in editor's text. Unless `force`, a file that changed since it was opened is
+/// left alone and `remote_changed` is returned.
+#[tauri::command]
+pub async fn files_write_text(
+    files: State<'_, Files>,
+    file_id: String,
+    path: String,
+    text: String,
+    crlf: bool,
+    opened_modified: Option<i64>,
+    force: bool,
+) -> Result<toolbox_core::files::text::SaveOutcome, AppError> {
+    let backend = files.backend(&file_id)?;
+    toolbox_core::files::text::write_text(
+        backend.as_ref(),
+        &path,
+        &text,
+        crlf,
+        opened_modified,
+        force,
+    )
+    .await
+}

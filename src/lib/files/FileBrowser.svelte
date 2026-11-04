@@ -25,6 +25,8 @@
     ontransfer?: (paths: string[]) => void;
     /** Opens a file in a program on this computer. `choose` asks which program. */
     onopenfile?: (entry: FileEntry, path: string, choose: boolean) => void;
+    /** Opens a text file in the built-in editor. */
+    oneditfile?: (entry: FileEntry, path: string) => void;
     transferLabel?: string;
     transferIcon?: IconName;
     /** The folder being shown, so the other side knows where to put things. */
@@ -43,7 +45,7 @@
     oncopytoterminal?: (text: string) => void;
   }
 
-  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", onopenfile, path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
+  let { title, files, status = "", ontransfer, transferLabel = "Transfer", transferIcon = "down", onopenfile, oneditfile, path = $bindable(""), reloadSignal = 0, side = "local", highlight = false, onstartdrag, extra, oncopytoterminal }: Props = $props();
 
   let entries = $state<FileEntry[]>([]);
   let loading = $state(false);
@@ -487,6 +489,9 @@
       {#if one && one.kind === "file" && onopenfile}
         <li><button onclick={() => { onopenfile(one, pathOf(one), false); closeMenu(); }}><Icon name="edit" size={14} /> {side === "remote" ? "Open and edit here" : "Open"} <span class="hintkey">(double click)</span></button></li>
         <li><button onclick={() => { onopenfile(one, pathOf(one), true); closeMenu(); }}><Icon name="edit" size={14} /> Open with…</button></li>
+      {/if}
+      {#if one && one.kind === "file" && oneditfile}
+        <li><button onclick={() => { oneditfile(one, pathOf(one)); closeMenu(); }}><Icon name="edit" size={14} /> Edit in SSH Toolbox…</button></li>
       {/if}
       {#if ontransfer}
         <li><button onclick={() => { transfer(); closeMenu(); }}><Icon name={transferIcon} size={14} /> {transferLabel}</button></li>

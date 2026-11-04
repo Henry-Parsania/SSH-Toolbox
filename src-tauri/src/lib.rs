@@ -107,6 +107,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
             commands::platform::app_version,
+            commands::files::files_read_text,
+            commands::files::files_write_text,
             commands::edit::edit_open,
             commands::edit::edit_upload,
             commands::edit::edit_reopen,

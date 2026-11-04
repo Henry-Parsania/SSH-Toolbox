@@ -20,6 +20,7 @@
   import PromptDialog from "../terminal/PromptDialog.svelte";
   import Icon from "../ui/Icon.svelte";
   import EditList from "./EditList.svelte";
+  import TextEditor from "./TextEditor.svelte";
   import { edits } from "./edits.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import TransferList from "./TransferList.svelte";
@@ -78,6 +79,9 @@
   let message = $state("");
   let jobs = $state<TransferJob[]>([]);
   let question = $state<{ id: string; prompt: Prompt } | null>(null);
+
+  // The built-in editor, when a file is open in it.
+  let editing = $state<{ fileId: string; path: string } | null>(null);
 
   /** A file of the server opens here, and what is saved goes back. */
   async function openRemoteFile(_entry: unknown, path: string, choose: boolean) {
@@ -337,6 +341,7 @@
         transferIcon="down"
         ontransfer={(paths) => local && remote && queue(remote.id, paths, local.id, localPath)}
         onopenfile={openRemoteFile}
+        oneditfile={(_e, path) => remote && (editing = { fileId: remote.id, path })}
       />
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -356,11 +361,15 @@
         transferIcon="up"
         ontransfer={(paths) => local && remote && queue(local.id, paths, remote.id, remotePath)}
         onopenfile={openHereFile}
+        oneditfile={(_e, path) => local && (editing = { fileId: local.id, path })}
       />
     </div>
   </div>
 
   <EditList />
+  {#if editing}
+    <TextEditor fileId={editing.fileId} path={editing.path} onclose={() => (editing = null)} />
+  {/if}
 
   <TransferList {jobs} />
 
