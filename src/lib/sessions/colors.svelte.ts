@@ -1,10 +1,18 @@
 // Colours chosen for saved SSH sessions, by session ID. App keeps this in step with the library,
 // so tabs and terminals can look a colour up without being handed the whole list.
-export const sessionColors = $state<Record<string, string>>({});
+const state = $state<{ map: Record<string, string> }>({ map: {} });
+
+/** The colour chosen for a session, or undefined to follow the theme. Reactive. */
+export const sessionColors = {
+  get(id: string): string | undefined {
+    return state.map[id];
+  },
+};
 
 export function setSessionColors(sessions: { id: string; type: string; color?: string }[]) {
-  for (const id of Object.keys(sessionColors)) delete sessionColors[id];
-  for (const s of sessions) if (s.type === "ssh" && s.color) sessionColors[s.id] = s.color;
+  const next: Record<string, string> = {};
+  for (const s of sessions) if (s.type === "ssh" && s.color) next[s.id] = s.color;
+  state.map = next;
 }
 
 /** Light text on dark colours and dark text on light ones. */

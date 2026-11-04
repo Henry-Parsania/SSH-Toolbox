@@ -48,7 +48,7 @@
   /** The colour chosen for the SSH session a tab was opened from, if any. */
   function colorOf(tab: Tab): string | undefined {
     const spec = leaves(tab.root)[0]?.spec;
-    return spec?.type === "ssh" ? sessionColors[spec.saved_session_id] : undefined;
+    return spec?.type === "ssh" ? sessionColors.get(spec.saved_session_id) : undefined;
   }
 
   function startRename(id: string, title: string) {

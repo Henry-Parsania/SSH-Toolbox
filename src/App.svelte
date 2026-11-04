@@ -26,6 +26,7 @@
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import AgentPanel from "./lib/agent/AgentPanel.svelte";
   import ScannerDialog from "./lib/scan/ScannerDialog.svelte";
+  import { setSessionColors } from "./lib/sessions/colors.svelte";
   import XServerDialog from "./lib/x11/XServerDialog.svelte";
   import EditPrompt from "./lib/files/EditPrompt.svelte";
   import { AgentChat } from "./lib/agent/agent.svelte";
@@ -131,6 +132,7 @@
   let newSessionSignal = $state(0);
   const library = new Library();
   const reach = new Reachability();
+  $effect(() => setSessionColors(library.file.session));
 
   // Check which saved servers answer: at start, whenever the list changes, and then on the
   // interval from the settings (0 means only at start and on changes).

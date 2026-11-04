@@ -106,14 +106,14 @@
   function themeNow() {
     const base = terminalTheme(settings.theme);
     const id = spec.type === "ssh" ? spec.saved_session_id : "";
-    const color = id ? sessionColors[id] : undefined;
+    const color = id ? sessionColors.get(id) : undefined;
     return color ? { ...base, background: color, foreground: readableOn(color), cursor: readableOn(color) } : base;
   }
   // Font, size, theme and scrollback follow the settings as they change. The renderer is
   // chosen when the terminal opens.
   $effect(() => {
     void [settings.font_family, settings.font_size, settings.theme, settings.scrollback];
-    if (spec.type === "ssh") void sessionColors[spec.saved_session_id];
+    if (spec.type === "ssh") void sessionColors.get(spec.saved_session_id);
     applyAppearance();
   });
 
