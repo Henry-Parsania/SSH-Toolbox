@@ -32,6 +32,7 @@
   import Icon from "../ui/Icon.svelte";
   import { fitMenu } from "../ui/fitMenu";
   import Spark from "./Spark.svelte";
+  import { composeCommand, projectOf, type ComposeAction } from "./compose";
 
   interface Props {
     library: Library;
@@ -39,10 +40,12 @@
     active: { id: string; name: string } | null;
     /** Opens a container's log or shell in a new tab. */
     onopen: (spec: SessionSpec, title: string) => void;
+    /** Runs a command in a new terminal tab on the server being shown ("local" or a saved session ID). */
+    oncompose: (target: string, command: string, title: string) => void;
     onclose: () => void;
   }
 
-  let { library, active, onopen, onclose }: Props = $props();
+  let { library, active, onopen, oncompose, onclose }: Props = $props();
 
   const REFRESH_MS = 4000;
   const LOCAL = "local";
@@ -197,6 +200,18 @@
     if (days < 45) return `${Math.round(days)} days ago`;
     if (days < 540) return `${Math.round(days / 30)} months ago`;
     return `${Math.round(days / 365)} years ago`;
+  }
+
+  /** Runs `docker compose` for a project in a terminal tab, where its output can be read. */
+  function compose(project: string, action: ComposeAction) {
+    const found = projectOf(project, containers);
+    const command = found && composeCommand(found, action);
+    if (!found || !command) {
+      say("This project's folder or files can't be used safely, so it can't be run from here.");
+      return;
+    }
+    if (action === "down" && !confirm(`Stop and remove the containers of "${project}"? Volumes and images are kept.`)) return;
+    oncompose(wanted ?? LOCAL, command, `compose ${action}: ${project}`);
   }
 
   /** Starts, stops or restarts several containers one after the other. */
@@ -872,6 +887,12 @@
         <li><button onclick={() => { void actAll(items, "start"); closeMenu(); }}><Icon name="play" size={14} /> Start all</button></li>
         <li><button onclick={() => { void actAll(items, "restart"); closeMenu(); }}><Icon name="refresh" size={14} /> Restart all</button></li>
         <li><button onclick={() => { void actAll(items, "stop"); closeMenu(); }}><Icon name="stop" size={14} /> Stop all</button></li>
+        <li class="sep" role="separator"></li>
+        <li><button onclick={() => { compose(menu?.project ?? "", "up"); closeMenu(); }}><Icon name="play" size={14} /> Compose up (create and start)</button></li>
+        <li><button onclick={() => { compose(menu?.project ?? "", "down"); closeMenu(); }}><Icon name="stop" size={14} /> Compose down (stop and remove)…</button></li>
+        <li><button onclick={() => { compose(menu?.project ?? "", "pull"); closeMenu(); }}><Icon name="down" size={14} /> Compose pull (update images)</button></li>
+        <li><button onclick={() => { compose(menu?.project ?? "", "restart"); closeMenu(); }}><Icon name="refresh" size={14} /> Compose restart</button></li>
+        <li><button onclick={() => { compose(menu?.project ?? "", "logs"); closeMenu(); }}><Icon name="log" size={14} /> Compose logs (follow)</button></li>
         <li class="sep" role="separator"></li>
         <li><button onclick={() => { copy(menu?.project ?? "", "Name"); closeMenu(); }}><Icon name="copy" size={14} /> Copy project name</button></li>
       {:else if menu.kind === "resource" && menu.r}

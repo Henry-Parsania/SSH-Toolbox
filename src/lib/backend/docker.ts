@@ -16,6 +16,9 @@ export interface ContainerInfo {
   /** The Compose project the container belongs to, if any. */
   project: string | null;
   service: string | null;
+  /** Where the Compose project was started from, and its compose files (comma separated). */
+  project_dir?: string | null;
+  config_files?: string | null;
   ports: string[];
   /** Seconds since 1970. */
   created: number;

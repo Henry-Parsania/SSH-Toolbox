@@ -18,6 +18,8 @@ const MAX_TEXT: usize = 300;
 const MAX_RAW: usize = 512 * 1024;
 const COMPOSE_PROJECT: &str = "com.docker.compose.project";
 const COMPOSE_SERVICE: &str = "com.docker.compose.service";
+const COMPOSE_DIR: &str = "com.docker.compose.project.working_dir";
+const COMPOSE_FILES: &str = "com.docker.compose.project.config_files";
 
 /// Text from Docker made safe to show: control characters dropped, length limited.
 pub fn clean(text: &str) -> String {
@@ -40,6 +42,10 @@ pub struct ContainerInfo {
     /// The Compose project the container belongs to, if any.
     pub project: Option<String>,
     pub service: Option<String>,
+    /// The folder and compose files the project was started from (Compose's own labels), so the
+    /// project can be brought up or down again. Empty for containers not made by Compose.
+    pub project_dir: Option<String>,
+    pub config_files: Option<String>,
     /// Published ports, such as "0.0.0.0:8080->80/tcp".
     pub ports: Vec<String>,
     /// Seconds since 1970 when the container was created.
@@ -143,6 +149,8 @@ pub async fn list_containers(docker: &Docker) -> Result<Vec<ContainerInfo>, AppE
                     status: text(&value, "Status"),
                     project: label(&value, COMPOSE_PROJECT),
                     service: label(&value, COMPOSE_SERVICE),
+                    project_dir: label(&value, COMPOSE_DIR),
+                    config_files: label(&value, COMPOSE_FILES),
                     ports: value
                         .get("Ports")
                         .and_then(Value::as_array)

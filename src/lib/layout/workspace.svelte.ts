@@ -40,6 +40,8 @@ export class Workspace {
   activeGroup = $state("");
   /** The last tab that was in front, for the side panels that follow the terminal. */
   lastTerminalTabId = $state("");
+  /** Text to type into a pane once its session connects, then forgotten (such as a compose command). */
+  pendingInput = $state<Record<string, string>>({});
   /** Tabs where a long command seems to have finished while they weren't showing. */
   finished = $state<Record<string, boolean>>({});
 

@@ -98,6 +98,11 @@
     if (status.type === "connected") {
       wasConnected = true;
       retries = 0;
+      const pending = workspace.pendingInput[node.pane_id];
+      if (pending) {
+        delete workspace.pendingInput[node.pane_id];
+        setTimeout(() => sendToPane(tabId, node.pane_id, snippetBytes({ text: pending, run: true })), 400);
+      }
       // The session's own startup commands, typed once the shell has had a moment to start.
       const startup = node.spec?.type === "ssh" && !node.spec.monitor ? sessionStartup(node.spec.saved_session_id) : undefined;
       if (startup) setTimeout(() => sendToPane(tabId, node.pane_id, snippetBytes({ text: startup, run: true })), 400);

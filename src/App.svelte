@@ -381,6 +381,22 @@
     if (option) workspace.newTab(option.spec, option.label);
   }
 
+  /**
+   * Types a `docker compose` command into a new tab for the server the Docker panel shows. On
+   * this computer that is PowerShell when there is one (the command is the same in any shell).
+   */
+  function runCompose(target: string, command: string, title: string) {
+    let tab;
+    if (target === "local") {
+      const shell = shells.find((s) => /powershell|pwsh/i.test(s.id)) ?? shells.find((s) => s.id === settings.default_shell) ?? shells[0];
+      if (!shell) return;
+      tab = workspace.newTab({ type: "local", shell_id: shell.id }, title);
+    } else {
+      tab = workspace.newTab({ type: "ssh", saved_session_id: target }, title);
+    }
+    workspace.pendingInput[tab.active] = command;
+  }
+
   function newSession() {
     sidebarOpen = true;
     newSessionSignal++;
@@ -485,6 +501,7 @@
                 {library}
                 active={activeSshSession}
                 onopen={(spec, title) => workspace.newTab(spec, title)}
+                oncompose={runCompose}
                 onclose={() => (dockerOpen = false)}
               />
             </div>
