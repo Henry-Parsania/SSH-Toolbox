@@ -13,9 +13,11 @@
     /** An address to start a new session with, such as one found by the network scanner. */
     prefill?: { host: string; port: number };
     onclose: () => void;
+    /** Opens the "set up key login" dialog for a saved session. */
+    onsetupkey?: (session: SshSession) => void;
   }
 
-  let { library, editing, folder = "", prefill, onclose }: Props = $props();
+  let { library, editing, folder = "", prefill, onclose, onsetupkey }: Props = $props();
 
   // The form starts from the session being edited, and doesn't follow later changes to it.
   const start = untrack(() => ({
@@ -38,6 +40,7 @@
   let inFolder = $state(start.folder);
   let jump = $state(start.jump);
   let x11 = $state(start.x11);
+  let copyKey = $state(false);
   // Typed here only to be passed to the keychain. They never go in the sessions file.
   let password = $state("");
   let passphrase = $state("");
@@ -99,6 +102,7 @@
       password = "";
       passphrase = "";
       onclose();
+      if (copyKey && auth === "password") onsetupkey?.(session);
     } catch (err) {
       error = (err as { message?: string }).message ?? "Couldn't save the session.";
     } finally {
@@ -143,6 +147,18 @@
         <option value="agent">SSH agent</option>
       </select>
     </label>
+    {#if auth === "password" && onsetupkey}
+      <div class="field">
+        <label class="check">
+          <input type="checkbox" bind:checked={copyKey} />
+          Copy an SSH key to the server after saving (like ssh-copy-id)
+        </label>
+        <small>
+          Logs in once with your password, adds a key to the server, and switches this session to
+          key login. You can pick an existing key or make a new one.
+        </small>
+      </div>
+    {/if}
     {#if auth === "key"}
       <label class="field">
         Private key file

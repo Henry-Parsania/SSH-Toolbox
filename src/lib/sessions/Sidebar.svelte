@@ -354,7 +354,7 @@
 </aside>
 
 {#if editor}
-  <SessionEditor {library} editing={editor.editing} folder={editor.folder} prefill={editor.prefill} onclose={() => (editor = null)} />
+  <SessionEditor {library} editing={editor.editing} folder={editor.folder} prefill={editor.prefill} onclose={() => (editor = null)} onsetupkey={(s) => (keySetupFor = s)} />
 {/if}
 
 {#if serialEditor}
