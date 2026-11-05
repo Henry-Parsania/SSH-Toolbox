@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import type { PlatformInfo, Settings, Shell } from "./backend";
   import { saveSettings, settings } from "./settings.svelte";
-  import { allThemes, chooseTheme, currentTheme } from "./ui/themes.svelte";
+  import { allThemes, chooseTheme, currentTheme, setPreview } from "./ui/themes.svelte";
   import ThemeBuilder from "./ui/ThemeBuilder.svelte";
 
   interface Props {
@@ -17,6 +18,13 @@
   let saving = $state(false);
   let themeChoice = $state(currentTheme().id);
   let building = $state(false);
+
+  // Picking a theme shows it at once; closing the dialog without saving puts the old one back.
+  $effect(() => {
+    if (building) return;
+    setPreview(allThemes().find((t) => t.id === themeChoice) ?? null);
+  });
+  onDestroy(() => setPreview(null));
 
   async function save() {
     saving = true;
@@ -41,7 +49,7 @@
   }
 </script>
 
-<div class="modal-backdrop">
+<div class="modal-backdrop" style:visibility={building ? "hidden" : "visible"}>
   <div
     class="modal"
     role="dialog"

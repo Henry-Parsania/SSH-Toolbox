@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import {
     allThemes,
     deleteCustomTheme,
     newThemeId,
     saveCustomTheme,
+    setPreview,
   } from "./themes.svelte";
   import { COLOR_LABELS, isHex, terminalThemeFor, themeVariables, warnings, type AppTheme } from "./themes";
   import type { TerminalTheme } from "../terminal/themes";
@@ -37,6 +38,12 @@
   );
   const term = $derived(terminalThemeFor(draft));
   const problems = $derived(warnings(draft));
+
+  // Every change shows in the whole window straight away, saved or not.
+  $effect(() => {
+    setPreview(draft);
+  });
+  onDestroy(() => setPreview(null));
 
   function refresh(pick: string) {
     list = allThemes();
@@ -88,9 +95,9 @@
   }
 </script>
 
-<div class="modal-backdrop">
+<div class="dock">
   <div
-    class="modal wide builder"
+    class="modal builder"
     role="dialog"
     aria-label="Themes"
     tabindex="-1"
@@ -100,6 +107,7 @@
     }}
   >
     <h2>Themes</h2>
+    <p class="lead">Changes show in the window behind as you make them.</p>
 
     <div class="top">
       <label class="field grow">
@@ -209,6 +217,23 @@
 </div>
 
 <style>
+  /* A side panel that leaves the app visible and undimmed, so changes can be seen. */
+  .dock {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    pointer-events: none;
+  }
+  .builder {
+    width: 440px;
+    max-height: calc(100vh - 24px);
+    pointer-events: auto;
+  }
   .top {
     display: flex;
     align-items: flex-end;

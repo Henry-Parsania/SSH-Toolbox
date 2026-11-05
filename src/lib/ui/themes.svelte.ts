@@ -26,12 +26,20 @@ function persist() {
   }
 }
 
+/** A theme shown while the person is still choosing or editing, not yet saved. */
+const preview = $state<{ theme: AppTheme | null }>({ theme: null });
+
+export function setPreview(theme: AppTheme | null) {
+  preview.theme = theme ? structuredClone($state.snapshot(theme)) : null;
+}
+
 export function allThemes(): AppTheme[] {
   return [...BUILTIN_THEMES, ...themeStore.custom];
 }
 
 /** The theme in use: the chosen one, or the plain dark or light one that the old setting names. */
 export function currentTheme(): AppTheme {
+  if (preview.theme) return preview.theme;
   const found = allThemes().find((t) => t.id === themeStore.active);
   return found ?? BUILTIN_THEMES.find((t) => t.id === settings.theme) ?? BUILTIN_THEMES[0];
 }
