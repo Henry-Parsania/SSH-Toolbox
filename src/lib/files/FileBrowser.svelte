@@ -332,9 +332,6 @@
       <button class="icon-btn small" title="Home folder" disabled={!files} onclick={() => files && go(files.home)}>
         <Icon name="home" size={14} />
       </button>
-      <button class="icon-btn small" title="Top folder (root)" disabled={!files} onclick={() => files && go(rootPath(path, sep))}>
-        <Icon name="server" size={14} />
-      </button>
       <button class="icon-btn small" title="Refresh" disabled={!files} onclick={reload}>
         <Icon name="refresh" size={14} />
       </button>
@@ -346,29 +343,6 @@
       <button class="icon-btn small" title="New folder" disabled={!files} onclick={() => (dialog = { kind: "mkdir", value: "" })}>
         <Icon name="folder-plus" size={14} />
       </button>
-      <button
-        class="icon-btn small"
-        title="Rename (F2)"
-        disabled={chosen.length !== 1}
-        onclick={() => (dialog = { kind: "rename", entry: chosen[0], value: chosen[0].name })}
-      >
-        <Icon name="edit" size={14} />
-      </button>
-      {#if files?.chmod}
-        <button
-          class="icon-btn small"
-          title="Permissions"
-          disabled={chosen.length !== 1}
-          onclick={() =>
-            (dialog = {
-              kind: "chmod",
-              entry: chosen[0],
-              value: chosen[0].permissions === null ? "" : (chosen[0].permissions & 0o777).toString(8),
-            })}
-        >
-          <Icon name="key" size={14} />
-        </button>
-      {/if}
       <button class="icon-btn small" title="Delete (Del)" disabled={chosen.length === 0 || working} onclick={startDelete}>
         <Icon name="trash" size={14} />
       </button>
@@ -519,6 +493,7 @@
     {/if}
     <li><button onclick={() => { dialog = { kind: "mkdir", value: "" }; closeMenu(); }}><Icon name="folder-plus" size={14} /> New folder</button></li>
     <li><button onclick={() => { reload(); closeMenu(); }}><Icon name="refresh" size={14} /> Refresh</button></li>
+    <li><button onclick={() => { if (files) go(rootPath(path, sep)); closeMenu(); }}><Icon name="server" size={14} /> Go to the top folder</button></li>
   </ul>
 {/if}
 
@@ -649,7 +624,7 @@
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 650;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
   }
   .tools {
     display: flex;

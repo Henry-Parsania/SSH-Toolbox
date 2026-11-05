@@ -389,7 +389,7 @@
     flex: none;
     min-height: 0;
     background: var(--bg-1);
-    border-right: 1px solid var(--border);
+    border-right: 1px solid var(--border-strong);
   }
   header {
     display: flex;
@@ -399,10 +399,9 @@
   }
   .heading {
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
   .head-tools {
     display: flex;
