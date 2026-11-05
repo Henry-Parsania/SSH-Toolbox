@@ -58,6 +58,8 @@ pub trait SecretStore: Send + Sync + 'static {
 }
 
 /// The system keychain through `keyring-core`.
+// Only the Windows and Linux builds connect to a system keychain for now.
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 struct SystemStore;
 
 impl SecretStore for SystemStore {
