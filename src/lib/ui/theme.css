@@ -26,6 +26,9 @@
   --accent-soft: #6aa2ff22;
   --on-accent: #0b1220;
 
+  --go: #3fb97a;
+  --go-strong: #34a269;
+  --on-go: #06180f;
   --success: #5fd39b;
   --warning: #f0b45a;
   --warning-soft: #f0b45a1f;
@@ -60,6 +63,9 @@
   --accent-soft: #2f6fe41a;
   --on-accent: #ffffff;
 
+  --go: #1f9d63;
+  --go-strong: #188553;
+  --on-go: #ffffff;
   --success: #1f9d63;
   --warning: #b77a14;
   --warning-soft: #b77a141a;
@@ -177,6 +183,17 @@ body,
   background: var(--accent-strong);
   border-color: var(--accent-strong);
 }
+/* Green is for "go": connect, start. Blue stays for selection and focus. */
+.btn.go {
+  color: var(--on-go);
+  background: var(--go);
+  border-color: var(--go);
+  font-weight: 600;
+}
+.btn.go:hover:not(:disabled) {
+  background: var(--go-strong);
+  border-color: var(--go-strong);
+}
 .btn.danger {
   color: #fff;
   background: var(--danger-strong);
@@ -198,6 +215,86 @@ body,
 .btn.small {
   padding: 3px 10px;
   font-size: 12px;
+}
+
+/* A small status label, like "Disconnected". */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+.pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.pill.on {
+  color: var(--go);
+}
+.pill.on::before {
+  background: currentColor;
+}
+.pill.bad {
+  color: var(--danger);
+}
+
+/* A row of choices where exactly one is picked, instead of a dropdown. */
+.seg {
+  display: flex;
+  margin-top: 5px;
+  padding: 2px;
+  background: var(--bg-0);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+}
+.seg button {
+  flex: 1;
+  padding: 5px 8px;
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button.picked {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+}
+
+/* A boxed group in a form, with a coloured heading. */
+.modal .card {
+  margin: 0 0 12px;
+  padding: 4px 14px 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.modal .card > h3 {
+  margin: 10px 0 10px;
+  color: var(--accent);
+}
+.modal .card input[type="text"],
+.modal .card input[type="password"],
+.modal .card input[type="number"],
+.modal .card select,
+.modal .card textarea {
+  background: var(--bg-1);
 }
 
 /* A small square button that holds only an icon. */

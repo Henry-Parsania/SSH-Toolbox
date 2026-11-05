@@ -55,6 +55,27 @@
   let typed = $state("");
   let showHidden = $state(true);
 
+  // Which of the extra columns to show. Narrow panels hide dates and permissions anyway, so the name keeps the room.
+  type Columns = { size: boolean; when: boolean; perm: boolean };
+  let cols = $state<Columns>(loadColumns());
+  function loadColumns(): Columns {
+    try {
+      const saved = JSON.parse(localStorage.getItem("file-columns") ?? "null");
+      if (saved && typeof saved === "object") return { size: saved.size !== false, when: saved.when !== false, perm: saved.perm !== false };
+    } catch {
+      // an unreadable value just means the defaults
+    }
+    return { size: true, when: true, perm: true };
+  }
+  function toggleColumn(which: keyof Columns) {
+    cols[which] = !cols[which];
+    try {
+      localStorage.setItem("file-columns", JSON.stringify($state.snapshot(cols)));
+    } catch {
+      // not saving is fine
+    }
+  }
+
   type Dialog =
     | { kind: "mkdir"; value: string }
     | { kind: "rename"; entry: FileEntry; value: string }
@@ -415,9 +436,9 @@
           />
           <span class="icon" class:dir={entry.kind === "dir"}><Icon name={icon(entry)} size={14} /></span>
           <span class="name" title={entry.name}>{entry.name}</span>
-          <span class="meta size">{formatSize(entry.size)}</span>
-          <span class="meta when">{formatTime(entry.modified)}</span>
-          {#if files.chmod && entry.permissions !== null}
+          {#if cols.size}<span class="meta size">{formatSize(entry.size)}</span>{/if}
+          {#if cols.when}<span class="meta when">{formatTime(entry.modified)}</span>{/if}
+          {#if cols.perm && files.chmod && entry.permissions !== null}
             <span class="meta perm">{modeToText(entry.permissions & 0o777)}</span>
           {/if}
         </div>
@@ -493,6 +514,12 @@
     {/if}
     <li><button onclick={() => { dialog = { kind: "mkdir", value: "" }; closeMenu(); }}><Icon name="folder-plus" size={14} /> New folder</button></li>
     <li><button onclick={() => { reload(); closeMenu(); }}><Icon name="refresh" size={14} /> Refresh</button></li>
+    <li class="sep" role="separator"></li>
+    <li><button onclick={() => toggleColumn("size")}><span class="tick">{cols.size ? "✓" : ""}</span> Show sizes</button></li>
+    <li><button onclick={() => toggleColumn("when")}><span class="tick">{cols.when ? "✓" : ""}</span> Show dates</button></li>
+    {#if files?.chmod}
+      <li><button onclick={() => toggleColumn("perm")}><span class="tick">{cols.perm ? "✓" : ""}</span> Show permissions</button></li>
+    {/if}
     <li><button onclick={() => { if (files) go(rootPath(path, sep)); closeMenu(); }}><Icon name="server" size={14} /> Go to the top folder</button></li>
   </ul>
 {/if}
@@ -651,6 +678,11 @@
     margin: 4px 6px;
     background: var(--border);
   }
+  .tick {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+  }
   .hintkey {
     color: var(--text-faint);
     font-size: 11px;
@@ -732,7 +764,7 @@
   }
   .name {
     flex: 1;
-    min-width: 0;
+    min-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -754,13 +786,18 @@
     font-family: var(--mono);
   }
   /* Names and sizes come first: dates and permissions only appear when there is room. */
-  @container (max-width: 400px) {
+  @container (max-width: 560px) {
     .perm {
       display: none;
     }
   }
-  @container (max-width: 320px) {
+  @container (max-width: 440px) {
     .when {
+      display: none;
+    }
+  }
+  @container (max-width: 300px) {
+    .size {
       display: none;
     }
   }

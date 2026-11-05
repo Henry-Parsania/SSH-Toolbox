@@ -82,7 +82,7 @@
     return n >= 180 && n <= 1200 ? n : fallback;
   };
   let sidebarWidth = $state(saved("sidebar-width", 264));
-  let filesWidth = $state(saved("files-width", 460));
+  let filesWidth = $state(saved("files-width", 540));
   let agentWidth = $state(saved("agent-width", 420));
 
   function resizeSide(e: PointerEvent, side: "sidebar" | "files" | "agent") {

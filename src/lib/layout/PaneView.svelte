@@ -139,8 +139,9 @@
     <div class="waiting">
       <div class="badge"><Icon name="server" size={26} /></div>
       <h3>{node.title}</h3>
+      <span class="pill">Disconnected · restored tab</span>
       <p>This session was open when the app closed.<br />It doesn't connect by itself.</p>
-      <button class="btn primary" onclick={() => workspace.connect(node.pane_id)}>
+      <button class="btn go" onclick={() => workspace.connect(node.pane_id)}>
         <Icon name="play" size={14} /> Connect
       </button>
     </div>

@@ -134,7 +134,8 @@
   >
     <h2>{editing ? "Edit session" : "New SSH session"}</h2>
 
-    <h3>Connection</h3>
+    <section class="card">
+      <h3>Connection</h3>
     <label class="field">Name <input type="text" bind:value={name} /></label>
     <div class="row">
       <label class="field grow">Host <input type="text" bind:value={host} /></label>
@@ -151,15 +152,18 @@
       </select>
     </label>
 
-    <h3>Login</h3>
-    <label class="field">
+    </section>
+
+    <section class="card">
+      <h3>Login</h3>
+    <div class="field">
       Login with
-      <select bind:value={auth}>
-        <option value="password">Password</option>
-        <option value="key">Private key file</option>
-        <option value="agent">SSH agent</option>
-      </select>
-    </label>
+      <div class="seg" role="radiogroup" aria-label="Login with">
+        <button type="button" role="radio" aria-checked={auth === "password"} class:picked={auth === "password"} onclick={() => (auth = "password")}>Password</button>
+        <button type="button" role="radio" aria-checked={auth === "key"} class:picked={auth === "key"} onclick={() => (auth = "key")}>Key file</button>
+        <button type="button" role="radio" aria-checked={auth === "agent"} class:picked={auth === "agent"} onclick={() => (auth = "agent")}>SSH agent</button>
+      </div>
+    </div>
     {#if auth === "key"}
       <label class="field">
         Private key file
@@ -193,7 +197,10 @@
       </div>
     {/if}
 
-    <h3>Appearance</h3>
+    </section>
+
+    <section class="card">
+      <h3>Appearance</h3>
     <div class="field">
       Colour
       <div class="swatches">
@@ -206,7 +213,10 @@
       <small>Colours this session's tab and terminal background, instead of the theme's. Handy for telling servers apart.</small>
     </div>
 
-    <h3>Advanced</h3>
+    </section>
+
+    <section class="card">
+      <h3>Advanced</h3>
     <label class="field">
       Go through a jump host
       <select bind:value={jump}>
@@ -229,6 +239,8 @@
       <textarea rows="3" bind:value={startup} spellcheck="false" placeholder="cd /srv/app"></textarea>
       <small>Typed once, one line at a time, when the shell is ready. Don't put passwords here: this is saved as plain text.</small>
     </label>
+
+    </section>
 
     {#if error}<p class="message error">{error}</p>{/if}
     <div class="modal-actions">

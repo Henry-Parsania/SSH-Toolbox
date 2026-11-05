@@ -543,7 +543,7 @@
     display: none;
   }
   .icon-btn.accent:hover {
-    color: var(--accent);
+    color: var(--go);
   }
   .rename {
     padding: 3px 8px;

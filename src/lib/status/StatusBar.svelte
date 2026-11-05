@@ -139,7 +139,7 @@
     {#if prefs.net.show && stats.net_rx_bytes !== null}
       <span class="metric" title="Network traffic of all connections (received, sent)">
         <span class="label">Net</span>
-        {#if prefs.net.numbers}<span class="value">{speed ? `↓ ${rate(speed.rx)}  ↑ ${rate(speed.tx)}` : "…"}</span>{/if}
+        {#if prefs.net.numbers}<span class="value">{#if speed}<span class="rx">↓ {rate(speed.rx)}</span> <span class="tx">↑ {rate(speed.tx)}</span>{:else}…{/if}</span>{/if}
         {#if prefs.net.graph}<Spark values={netHistory} width={44} height={14} label="Network traffic over the last minutes" />{/if}
       </span>
     {/if}
@@ -230,6 +230,12 @@
   .label {
     color: var(--text-faint);
     font-weight: 500;
+  }
+  .rx {
+    color: var(--accent);
+  }
+  .tx {
+    color: var(--go);
   }
   .value {
     font-variant-numeric: tabular-nums;
