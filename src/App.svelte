@@ -497,7 +497,7 @@
     <div class="body">
       {#if sidebarOpen}
         <div class="side column" style:width="{sidebarWidth}px">
-          <div class="top-part"><Sidebar {library} onopen={openSaved} onmonitor={openMonitor} {newSessionSignal} command={sidebarCommand} {reach} /></div>
+          <div class="top-part"><Sidebar {library} onopen={openSaved} onmonitor={openMonitor} {newSessionSignal} command={sidebarCommand} {reach} activeId={footerTarget.kind === "ssh" ? footerTarget.id : null} /></div>
           {#if dockerOpen}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="grip-h" onpointerdown={resizeDock}></div>

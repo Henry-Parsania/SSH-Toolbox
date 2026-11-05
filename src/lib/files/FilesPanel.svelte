@@ -323,7 +323,7 @@
   <div class="browsers" bind:this={browsersBox}>
     <div class="half" style:flex="{split} 1 0">
     <FileBrowser
-        title={source ? source.name : "Server"}
+        title={source ? `Remote · ${source.name}` : "Remote"}
         side="remote"
         bind:this={browsers.remote}
         highlight={desktopOver || (drag !== null && drag.from === "local")}
@@ -352,7 +352,7 @@
     <div class="divider" onpointerdown={resizeSplit} title="Drag to change the sizes"></div>
     <div class="half" style:flex="{1 - split} 1 0">
     <FileBrowser
-        title="This computer"
+        title="Local · This computer"
         side="local"
         bind:this={browsers.local}
         highlight={drag !== null && drag.from === "remote"}

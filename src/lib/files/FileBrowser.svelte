@@ -464,10 +464,10 @@
         <input type="checkbox" bind:checked={showHidden} /> Hidden files
       </label>
       <span class="count">
-        {#if note}{note}{:else if chosen.length}{chosen.length} selected{:else}{visible.length} items{/if}
+        {#if note}{note}{:else if chosen.length}{chosen.length} selected{:else}{visible.length} items{#if ontransfer} · select files to {transferLabel.toLowerCase()}{/if}{/if}
       </span>
       {#if ontransfer}
-        <button class="btn small primary" disabled={chosen.length === 0} onclick={transfer}>
+        <button class="btn small primary" disabled={chosen.length === 0} title={chosen.length === 0 ? `Select files to ${transferLabel.toLowerCase()}` : transferLabel} onclick={transfer}>
           <Icon name={transferIcon} size={13} />
           {transferLabel}
         </button>
@@ -628,6 +628,7 @@
 
 <style>
   .browser {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -649,10 +650,14 @@
     font-size: 11px;
     font-weight: 650;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
   .tools {
     display: flex;
+    gap: 2px;
+  }
+  .tools :global(.icon-btn.small) {
+    width: 26px;
+    height: 26px;
   }
   .tools :global(.icon-btn:disabled) {
     opacity: 0.35;
@@ -772,6 +777,17 @@
   .perm {
     width: 70px;
     font-family: var(--mono);
+  }
+  /* Names and sizes come first: dates and permissions only appear when there is room. */
+  @container (max-width: 400px) {
+    .perm {
+      display: none;
+    }
+  }
+  @container (max-width: 320px) {
+    .when {
+      display: none;
+    }
   }
   footer {
     display: flex;

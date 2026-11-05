@@ -26,9 +26,11 @@
     command?: { name: "ssh" | "ftp" | "serial" | "import"; n: number; prefill?: { host: string; port: number; user?: string; connect?: boolean } } | null;
     /** Which servers answer, shown as a dot beside each one. */
     reach?: Reachability;
+    /** The saved session of the active tab, highlighted in the list. */
+    activeId?: string | null;
   }
 
-  let { library, onopen, onmonitor, newSessionSignal = 0, command = null, reach }: Props = $props();
+  let { library, onopen, onmonitor, newSessionSignal = 0, command = null, reach, activeId = null }: Props = $props();
 
   let search = $state("");
   let collapsed = $state<Record<string, boolean>>({});
@@ -107,7 +109,7 @@
     if (!answer) return { state: "unknown", tip: reach.checking ? "Checking..." : "Not checked yet" };
     return answer.reachable
       ? { state: "up", tip: `Reachable${answer.millis === null ? "" : ` (${answer.millis} ms)`}` }
-      : { state: "down", tip: "Not reachable" };
+      : { state: "down", tip: "Did not answer the last check" };
   }
 
   function iconOf(session: SavedSession) {
@@ -209,8 +211,8 @@
     {/if}
   {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="item" style:padding-left="{6 + depth * 14 + 13}px" oncontextmenu={(e) => openMenu(e, { session: item.session })}>
-      <button class="label" title={describe(item.session)} ondblclick={() => onopen(item.session)}>
+    <div class="item" class:current={item.session.id === activeId} style:padding-left="{6 + depth * 14 + 13}px" oncontextmenu={(e) => openMenu(e, { session: item.session })}>
+      <button class="label" title="{item.session.name}: {describe(item.session)}" ondblclick={() => onopen(item.session)}>
         <span class="glyph"><Icon name={iconOf(item.session)} size={15} /></span>
         {#if dot(item.session)}
           {@const d = dot(item.session)!}
@@ -465,9 +467,15 @@
     opacity: 1;
     box-shadow: 0 0 0 3px #3fb97a26;
   }
+  /* Not answering is routine (a laptop that is off), so it is a quiet hollow dot, not an alarm. */
   .dot.down {
-    background: var(--danger);
+    background: transparent;
+    border: 1.5px solid var(--text-faint);
     opacity: 0.9;
+  }
+  .item.current {
+    background: var(--accent-soft);
+    box-shadow: inset 2px 0 0 var(--accent);
   }
   .glyph {
     display: grid;
@@ -528,7 +536,8 @@
     display: none;
     flex: none;
   }
-  .item:hover .tools {
+  .item:hover .tools,
+  .item:focus-within .tools {
     display: flex;
   }
   .item:hover .count {

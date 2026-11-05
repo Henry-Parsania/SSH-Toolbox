@@ -18,8 +18,8 @@
   --border-strong: #3a4150;
 
   --text: #e4e7ee;
-  --text-muted: #9097a8;
-  --text-faint: #666d7e;
+  --text-muted: #a9b0c1;
+  --text-faint: #8890a3;
 
   --accent: #6aa2ff;
   --accent-strong: #4a86f0;
@@ -52,8 +52,8 @@
   --border-strong: #c7ccd8;
 
   --text: #1d2230;
-  --text-muted: #5c6477;
-  --text-faint: #8b92a4;
+  --text-muted: #525a6d;
+  --text-faint: #6f7689;
 
   --accent: #2f6fe4;
   --accent-strong: #2158c4;
@@ -166,6 +166,12 @@ body,
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 600;
+}
+.btn.primary:disabled {
+  color: var(--text-faint);
+  background: var(--bg-3);
+  border-color: var(--border);
+  opacity: 1;
 }
 .btn.primary:hover:not(:disabled) {
   background: var(--accent-strong);
