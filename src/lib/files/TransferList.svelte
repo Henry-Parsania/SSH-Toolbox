@@ -132,9 +132,9 @@
               <span class="ok"><Icon name="check" size={13} /></span>
             {/if}
           </div>
-          {#if state === "running"}
+          {#if state === "running" || state === "queued"}
             <div class="bar" role="progressbar" aria-valuenow={p ?? undefined} aria-valuemin="0" aria-valuemax="100">
-              <span class:indeterminate={p === null} style:width={p === null ? "40%" : `${p}%`}></span>
+              <span class:indeterminate={p === null && state === "running"} style:width={state === "queued" ? "0%" : p === null ? "40%" : `${p}%`}></span>
             </div>
           {/if}
         </li>
@@ -165,7 +165,8 @@
   .transfers {
     border-top: 1px solid var(--border);
     background: var(--bg-1);
-    max-height: 34%;
+    flex: none;
+    max-height: 40%;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -193,6 +194,8 @@
     padding: 0 10px 8px;
     list-style: none;
     overflow: auto;
+    flex: 0 1 auto;
+    min-height: 48px;
   }
   li {
     padding: 5px 0;
@@ -230,11 +233,11 @@
     color: var(--success);
   }
   .bar {
-    height: 8px;
-    margin-top: 5px;
+    height: 10px;
+    margin-top: 6px;
     overflow: hidden;
-    background: var(--bg-3);
-    border-radius: 4px;
+    background: var(--border-strong);
+    border-radius: 5px;
   }
   .bar.overall {
     margin: 0 12px 6px;
@@ -243,7 +246,7 @@
     display: block;
     height: 100%;
     background: var(--accent);
-    border-radius: 4px;
+    border-radius: 5px;
     transition: width 0.15s linear;
   }
   .bar span.indeterminate {
