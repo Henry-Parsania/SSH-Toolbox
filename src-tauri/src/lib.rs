@@ -73,6 +73,9 @@ pub fn run() {
                     }
                     _ => {}
                 });
+                // A Mac gets its usual title bar (with the three dots) and the menu bar at the top of the screen.
+                #[cfg(target_os = "macos")]
+                let _ = window.set_decorations(true);
                 // The title names the exact build, so it is clear which one is running.
                 let _ = window.set_title(&format!(
                     "SSH Toolbox {}",

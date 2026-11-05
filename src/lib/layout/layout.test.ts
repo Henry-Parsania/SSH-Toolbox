@@ -343,3 +343,24 @@ describe("Workspace finished marks", () => {
     expect(w.finished[a.id]).toBeUndefined();
   });
 });
+
+describe("Mac shortcuts (the Command key)", () => {
+  const cmd = (code: string, extra: { shift?: boolean; alt?: boolean } = {}) =>
+    ({ type: "keydown", ctrlKey: false, shiftKey: !!extra.shift, altKey: !!extra.alt, metaKey: true, code }) as Parameters<typeof shortcutFor>[0];
+  it("zooms with Cmd and plus, minus and zero", () => {
+    expect(shortcutFor(cmd("Equal", { shift: true }))).toEqual({ type: "zoom", change: "in" });
+    expect(shortcutFor(cmd("Minus"))).toEqual({ type: "zoom", change: "out" });
+    expect(shortcutFor(cmd("Digit0"))).toEqual({ type: "zoom", change: "reset" });
+  });
+  it("opens the palette with Cmd+Shift+P", () => {
+    expect(shortcutFor(cmd("KeyP", { shift: true }))).toEqual({ type: "palette" });
+  });
+  it("moves between panes with Cmd+Option and an arrow", () => {
+    expect(shortcutFor(cmd("ArrowLeft", { alt: true }))).toEqual({ type: "move-focus", move: "left" });
+  });
+  it("leaves the menu shortcuts and everything else to the system and the program", () => {
+    expect(shortcutFor(cmd("KeyT"))).toBeNull();
+    expect(shortcutFor(cmd("KeyC"))).toBeNull();
+    expect(shortcutFor(cmd("KeyD", { shift: true }))).toBeNull();
+  });
+});

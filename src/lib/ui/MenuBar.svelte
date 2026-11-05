@@ -8,6 +8,8 @@
     label: string;
     /** Shown on the right, such as "Ctrl+Shift+T". */
     hint?: string;
+    /** The Mac shortcut, such as "CmdOrCtrl+T". Only the macOS menu bar uses it. */
+    accelerator?: string;
     /** Shows a tick when set. */
     checked?: boolean;
     disabled?: boolean;

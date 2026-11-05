@@ -22,6 +22,7 @@
   import { Library } from "./lib/sessions/library.svelte";
   import HelpDialog from "./lib/ui/HelpDialog.svelte";
   import MenuBar, { type Menu } from "./lib/ui/MenuBar.svelte";
+  import { installNativeMenu } from "./lib/backend/nativeMenu";
   import DockerPanel from "./lib/docker/DockerPanel.svelte";
   import FilesPanel from "./lib/files/FilesPanel.svelte";
   import AgentPanel from "./lib/agent/AgentPanel.svelte";
@@ -279,7 +280,7 @@
     {
       label: "File",
       items: [
-        { label: "New terminal tab", hint: "Ctrl+Shift+T", onselect: () => newTab() },
+        { label: "New terminal tab", hint: "Ctrl+Shift+T", accelerator: "CmdOrCtrl+T", onselect: () => newTab() },
         "separator",
         { label: "New SSH session…", onselect: () => sessionCommand("ssh") },
         { label: "New FTP session…", onselect: () => sessionCommand("ftp") },
@@ -287,7 +288,7 @@
         { label: "Import from ~/.ssh/config…", onselect: () => sessionCommand("import") },
         { label: "Back up and restore sessions…", onselect: () => (backupOpen = true) },
         "separator",
-        { label: "Settings…", onselect: () => (showSettings = true) },
+        { label: "Settings…", accelerator: "CmdOrCtrl+,", onselect: () => (showSettings = true) },
       ],
     },
     {
@@ -317,19 +318,20 @@
     {
       label: "Terminal",
       items: [
-        { label: "Split side by side", hint: "Ctrl+Shift+E", onselect: () => workspace.split("row") },
-        { label: "Split top and bottom", hint: "Ctrl+Shift+O", onselect: () => workspace.split("column") },
+        { label: "Split side by side", hint: "Ctrl+Shift+E", accelerator: "CmdOrCtrl+D", onselect: () => workspace.split("row") },
+        { label: "Split top and bottom", hint: "Ctrl+Shift+O", accelerator: "CmdOrCtrl+Shift+D", onselect: () => workspace.split("column") },
         { label: "Duplicate this tab to the right", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "row") },
         { label: "Duplicate this tab below", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "column") },
-        { label: "Close pane", hint: "Ctrl+Shift+W", onselect: () => workspace.closeActivePane() },
+        { label: "Close pane", hint: "Ctrl+Shift+W", accelerator: "CmdOrCtrl+W", onselect: () => workspace.closeActivePane() },
         { label: "Move this tab to its own window", disabled: workspace.tabs.length === 0, onselect: detachActiveTab },
         "separator",
         { label: "Snippets…", disabled: workspace.tabs.length === 0, onselect: () => (snippets = true) },
-        { label: "Search the output", hint: "Ctrl+Shift+F", onselect: () => workspace.requestSearch() },
-        { label: "Save the output to Downloads", hint: "Ctrl+Shift+S", onselect: () => workspace.requestSave() },
+        { label: "Search the output", hint: "Ctrl+Shift+F", accelerator: "CmdOrCtrl+F", onselect: () => workspace.requestSearch() },
+        { label: "Save the output to Downloads", hint: "Ctrl+Shift+S", accelerator: "CmdOrCtrl+Shift+S", onselect: () => workspace.requestSave() },
         {
           label: "Type into all panes of the tab",
           hint: "Ctrl+Shift+B",
+          accelerator: "CmdOrCtrl+Shift+B",
           checked: workspace.broadcast,
           onselect: () => (workspace.broadcast = !workspace.broadcast),
         },
@@ -354,6 +356,16 @@
       ],
     },
   ]);
+
+  // On a Mac the menus live in the system menu bar. The app's own menu (About, Settings) comes first.
+  $effect(() => {
+    if (platform?.os !== "macos") return;
+    const all = menus;
+    const named = (label: string) => all.flatMap((m) => m.items).flatMap((i) => (i !== "separator" && i.label === label ? [i] : []));
+    const appItems = [...named("About SSH Toolbox"), ...named("Settings…")];
+    const rest = all.map((m) => ({ ...m, items: m.items.filter((i) => i === "separator" || !appItems.includes(i)) }));
+    void installNativeMenu("SSH Toolbox", appItems, rest).catch(() => {});
+  });
 
   $effect(() => {
     Promise.all([platformInfo(), listShells(), loadSettings().catch(() => {})]).then(
@@ -494,7 +506,7 @@
   </div>
 {:else if platform}
   <div class="app">
-    <MenuBar {menus} />
+    {#if platform.os !== "macos"}<MenuBar {menus} />{/if}
     <div class="body">
       {#if sidebarOpen}
         <div class="side column" style:width="{sidebarWidth}px">
