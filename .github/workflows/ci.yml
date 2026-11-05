@@ -148,16 +148,8 @@ jobs:
       - name: Build the app
         run: npx tauri build --bundles dmg
 
-      # A double-click installer that puts the app in Applications, next to the disk image.
-      - name: Make the installer package
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          pkgbuild --component "target/release/bundle/macos/SSH Toolbox.app"             --install-location /Applications             --identifier "$(node -p "require('./src-tauri/tauri.conf.json').identifier")"             --version "$VERSION"             "target/release/bundle/dmg/SSH Toolbox_${VERSION}_aarch64.pkg"
-
       - uses: actions/upload-artifact@v4
         with:
           name: ssh-toolbox-macOS
-          path: |
-            target/release/bundle/dmg/*.dmg
-            target/release/bundle/dmg/*.pkg
+          path: target/release/bundle/dmg/*.dmg
           if-no-files-found: error
