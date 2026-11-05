@@ -335,6 +335,9 @@ input[type="radio"] {
   margin: -8px 0 16px;
   color: var(--text-muted);
 }
+.modal h2 + h3 {
+  margin-top: 0;
+}
 .modal h3 {
   margin: 18px 0 8px;
   color: var(--text-muted);

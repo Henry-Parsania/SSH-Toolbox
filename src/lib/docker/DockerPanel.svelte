@@ -179,6 +179,13 @@
     menu = { ...next, x: e.clientX, y: e.clientY };
   }
 
+  /** Opens a row's menu from its small "more" button, just under it. */
+  function openMenuFrom(e: MouseEvent, next: Omit<Menu, "x" | "y">) {
+    e.stopPropagation();
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu = { ...next, x: box.left, y: box.bottom + 2 };
+  }
+
   function closeMenu() {
     menu = null;
   }
@@ -785,14 +792,9 @@
                   <Icon name="play" size={13} />
                 </button>
               {/if}
-              <button class="icon-btn small" title="Details" onclick={() => showResourceDetails(r)}>
-                <Icon name="info" size={13} />
+              <button class="icon-btn small" title="More: details, copy, tag, push, remove" aria-label="More" onclick={(e) => openMenuFrom(e, { kind: "resource", r })}>
+                <Icon name="more" size={13} />
               </button>
-              {#if !r.protected}
-                <button class="icon-btn small" title="Remove" onclick={() => (removingResource = r)}>
-                  <Icon name="trash" size={13} />
-                </button>
-              {/if}
             </div>
           </div>
         {:else}
@@ -808,9 +810,9 @@
             <h3>{group.name}</h3>
             {#if group.project}
               <span class="actions">
-                <button class="icon-btn small" title="Start all" onclick={() => actAll(group.items, "start")}><Icon name="play" size={13} /></button>
-                <button class="icon-btn small" title="Restart all" onclick={() => actAll(group.items, "restart")}><Icon name="refresh" size={13} /></button>
-                <button class="icon-btn small" title="Stop all" onclick={() => actAll(group.items, "stop")}><Icon name="stop" size={13} /></button>
+                <button class="icon-btn small" title="More: start, stop, restart, compose" aria-label="More" onclick={(e) => openMenuFrom(e, { kind: "project", project: group.name, items: group.items })}>
+                  <Icon name="more" size={13} />
+                </button>
               </span>
             {/if}
           </div>
@@ -835,9 +837,6 @@
                 <button class="icon-btn small" title="Stop" disabled={busy[c.id]} onclick={() => act(c, "stop")}>
                   <Icon name="stop" size={13} />
                 </button>
-                <button class="icon-btn small" title="Restart" disabled={busy[c.id]} onclick={() => act(c, "restart")}>
-                  <Icon name="refresh" size={13} />
-                </button>
                 <button class="icon-btn small" title="Open a shell" onclick={() => open("docker_shell", c)}>
                   <Icon name="terminal" size={13} />
                 </button>
@@ -846,14 +845,8 @@
                   <Icon name="play" size={13} />
                 </button>
               {/if}
-              <button class="icon-btn small" title="Show the log" onclick={() => open("docker_logs", c)}>
-                <Icon name="log" size={13} />
-              </button>
-              <button class="icon-btn small" title="Details" onclick={() => showDetails(c)}>
-                <Icon name="info" size={13} />
-              </button>
-              <button class="icon-btn small" title="Remove" disabled={busy[c.id]} onclick={() => (removing = c)}>
-                <Icon name="trash" size={13} />
+              <button class="icon-btn small" title="More: log, details, restart, copy, networks, remove" aria-label="More" onclick={(e) => openMenuFrom(e, { kind: "container", c })}>
+                <Icon name="more" size={13} />
               </button>
             </div>
           </div>

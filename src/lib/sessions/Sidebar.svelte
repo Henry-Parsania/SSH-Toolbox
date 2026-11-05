@@ -42,12 +42,19 @@
   let renaming = $state<{ id: string; name: string } | null>(null);
   let message = $state("");
   // The right-click menu: the same actions as the small buttons on the row.
-  let menu = $state<{ x: number; y: number; target: { folder: TreeItem & { kind: "folder" } } | { session: SavedSession } } | null>(null);
+  let menu = $state<{ x: number; y: number; target: { folder: TreeItem & { kind: "folder" } } | { session: SavedSession } | { add: true } } | null>(null);
 
   function openMenu(e: MouseEvent, target: NonNullable<typeof menu>["target"]) {
     e.preventDefault();
     e.stopPropagation();
     menu = { x: e.clientX, y: e.clientY, target };
+  }
+
+  /** Opens the same menu from a small "more" button, just under it. */
+  function openMenuFrom(e: MouseEvent, target: NonNullable<typeof menu>["target"]) {
+    e.stopPropagation();
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu = { x: box.left, y: box.bottom + 2, target };
   }
 
   /** Runs a menu action, then closes the menu. The action goes first because it reads the menu's target. */
@@ -187,15 +194,8 @@
         <button class="icon-btn small" title="New session here" onclick={() => (editor = { folder: item.folder.id })}>
           <Icon name="plus" size={13} />
         </button>
-        <button class="icon-btn small" title="New folder inside" onclick={() => addFolder(item.folder.id)}>
-          <Icon name="folder-plus" size={13} />
-        </button>
-        <button
-          class="icon-btn small"
-          title="Delete folder"
-          onclick={() => (confirm = { kind: "folder", id: item.folder.id, name: item.folder.name })}
-        >
-          <Icon name="trash" size={13} />
+        <button class="icon-btn small" title="More: new folder, rename, delete" aria-label="More" onclick={(e) => openMenuFrom(e, { folder: item })}>
+          <Icon name="more" size={13} />
         </button>
       </span>
     </div>
@@ -223,36 +223,8 @@
         <button class="icon-btn small accent" title="Connect in a new tab" onclick={() => onopen(item.session)}>
           <Icon name="play" size={13} />
         </button>
-        {#if item.session.type === "serial"}
-          <button class="icon-btn small" title="Edit" onclick={() => (serialEditor = { editing: item.session as SerialSession })}>
-            <Icon name="edit" size={13} />
-          </button>
-        {/if}
-        {#if item.session.type === "ftp"}
-          <button class="icon-btn small" title="Edit" onclick={() => (ftpEditor = { editing: item.session as FtpSession })}>
-            <Icon name="edit" size={13} />
-          </button>
-        {/if}
-        {#if item.session.type === "ssh"}
-          <button class="icon-btn small" title="Process monitor (btop, htop or top)" onclick={() => onmonitor?.(item.session)}>
-            <Icon name="monitor" size={13} />
-          </button>
-          <button class="icon-btn small" title="Port forwarding" onclick={() => (forwardsFor = item.session as SshSession)}>
-            <Icon name="route" size={13} />
-          </button>
-          <button class="icon-btn small" title="Set up key login" onclick={() => (keySetupFor = item.session as SshSession)}>
-            <Icon name="key" size={13} />
-          </button>
-          <button class="icon-btn small" title="Edit" onclick={() => (editor = { editing: item.session as SshSession })}>
-            <Icon name="edit" size={13} />
-          </button>
-        {/if}
-        <button
-          class="icon-btn small"
-          title="Delete"
-          onclick={() => (confirm = { kind: "session", id: item.session.id, name: item.session.name })}
-        >
-          <Icon name="trash" size={13} />
+        <button class="icon-btn small" title="More: edit, monitor, forwarding, key login, duplicate, delete" aria-label="More" onclick={(e) => openMenuFrom(e, { session: item.session })}>
+          <Icon name="more" size={13} />
         </button>
       </span>
     </div>
@@ -264,7 +236,14 @@
 {#if menu}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
-    {#if "folder" in menu.target}
+    {#if "add" in menu.target}
+      <li><button onclick={() => act(() => (editor = {}))}><Icon name="server" size={14} /> New SSH session</button></li>
+      <li><button onclick={() => act(() => (ftpEditor = {}))}><Icon name="ftp" size={14} /> New FTP session</button></li>
+      <li><button onclick={() => act(() => (serialEditor = {}))}><Icon name="serial" size={14} /> New serial session</button></li>
+      <li class="sep" role="separator"></li>
+      <li><button onclick={() => act(() => addFolder(""))}><Icon name="folder-plus" size={14} /> New folder</button></li>
+      <li><button onclick={() => act(() => (importing = true))}><Icon name="import" size={14} /> Import from ~/.ssh/config</button></li>
+    {:else if "folder" in menu.target}
       {@const f = menu.target.folder.folder}
       <li><button onclick={() => act(() => (editor = { folder: f.id }))}><Icon name="plus" size={14} /> New session here</button></li>
       <li><button onclick={() => act(() => addFolder(f.id))}><Icon name="folder-plus" size={14} /> New folder inside</button></li>
@@ -300,20 +279,11 @@
   <header>
     <span class="heading">Sessions</span>
     <span class="head-tools">
-      <button class="icon-btn" title="New SSH session" onclick={() => (editor = {})}>
+      <button class="icon-btn" title="New SSH session" aria-label="New SSH session" onclick={() => (editor = {})}>
         <Icon name="plus" size={16} />
       </button>
-      <button class="icon-btn" title="New FTP session" onclick={() => (ftpEditor = {})}>
-        <Icon name="ftp" size={16} />
-      </button>
-      <button class="icon-btn" title="New serial session" onclick={() => (serialEditor = {})}>
-        <Icon name="serial" size={16} />
-      </button>
-      <button class="icon-btn" title="New folder" onclick={() => addFolder("")}>
-        <Icon name="folder-plus" size={16} />
-      </button>
-      <button class="icon-btn" title="Import from ~/.ssh/config" onclick={() => (importing = true)}>
-        <Icon name="import" size={16} />
+      <button class="icon-btn" title="More: new FTP or serial session, new folder, import" aria-label="More" onclick={(e) => openMenuFrom(e, { add: true })}>
+        <Icon name="more" size={16} />
       </button>
     </span>
   </header>
@@ -337,7 +307,8 @@
 
   {#if message}<p class="message error side-message">{message}</p>{/if}
 
-  <div class="list">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="list" oncontextmenu={(e) => openMenu(e, { add: true })}>
     {#if renaming?.id === "new:"}
       {@render renameBox(0)}
     {/if}

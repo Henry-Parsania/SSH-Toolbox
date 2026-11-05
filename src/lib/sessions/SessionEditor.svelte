@@ -134,6 +134,7 @@
   >
     <h2>{editing ? "Edit session" : "New SSH session"}</h2>
 
+    <h3>Connection</h3>
     <label class="field">Name <input type="text" bind:value={name} /></label>
     <div class="row">
       <label class="field grow">Host <input type="text" bind:value={host} /></label>
@@ -149,30 +150,36 @@
         {/each}
       </select>
     </label>
+
+    <h3>Login</h3>
     <label class="field">
-      Login
+      Login with
       <select bind:value={auth}>
         <option value="password">Password</option>
         <option value="key">Private key file</option>
         <option value="agent">SSH agent</option>
       </select>
     </label>
-    <label class="field">
-      Commands to run after connecting (optional)
-      <textarea rows="3" bind:value={startup} spellcheck="false" placeholder="cd /srv/app"></textarea>
-      <small>Typed once, one line at a time, when the shell is ready. Don't put passwords here: this is saved as plain text.</small>
-    </label>
-    <div class="field">
-      Colour
-      <div class="swatches">
-        <button type="button" class="swatch none" class:picked={!color} title="Follow the theme" aria-label="No colour" onclick={() => (color = "")}></button>
-        {#each COLOR_CHOICES as c (c)}
-          <button type="button" class="swatch" class:picked={color === c} style:background={c} title={c} aria-label={c} onclick={() => (color = c)}></button>
-        {/each}
-        <input type="color" value={color || "#1f3f7a"} oninput={(e) => (color = e.currentTarget.value)} title="Pick any colour" aria-label="Custom colour" />
-      </div>
-      <small>Colours this session's tab and terminal background, instead of the theme's. Handy for telling servers apart.</small>
-    </div>
+    {#if auth === "key"}
+      <label class="field">
+        Private key file
+        <input type="text" bind:value={keyPath} placeholder="~/.ssh/id_ed25519" />
+        <small>The app reads this file when connecting and never copies it.</small>
+      </label>
+    {/if}
+    {#if library.keychain && auth === "password"}
+      <label class="field">
+        Save password in the keychain (optional)
+        <input type="password" bind:value={password} autocomplete="new-password" />
+        <small>Leave empty to be asked each time.</small>
+      </label>
+    {/if}
+    {#if library.keychain && auth === "key"}
+      <label class="field">
+        Save the key's passphrase in the keychain (optional)
+        <input type="password" bind:value={passphrase} autocomplete="new-password" />
+      </label>
+    {/if}
     {#if auth === "password" && onsetupkey}
       <div class="field">
         <label class="check">
@@ -185,13 +192,21 @@
         </small>
       </div>
     {/if}
-    {#if auth === "key"}
-      <label class="field">
-        Private key file
-        <input type="text" bind:value={keyPath} placeholder="~/.ssh/id_ed25519" />
-        <small>The app reads this file when connecting and never copies it.</small>
-      </label>
-    {/if}
+
+    <h3>Appearance</h3>
+    <div class="field">
+      Colour
+      <div class="swatches">
+        <button type="button" class="swatch none" class:picked={!color} title="Follow the theme" aria-label="No colour" onclick={() => (color = "")}></button>
+        {#each COLOR_CHOICES as c (c)}
+          <button type="button" class="swatch" class:picked={color === c} style:background={c} title={c} aria-label={c} onclick={() => (color = c)}></button>
+        {/each}
+        <input type="color" value={color || "#1f3f7a"} oninput={(e) => (color = e.currentTarget.value)} title="Pick any colour" aria-label="Custom colour" />
+      </div>
+      <small>Colours this session's tab and terminal background, instead of the theme's. Handy for telling servers apart.</small>
+    </div>
+
+    <h3>Advanced</h3>
     <label class="field">
       Go through a jump host
       <select bind:value={jump}>
@@ -209,19 +224,11 @@
       </label>
       <small>Needs an X server on this computer (Tools, X server) and X11 forwarding allowed on the server.</small>
     </div>
-    {#if library.keychain && auth === "password"}
-      <label class="field">
-        Save password in the keychain (optional)
-        <input type="password" bind:value={password} autocomplete="new-password" />
-        <small>Leave empty to be asked each time.</small>
-      </label>
-    {/if}
-    {#if library.keychain && auth === "key"}
-      <label class="field">
-        Save the key's passphrase in the keychain (optional)
-        <input type="password" bind:value={passphrase} autocomplete="new-password" />
-      </label>
-    {/if}
+    <label class="field">
+      Commands to run after connecting (optional)
+      <textarea rows="3" bind:value={startup} spellcheck="false" placeholder="cd /srv/app"></textarea>
+      <small>Typed once, one line at a time, when the shell is ready. Don't put passwords here: this is saved as plain text.</small>
+    </label>
 
     {#if error}<p class="message error">{error}</p>{/if}
     <div class="modal-actions">

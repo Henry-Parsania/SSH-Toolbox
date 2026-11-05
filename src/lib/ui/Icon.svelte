@@ -38,6 +38,7 @@
     | "monitor"
     | "copy"
     | "shield"
+    | "more"
     | "sparkle";
 
   interface Props {
@@ -46,6 +47,9 @@
   }
 
   let { name, size = 16 }: Props = $props();
+
+  // Play and stop are solid shapes, which read better at a small size than outlines.
+  const solid = $derived(name === "play" || name === "stop");
 
   const paths: Record<IconName, string> = {
     menu: "M4 7h16M4 12h16M4 17h16",
@@ -64,7 +68,7 @@
     import: "M12 4v11m0 0l-4-4m4 4l4-4M5 19h14",
     folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z",
     "folder-plus": "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7zM12 11v5M9.5 13.5h5",
-    play: "M8 5.5v13l11-6.5-11-6.5z",
+    play: "M7.5 5.2v13.6a.6.6 0 00.9.5l11-6.8a.6.6 0 000-1l-11-6.8a.6.6 0 00-.9.5z",
     edit: "M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17v3zM14 8l3 3",
     trash: "M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5",
     sidebar: "M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM9 5v14",
@@ -79,14 +83,15 @@
     ftp: "M4 6h7l2 2h7v10H4zM12 11v5m0 0l-2-2m2 2l2-2",
     home: "M4 11l8-7 8 7M6 10v9a1 1 0 001 1h3v-6h4v6h3a1 1 0 001-1v-9",
     file: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5",
-    files: "M4 6a2 2 0 012-2h3l2 2h5a2 2 0 012 2v1M3 11h15a1 1 0 011 1l-1 6a2 2 0 01-2 2H5a2 2 0 01-2-2v-7zM21 11v-0",
+    files: "M8 4h8a1 1 0 011 1v13a1 1 0 01-1 1H8a1 1 0 01-1-1V5a1 1 0 011-1zM4 8v12a1 1 0 001 1h10",
     box: "M12 3l8 4v10l-8 4-8-4V7l8-4zM4 7l8 4 8-4M12 11v10",
-    stop: "M7 7h10v10H7z",
+    stop: "M8 6.5h8A1.5 1.5 0 0117.5 8v8a1.5 1.5 0 01-1.5 1.5H8A1.5 1.5 0 016.5 16V8A1.5 1.5 0 018 6.5z",
     info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5h.01",
     log: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M9 13h6M9 17h6",
     monitor: "M3 5h18v11H3zM8 20h8M12 16v4M6 13l3-4 3 3 3-5 3 4",
     copy: "M9 9h10a1 1 0 011 1v10a1 1 0 01-1 1H9a1 1 0 01-1-1V10a1 1 0 011-1zM16 9V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3",
     shield: "M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3zM9.5 12l2 2 3.5-4",
+    more: "M5 12h.01M12 12h.01M19 12h.01",
     sparkle: "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z",
   };
 </script>
@@ -95,9 +100,9 @@
   width={size}
   height={size}
   viewBox="0 0 24 24"
-  fill="none"
+  fill={solid ? "currentColor" : "none"}
   stroke="currentColor"
-  stroke-width="1.8"
+  stroke-width={solid ? 1.2 : 1.75}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"
