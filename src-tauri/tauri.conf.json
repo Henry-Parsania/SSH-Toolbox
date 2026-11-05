@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SSH Toolbox",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "identifier": "dev.sshtoolbox.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -37,6 +37,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
