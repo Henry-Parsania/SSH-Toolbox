@@ -33,7 +33,7 @@
     ["Command palette and quick connect", "Ctrl+Shift+P opens a box where you type to jump to a saved session, an open tab or any menu command. Typing something like pi@10.0.0.5:22 offers to connect to it: the new session form opens filled in, and saving it connects."],
     ["Agent", "An assistant for the SSH server in the active tab (the sparkle button, or View menu). It can read the terminal and files and run commands; anything that changes something is shown to you first. Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model: set one up with the gear in the panel."],
     ["Serial ports", "Open a serial device with its settings, and set DTR, RTS or send a break. File menu."],
-    ["Footer", "CPU, memory and disk of this computer or of the active SSH server. Settings."],
+    ["Footer", "CPU, memory, network speed, graphics card, disk, load and uptime of this computer or of the active SSH server, with small graphs of the last few minutes. Click the gear at its right end (or right-click the footer) to choose what shows: each reading can be hidden, and its bar, numbers and graph switched on or off. Graphs are off until you turn them on. Your choices are kept. Settings turns the whole footer on or off."],
     ["Long commands", "When a tab that isn't showing has printed output for a while and then goes quiet, a check mark appears on its tab. It goes away when you open the tab."],
     ["Own window", "Move the active tab into a window of its own; its programs keep running. Terminal menu."],
     ["Search and save", "Search the output of a pane, or save all of it as a text file in Downloads. Terminal menu."],

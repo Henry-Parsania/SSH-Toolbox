@@ -4,6 +4,19 @@
   import Spark from "../docker/Spark.svelte";
   import { bytes, percent, rate, uptime } from "./format";
   import { netSpeed, pushReading, type NetSample } from "./history";
+  import Icon from "../ui/Icon.svelte";
+  import { fitMenu } from "../ui/fitMenu";
+  import { METRICS, type Part } from "./prefs";
+  import { footerPrefs, resetFooter, setPart } from "./prefs.svelte";
+
+  const PARTS: { id: Part; label: string }[] = [
+    { id: "bar", label: "Bar" },
+    { id: "numbers", label: "Numbers" },
+    { id: "graph", label: "Graph" },
+  ];
+  const prefs = $derived(footerPrefs.value);
+  // The footer's choice box, when open: where it was asked for.
+  let menu = $state<{ x: number; y: number } | null>(null);
 
   interface Props {
     /** Whose load to show: a connected SSH session, or this computer. */
@@ -94,57 +107,101 @@
   }
 </script>
 
-<footer class="status" aria-label="Load">
+<svelte:window onpointerdown={() => (menu = null)} onblur={() => (menu = null)} onkeydown={(e) => e.key === "Escape" && (menu = null)} />
+
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<footer
+  class="status"
+  aria-label="Load"
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    menu = { x: e.clientX, y: e.clientY };
+  }}
+>
   <span class="where">{target.kind === "ssh" ? target.name : "This computer"}</span>
   {#if stats}
-    <span class="metric" title="Processor in use">
-      <span class="label">CPU</span>
-      <span class="bar"><span class="fill {level(cpu ?? 0)}" style:width="{cpu ?? 0}%"></span></span>
-      <span class="value">{cpu === null ? "…" : `${Math.round(cpu)}%`}</span>
-      <Spark values={cpuHistory} max={100} width={44} height={14} label="Processor use over the last minutes" />
-    </span>
-    <span class="metric" title="Memory in use">
-      <span class="label">RAM</span>
-      <span class="bar"><span class="fill {level(memPct)}" style:width="{memPct}%"></span></span>
-      <span class="value">{bytes(stats.mem_used)} / {bytes(stats.mem_total)}</span>
-      <Spark values={ramHistory} max={100} width={44} height={14} label="Memory use over the last minutes" />
-    </span>
-    {#if stats.net_rx_bytes !== null}
+    {#if prefs.cpu.show}
+      <span class="metric" title="Processor in use">
+        <span class="label">CPU</span>
+        {#if prefs.cpu.bar}<span class="bar"><span class="fill {level(cpu ?? 0)}" style:width="{cpu ?? 0}%"></span></span>{/if}
+        {#if prefs.cpu.numbers}<span class="value">{cpu === null ? "…" : `${Math.round(cpu)}%`}</span>{/if}
+        {#if prefs.cpu.graph}<Spark values={cpuHistory} max={100} width={44} height={14} label="Processor use over the last minutes" />{/if}
+      </span>
+    {/if}
+    {#if prefs.ram.show}
+      <span class="metric" title="Memory in use">
+        <span class="label">RAM</span>
+        {#if prefs.ram.bar}<span class="bar"><span class="fill {level(memPct)}" style:width="{memPct}%"></span></span>{/if}
+        {#if prefs.ram.numbers}<span class="value">{bytes(stats.mem_used)} / {bytes(stats.mem_total)}</span>{/if}
+        {#if prefs.ram.graph}<Spark values={ramHistory} max={100} width={44} height={14} label="Memory use over the last minutes" />{/if}
+      </span>
+    {/if}
+    {#if prefs.net.show && stats.net_rx_bytes !== null}
       <span class="metric" title="Network traffic of all connections (received, sent)">
         <span class="label">Net</span>
-        <span class="value">{speed ? `↓ ${rate(speed.rx)}  ↑ ${rate(speed.tx)}` : "…"}</span>
-        <Spark values={netHistory} width={44} height={14} label="Network traffic over the last minutes" />
+        {#if prefs.net.numbers}<span class="value">{speed ? `↓ ${rate(speed.rx)}  ↑ ${rate(speed.tx)}` : "…"}</span>{/if}
+        {#if prefs.net.graph}<Spark values={netHistory} width={44} height={14} label="Network traffic over the last minutes" />{/if}
       </span>
     {/if}
-    {#if stats.gpu_percent !== null}
-      <span class="metric" title="Graphics card in use (NVIDIA){stats.gpu_mem_total ? `, memory ${bytes(stats.gpu_mem_used ?? 0)} of ${bytes(stats.gpu_mem_total)}` : ''}">
+    {#if prefs.gpu.show && stats.gpu_percent !== null}
+      <span class="metric" title={`Graphics card in use (NVIDIA)${stats.gpu_mem_total ? `, memory ${bytes(stats.gpu_mem_used ?? 0)} of ${bytes(stats.gpu_mem_total)}` : ""}`}>
         <span class="label">GPU</span>
-        <span class="bar"><span class="fill {level(stats.gpu_percent)}" style:width="{stats.gpu_percent}%"></span></span>
-        <span class="value">{Math.round(stats.gpu_percent)}%</span>
-        <Spark values={gpuHistory} max={100} width={44} height={14} label="Graphics card use over the last minutes" />
+        {#if prefs.gpu.bar}<span class="bar"><span class="fill {level(stats.gpu_percent)}" style:width="{stats.gpu_percent}%"></span></span>{/if}
+        {#if prefs.gpu.numbers}<span class="value">{Math.round(stats.gpu_percent)}%</span>{/if}
+        {#if prefs.gpu.graph}<Spark values={gpuHistory} max={100} width={44} height={14} label="Graphics card use over the last minutes" />{/if}
       </span>
     {/if}
-    {#if stats.disk_total > 0}
+    {#if prefs.disk.show && stats.disk_total > 0}
       <span class="metric" title="Disk in use">
         <span class="label">Disk</span>
-        <span class="bar"><span class="fill {level(diskPct)}" style:width="{diskPct}%"></span></span>
-        <span class="value">{bytes(stats.disk_used)} / {bytes(stats.disk_total)}</span>
+        {#if prefs.disk.bar}<span class="bar"><span class="fill {level(diskPct)}" style:width="{diskPct}%"></span></span>{/if}
+        {#if prefs.disk.numbers}<span class="value">{bytes(stats.disk_used)} / {bytes(stats.disk_total)}</span>{/if}
       </span>
     {/if}
-    {#if stats.load}
+    {#if prefs.load.show && stats.load}
       <span class="metric" title="Load over 1, 5 and 15 minutes">
-        <span class="label">Load</span><span class="value">{stats.load}</span>
+        <span class="label">Load</span>{#if prefs.load.numbers}<span class="value">{stats.load}</span>{/if}
       </span>
     {/if}
-    {#if stats.uptime_secs !== null}
+    {#if prefs.uptime.show && stats.uptime_secs !== null}
       <span class="metric" title="Time since the computer started">
-        <span class="label">Up</span><span class="value">{uptime(stats.uptime_secs)}</span>
+        <span class="label">Up</span>{#if prefs.uptime.numbers}<span class="value">{uptime(stats.uptime_secs)}</span>{/if}
       </span>
     {/if}
   {:else}
     <span class="note">{note || "Reading…"}</span>
   {/if}
+  <button class="adjust" title="Choose what the footer shows (or right-click it)" aria-label="Adjust the footer" onclick={(e) => {
+    e.stopPropagation();
+    const box = e.currentTarget.getBoundingClientRect();
+    menu = { x: box.left, y: box.top - 4 };
+  }}>
+    <Icon name="settings" size={12} />
+  </button>
 </footer>
+
+{#if menu}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="picker" role="dialog" aria-label="Footer" tabindex="-1" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    <div class="row head">
+      <span class="name">What the footer shows</span>
+      {#each PARTS as part (part.id)}<span class="cell">{part.label}</span>{/each}
+    </div>
+    {#each METRICS as m (m.id)}
+      <div class="row">
+        <label class="name"><input type="checkbox" checked={prefs[m.id].show} onchange={(e) => setPart(m.id, "show", e.currentTarget.checked)} /> {m.label}</label>
+        {#each PARTS as part (part.id)}
+          <span class="cell">
+            {#if m.parts.includes(part.id)}
+              <input type="checkbox" aria-label="{m.label}: {part.label}" disabled={!prefs[m.id].show} checked={prefs[m.id][part.id]} onchange={(e) => setPart(m.id, part.id, e.currentTarget.checked)} />
+            {/if}
+          </span>
+        {/each}
+      </div>
+    {/each}
+    <div class="foot"><button class="btn small" onclick={resetFooter}>Back to the defaults</button></div>
+  </div>
+{/if}
 
 <style>
   .status {
@@ -199,5 +256,56 @@
   }
   .note {
     color: var(--text-faint);
+  }
+  .adjust {
+    display: grid;
+    place-items: center;
+    margin-left: auto;
+    padding: 2px;
+    color: var(--text-faint);
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .adjust:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+  .picker {
+    position: fixed;
+    z-index: 70;
+    min-width: 330px;
+    padding: 8px 10px 10px;
+    color: var(--text);
+    font-size: 12px;
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 52px 64px 52px;
+    align-items: center;
+    padding: 3px 0;
+  }
+  .row.head {
+    color: var(--text-faint);
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3px;
+  }
+  .name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .cell {
+    text-align: center;
+  }
+  .foot {
+    margin-top: 8px;
+    text-align: right;
   }
 </style>
