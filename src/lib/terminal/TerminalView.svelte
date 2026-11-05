@@ -35,6 +35,7 @@
   import { chooseRenderer, webglFailureNotice } from "./renderer";
   import { parseCwd } from "./cwd";
   import { terminalThemeFor } from "../ui/themes";
+  import { quoteFont } from "./fonts";
   import { currentTheme } from "../ui/themes.svelte";
   import { readableOn, sessionColors } from "../sessions/colors.svelte";
   import { FinishDetector } from "./finish";
@@ -173,7 +174,7 @@
     if (family.trim().toLowerCase() === "monospace") {
       return `Cascadia Mono, 'SF Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
     }
-    return `${family}, Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
+    return `${quoteFont(family)}, Cascadia Mono, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace`;
   }
 
   $effect(() => {

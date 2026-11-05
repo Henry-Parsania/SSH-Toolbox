@@ -1,6 +1,6 @@
 [package]
 name = "toolbox-core"
-version = "1.5.1"
+version = "1.5.2"
 license = "Apache-2.0"
 description = "SSH Toolbox backend logic. Must not depend on Tauri."
 edition = "2024"
