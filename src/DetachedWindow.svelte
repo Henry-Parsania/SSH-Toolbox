@@ -6,6 +6,7 @@
   import PaneTree from "./lib/layout/PaneTree.svelte";
   import { Workspace } from "./lib/layout/workspace.svelte";
   import { loadSettings, settings } from "./lib/settings.svelte";
+  import { applyTheme, currentTheme } from "./lib/ui/themes.svelte";
 
   const payload = decodePayload(new URLSearchParams(location.search).get("window") ?? "");
   const workspace = new Workspace();
@@ -27,7 +28,7 @@
   });
 
   $effect(() => {
-    document.documentElement.dataset.theme = settings.theme;
+    applyTheme(currentTheme());
   });
 
   // When the last pane is closed there is nothing left to show.

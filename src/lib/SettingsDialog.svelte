@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { PlatformInfo, Settings, Shell } from "./backend";
   import { saveSettings, settings } from "./settings.svelte";
+  import { allThemes, chooseTheme, currentTheme } from "./ui/themes.svelte";
+  import ThemeBuilder from "./ui/ThemeBuilder.svelte";
 
   interface Props {
     platform: PlatformInfo;
@@ -13,18 +15,23 @@
   let draft = $state<Settings>({ ...settings });
   let error = $state("");
   let saving = $state(false);
+  let themeChoice = $state(currentTheme().id);
+  let building = $state(false);
 
   async function save() {
     saving = true;
     error = "";
     try {
+      const chosen = allThemes().find((t) => t.id === themeChoice) ?? currentTheme();
       await saveSettings({
         ...draft,
+        theme: chosen.base,
         font_size: Number(draft.font_size),
         scrollback: Number(draft.scrollback),
         reachability_interval_secs: Number(draft.reachability_interval_secs),
         stats_interval_secs: Number(draft.stats_interval_secs),
       });
+      chooseTheme(chosen.id);
       onclose();
     } catch (err) {
       error = (err as { message?: string }).message ?? "Couldn't save the settings.";
@@ -55,13 +62,15 @@
       Font size
       <input type="number" min="8" max="48" bind:value={draft.font_size} />
     </label>
-    <label class="field">
+    <div class="field">
       Colour theme
-      <select bind:value={draft.theme}>
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-      </select>
-    </label>
+      <div class="theme-row">
+        <select bind:value={themeChoice}>
+          {#each allThemes() as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+        </select>
+        <button type="button" class="btn" onclick={() => (building = true)}>Edit themes…</button>
+      </div>
+    </div>
     <label class="field">
       Scrollback (lines, at least 10,000)
       <input type="number" min="10000" max="1000000" step="1000" bind:value={draft.scrollback} />
@@ -157,7 +166,19 @@
   </div>
 </div>
 
+{#if building}
+  <ThemeBuilder current={themeChoice} onuse={(id) => { themeChoice = id; building = false; }} onclose={() => (building = false)} />
+{/if}
+
 <style>
+  .theme-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+  }
+  .theme-row select {
+    flex: 1;
+  }
   .group {
     margin: 14px 0 4px;
     font-size: 12px;

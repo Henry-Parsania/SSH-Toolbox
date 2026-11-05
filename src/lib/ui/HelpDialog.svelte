@@ -42,7 +42,7 @@
     ["Back up and restore", "File menu: saves your sessions and folders to one file in Downloads (no passwords, no key contents), and adds the sessions of such a file on another computer without changing the ones already there."],
     ["Reconnect and logs", "A dropped SSH connection is started again by itself (up to 5 tries; Settings turns it off). Settings can also save a plain-text copy of every session in a folder."],
     ["Import", "Bring in hosts from your ~/.ssh/config file. File menu."],
-    ["Settings", "Theme, font, scrollback, renderer, server checks and the footer. File menu."],
+    ["Settings", "Eight ready-made colour themes (Nord, Dracula, Solarized, Gruvbox, high contrast and more), or press Edit themes to make your own from six colours: it checks that the text is readable, shows a preview, and saves your themes in the list. Also font, scrollback, renderer, server checks and the footer. File menu."],
   ];
 
   const keys: [string, string][] = [

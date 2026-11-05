@@ -9,6 +9,7 @@ It is a personal project: builds are for the owner's own machines, with no code 
 ## What it does
 
 - **Terminals and tabs.** Local shells (PowerShell, cmd, Git Bash, WSL, or the default shell on Linux) in tabs. The window can be split into panes; click a pane and pick which open tab it shows, or start a new terminal or saved session in it. Right-click a tab to duplicate its connection to the right or below, rename it, or move it to its own window. The layout comes back on the next start.
+- **Themes.** Eight built-in colour themes and a theme builder: pick six colours, see a preview, save your own and choose it from the list. The terminal follows the theme.
 - **SSH sessions.** Saved in folders, with password, key or agent login, jump hosts (up to 3 hops) and a status dot that shows which servers answer. Host keys are checked against `known_hosts`. Give a session a colour and its tab and terminal background use it instead of the theme.
 - **Key setup.** Make or pick a key and install it on a server (like `ssh-copy-id`), from the new-session window or the session's menu. Saved secrets go in the OS keychain, never in files.
 - **Reconnect.** A dropped SSH connection reconnects by itself (up to 5 tries). When a session has ended, press `R` to reconnect or `C` to close it.

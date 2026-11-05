@@ -41,6 +41,7 @@
   import StatusBar from "./lib/status/StatusBar.svelte";
   import { loadSettings, settings, saveSettings } from "./lib/settings.svelte";
   import Icon from "./lib/ui/Icon.svelte";
+  import { applyTheme, currentTheme } from "./lib/ui/themes.svelte";
 
   let platform = $state<PlatformInfo | null>(null);
   let shells = $state<Shell[]>([]);
@@ -220,7 +221,7 @@
 
   // The colour theme applies to the whole window, not only to the terminal.
   $effect(() => {
-    document.documentElement.dataset.theme = settings.theme;
+    applyTheme(currentTheme());
   });
 
   // A pop-up window with the server's process monitor (btop, htop or top) instead of a shell.

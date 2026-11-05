@@ -34,7 +34,8 @@
   import { broadcastInput, registerReceiver } from "./broadcast";
   import { chooseRenderer, webglFailureNotice } from "./renderer";
   import { parseCwd } from "./cwd";
-  import { terminalTheme } from "./themes";
+  import { terminalThemeFor } from "../ui/themes";
+  import { currentTheme } from "../ui/themes.svelte";
   import { readableOn, sessionColors } from "../sessions/colors.svelte";
   import { FinishDetector } from "./finish";
 
@@ -108,7 +109,7 @@
   let applyAppearance: () => void = () => {};
   /** The theme, with the session's own colour (if it has one) in place of the theme's background. */
   function themeNow() {
-    const base = terminalTheme(settings.theme);
+    const base = terminalThemeFor(currentTheme());
     const id = spec.type === "ssh" ? spec.saved_session_id : "";
     const color = id ? sessionColors.get(id) : undefined;
     return color ? { ...base, background: color, foreground: readableOn(color), cursor: readableOn(color) } : base;
@@ -117,6 +118,7 @@
   // chosen when the terminal opens.
   $effect(() => {
     void [settings.font_family, settings.font_size, settings.theme, settings.scrollback];
+    void JSON.stringify(currentTheme());
     if (spec.type === "ssh") void sessionColors.get(spec.saved_session_id);
     applyAppearance();
   });
