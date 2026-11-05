@@ -30,6 +30,11 @@ jobs:
             artifact_paths: |
               target/release/bundle/deb/*.deb
               target/release/bundle/appimage/*.AppImage
+          # The macOS apps are not signed, so macOS asks the person to allow them the first time.
+          - name: macOS
+            os: macos-latest
+            bundles: dmg
+            artifact_paths: target/release/bundle/dmg/*.dmg
 
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +115,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         with:
-          name: ssh-toolbox-${{ runner.os }}
+          name: ssh-toolbox-${{ matrix.name }}
           path: ${{ matrix.artifact_paths }}
           if-no-files-found: error
