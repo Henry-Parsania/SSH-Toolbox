@@ -583,6 +583,23 @@
     height: 100%;
     padding: 6px 4px 4px 10px;
   }
+  .ctx {
+    position: fixed;
+    z-index: 60;
+    min-width: 230px;
+  }
+  .ctx li {
+    list-style: none;
+  }
+  .ctx .sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
+  }
+  .ctx button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
   .hintkey {
     margin-left: 8px;
     color: var(--text-faint);
