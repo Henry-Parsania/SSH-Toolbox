@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   webkit_workaround: "off",
   default_shell: "",
   restore_layout: true,
+  copy_on_select: true,
   auto_reconnect: true,
   log_folder: "",
   tray_icon: false,

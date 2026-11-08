@@ -110,6 +110,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::platform::platform_info,
             commands::platform::app_version,
+            commands::vscode::vscode_themes,
+            commands::vscode::vscode_theme_read,
             commands::files::files_read_text,
             commands::files::files_write_text,
             commands::edit::edit_open,

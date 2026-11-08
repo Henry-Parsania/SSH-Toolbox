@@ -27,8 +27,9 @@
     type TerminalStatus,
   } from "../backend";
   import Icon from "../ui/Icon.svelte";
+  import { fitMenu } from "../ui/fitMenu";
   import PromptDialog from "./PromptDialog.svelte";
-  import { checkPaste, isCopyKey, isPasteKey, sanitizePaste, type PasteCheck } from "./clipboard";
+  import { checkPaste, copyText, isCopyKey, isPasteKey, sanitizePaste, type PasteCheck } from "./clipboard";
   import { AckBatcher, InputSender } from "./flow";
   import { settings } from "../settings.svelte";
   import { broadcastInput, registerReceiver } from "./broadcast";
@@ -144,6 +145,15 @@
   // Set by mount(), so the confirmation box can reach the terminal.
   let pasteConfirmed: (text: string) => void = () => {};
   let refocus: () => void = () => {};
+
+  // The right-click menu. The actions are set by mount(), which owns the terminal.
+  let menu = $state<{ x: number; y: number; hasSelection: boolean } | null>(null);
+  let doCopy: () => boolean = () => false;
+  let doPaste: () => void = () => {};
+  let doSelectAll: () => void = () => {};
+  function closeMenu() {
+    menu = null;
+  }
 
   function confirmPaste() {
     if (!pending) return;
@@ -300,6 +310,37 @@
     // Capture phase, so it runs before xterm's own paste handler.
     host.addEventListener("paste", onPasteEvent, true);
 
+    // Copy. Ctrl+C copies when something is selected (otherwise it is the interrupt key), as do
+    // Ctrl+Shift+C, Ctrl+Insert and Cmd+C. Selecting text also copies it, when that setting is on.
+    function copySelection(): boolean {
+      const selection = term.getSelection();
+      if (!selection) return false;
+      void copyText(selection).then((ok) => {
+        if (!ok) {
+          notice = "Couldn't copy to the clipboard.";
+          setTimeout(() => (notice = ""), 4000);
+        }
+      });
+      return true;
+    }
+    doCopy = copySelection;
+    doPaste = () => void navigator.clipboard.readText().then(requestPaste, () => {});
+    doSelectAll = () => term.selectAll();
+    const onMouseUp = () => {
+      if (!settings.copy_on_select) return;
+      // Let xterm finish the selection first.
+      setTimeout(() => {
+        if (term.hasSelection()) copySelection();
+      }, 0);
+    };
+    host.addEventListener("mouseup", onMouseUp);
+    const onContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      menu = { x: e.clientX, y: e.clientY, hasSelection: term.hasSelection() };
+    };
+    host.addEventListener("contextmenu", onContextMenu, true);
+
     // What the agent reads: the last lines of the screen and its scrollback, as plain text.
     let unregisterReader = () => {};
     function readText(maxLines: number): string {
@@ -331,10 +372,27 @@
     }
 
     term.attachCustomKeyEventHandler((e) => {
-      if (isCopyKey(e)) {
+      if (e.type === "keydown" && isCopyKey(e)) {
         e.preventDefault();
-        const selection = term.getSelection();
-        if (selection) void navigator.clipboard.writeText(selection).catch(() => {});
+        copySelection();
+        return false;
+      }
+      // Plain Ctrl+C, Ctrl+Insert and Cmd+C copy only when there is a selection.
+      if (
+        e.type === "keydown" &&
+        term.hasSelection() &&
+        !e.altKey &&
+        ((e.ctrlKey && !e.shiftKey && !e.metaKey && (e.code === "KeyC" || e.code === "Insert")) ||
+          (e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === "KeyC"))
+      ) {
+        e.preventDefault();
+        copySelection();
+        if (e.code === "KeyC") term.clearSelection();
+        return false;
+      }
+      if (e.type === "keydown" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && e.code === "Insert") {
+        e.preventDefault();
+        doPaste();
         return false;
       }
       if (e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === "KeyS") {
@@ -443,6 +501,8 @@
       clearInterval(finishTimer);
       dataSub.dispose();
       binarySub.dispose();
+      host.removeEventListener("mouseup", onMouseUp);
+      host.removeEventListener("contextmenu", onContextMenu, true);
       resizeSub.dispose();
       // A session handed to another window keeps running.
       if (sessionId && keepAlive.has(sessionId)) keepAlive.delete(sessionId);
@@ -454,9 +514,19 @@
   }
 </script>
 
+<svelte:window onpointerdown={closeMenu} onblur={closeMenu} />
+
 <div class="terminal-wrap" style:background>
   <div class="terminal" bind:this={host}></div>
   {#if notice}<p class="notice">{notice}</p>{/if}
+  {#if menu}
+    <ul class="menu ctx" role="menu" use:fitMenu={{ x: menu.x, y: menu.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+      <li><button disabled={!menu.hasSelection} onclick={() => { doCopy(); closeMenu(); refocus(); }}><Icon name="copy" size={14} /> Copy <span class="hintkey">(Ctrl+Shift+C)</span></button></li>
+      <li><button onclick={() => { doPaste(); closeMenu(); refocus(); }}><Icon name="terminal" size={14} /> Paste <span class="hintkey">(Ctrl+Shift+V)</span></button></li>
+      <li class="sep" role="separator"></li>
+      <li><button onclick={() => { doSelectAll(); closeMenu(); refocus(); }}><Icon name="search" size={14} /> Select all</button></li>
+    </ul>
+  {/if}
   {#if question}
     <PromptDialog prompt={question.prompt} onanswer={answerQuestion} />
   {/if}
@@ -512,6 +582,11 @@
     width: 100%;
     height: 100%;
     padding: 6px 4px 4px 10px;
+  }
+  .hintkey {
+    margin-left: 8px;
+    color: var(--text-faint);
+    font-size: 11px;
   }
   .notice {
     position: absolute;

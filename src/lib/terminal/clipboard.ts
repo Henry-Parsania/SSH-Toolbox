@@ -44,6 +44,32 @@ export function checkPaste(text: string): PasteCheck {
   };
 }
 
+/** Puts text on the clipboard. Falls back to the old way when the browser refuses; true if it worked. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // fall through to the older method
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+  const previous = document.activeElement as HTMLElement | null;
+  document.body.appendChild(area);
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  area.remove();
+  previous?.focus?.();
+  return ok;
+}
+
 /** True for the copy shortcut, Ctrl+Shift+C. */
 export function isCopyKey(e: Pick<KeyboardEvent, "type" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey" | "code">): boolean {
   return e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === "KeyC";

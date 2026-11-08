@@ -9,6 +9,8 @@
   } from "./themes.svelte";
   import { COLOR_LABELS, isHex, terminalThemeFor, themeVariables, warnings, type AppTheme } from "./themes";
   import type { TerminalTheme } from "../terminal/themes";
+  import { vscodeThemeRead, vscodeThemes, type VsCodeThemeInfo } from "../backend/vscode";
+  import { loadVsCodeColors, resolveSibling, vscodeToTheme } from "./vscodeTheme";
 
   interface Props {
     /** The theme the settings window has picked right now. */
@@ -85,6 +87,35 @@
     refresh("dark");
   }
 
+  // Importing from VS Code: one button looks through the themes VS Code has on this computer.
+  let importer = $state<{ loading: boolean; themes: VsCodeThemeInfo[]; current: string | null; filter: string; error: string } | null>(null);
+  const shown = $derived(
+    importer ? importer.themes.filter((t) => `${t.label} ${t.source}`.toLowerCase().includes(importer!.filter.trim().toLowerCase())) : [],
+  );
+
+  async function openImporter() {
+    importer = { loading: true, themes: [], current: null, filter: "", error: "" };
+    try {
+      const found = await vscodeThemes();
+      importer = { loading: false, themes: found.themes, current: found.current, filter: "", error: found.themes.length ? "" : "No VS Code themes were found on this computer. Is VS Code installed?" };
+    } catch (err) {
+      importer = { loading: false, themes: [], current: null, filter: "", error: (err as { message?: string })?.message ?? "Couldn't look for VS Code themes." };
+    }
+  }
+
+  async function importTheme(info: VsCodeThemeInfo) {
+    try {
+      const raw = await loadVsCodeColors(info.path, vscodeThemeRead, resolveSibling);
+      const theme = vscodeToTheme(info.label, info.ui_theme, raw, newThemeId());
+      saveCustomTheme(theme);
+      importer = null;
+      refresh(theme.id);
+      note = `Imported "${theme.name}" from VS Code. It is saved. Press "Use this theme" to switch to it.`;
+    } catch (err) {
+      if (importer) importer.error = (err as { message?: string })?.message ?? "Couldn't read that theme.";
+    }
+  }
+
   function setColor(key: keyof AppTheme["colors"], value: string) {
     if (!locked && isHex(value)) draft.colors[key] = value;
   }
@@ -124,7 +155,37 @@
         </select>
       </label>
       <button class="btn" onclick={copyTheme} title="Make your own theme, starting from this one">New from this</button>
+      <button class="btn" onclick={openImporter} title="Bring in one of the colour themes from VS Code">Import from VS Code…</button>
     </div>
+
+    {#if importer}
+      <div class="importer">
+        <div class="imp-head">
+          <b>VS Code themes</b>
+          <button class="btn small ghost" onclick={() => (importer = null)}>Cancel</button>
+        </div>
+        {#if importer.loading}
+          <p class="lead2">Looking…</p>
+        {:else}
+          {#if importer.error}<p class="message warn">{importer.error}</p>{/if}
+          {#if importer.themes.length}
+            <input type="text" placeholder="Search {importer.themes.length} themes" bind:value={importer.filter} spellcheck="false" />
+            <ul class="imp-list">
+              {#each shown as t (t.path + t.label)}
+                <li>
+                  <button onclick={() => importTheme(t)}>
+                    <span>{t.label}{#if importer.current === t.label} <em>(in use in VS Code)</em>{/if}</span>
+                    <small>{t.source}</small>
+                  </button>
+                </li>
+              {:else}
+                <li class="none">No theme matches.</li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
+      </div>
+    {/if}
 
     {#if locked}
       <p class="message warn">This is a built-in theme and can't be changed. Press "New from this" to make your own.</p>
@@ -340,6 +401,51 @@
     width: 8px;
     height: 14px;
     vertical-align: middle;
+  }
+  .importer {
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-s);
+  }
+  .imp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .imp-list {
+    max-height: 220px;
+    margin: 8px 0 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+  }
+  .imp-list button {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 5px 8px;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+  }
+  .imp-list button:hover {
+    background: var(--bg-hover);
+  }
+  .imp-list small,
+  .imp-list em {
+    color: var(--text-faint);
+    font-size: 11px;
+    font-style: normal;
+  }
+  .none {
+    padding: 6px 8px;
+    color: var(--text-faint);
   }
   .spacer {
     flex: 1;

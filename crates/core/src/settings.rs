@@ -53,6 +53,8 @@ pub struct Settings {
     pub webkit_workaround: WebkitWorkaround,
     pub default_shell: String,
     pub restore_layout: bool,
+    /// Selecting text in a terminal copies it at once.
+    pub copy_on_select: bool,
     /// A folder to save a text copy of every terminal session in, or empty for no logging.
     pub log_folder: String,
     /// Show an icon in the system tray (takes effect after a restart).
@@ -82,6 +84,7 @@ impl Default for Settings {
             webkit_workaround: WebkitWorkaround::Off,
             default_shell: String::new(),
             restore_layout: true,
+            copy_on_select: true,
             log_folder: String::new(),
             tray_icon: false,
             close_to_tray: false,

@@ -76,6 +76,56 @@
     }
   }
 
+  // Column widths, adjusted by dragging the thin divider at the left edge of a column heading.
+  type Widths = { size: number; when: number; perm: number };
+  const DEFAULT_WIDTHS: Widths = { size: 58, when: 108, perm: 70 };
+  let widths = $state<Widths>(loadWidths());
+  function loadWidths(): Widths {
+    try {
+      const saved = JSON.parse(localStorage.getItem("file-column-widths") ?? "null");
+      if (saved && typeof saved === "object") {
+        const ok = (v: unknown, d: number) => (typeof v === "number" && v >= 36 && v <= 400 ? v : d);
+        return { size: ok(saved.size, 58), when: ok(saved.when, 108), perm: ok(saved.perm, 70) };
+      }
+    } catch {
+      // an unreadable value just means the defaults
+    }
+    return { ...DEFAULT_WIDTHS };
+  }
+  function saveWidths() {
+    try {
+      localStorage.setItem("file-column-widths", JSON.stringify($state.snapshot(widths)));
+    } catch {
+      // not saving is fine
+    }
+  }
+  function startResize(which: keyof Widths, e: PointerEvent) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startW = widths[which];
+    const move = (ev: PointerEvent) => {
+      // The columns sit against the right edge, so dragging left makes a column wider.
+      widths[which] = Math.max(36, Math.min(400, Math.round(startW + (startX - ev.clientX))));
+    };
+    const stop = () => {
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", stop);
+      target.removeEventListener("pointercancel", stop);
+      saveWidths();
+    };
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", stop);
+    target.addEventListener("pointercancel", stop);
+  }
+  function resetWidth(which: keyof Widths) {
+    widths[which] = DEFAULT_WIDTHS[which];
+    saveWidths();
+  }
+
   type Dialog =
     | { kind: "mkdir"; value: string }
     | { kind: "rename"; entry: FileEntry; value: string }
@@ -390,7 +440,32 @@
   {:else}
     {#if error}<p class="message error inline">{error}</p>{/if}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown} oncontextmenu={(e) => openMenu(e, null)}>
+    <div class="list" role="listbox" tabindex="0" aria-label="{title} files" aria-multiselectable="true" {onkeydown} oncontextmenu={(e) => openMenu(e, null)} style="--w-size:{widths.size}px;--w-when:{widths.when}px;--w-perm:{widths.perm}px">
+      <div class="head" role="presentation">
+        <span class="h-gap"></span>
+        <span class="h-name">Name</span>
+        {#if cols.size}
+          <span class="h-col size">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span class="grip" title="Drag to change the width (double-click to reset)" onpointerdown={(e) => startResize("size", e)} ondblclick={() => resetWidth("size")}></span>
+            Size
+          </span>
+        {/if}
+        {#if cols.when}
+          <span class="h-col when">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span class="grip" title="Drag to change the width (double-click to reset)" onpointerdown={(e) => startResize("when", e)} ondblclick={() => resetWidth("when")}></span>
+            Modified
+          </span>
+        {/if}
+        {#if cols.perm && files.chmod}
+          <span class="h-col perm">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span class="grip" title="Drag to change the width (double-click to reset)" onpointerdown={(e) => startResize("perm", e)} ondblclick={() => resetWidth("perm")}></span>
+            Permissions
+          </span>
+        {/if}
+      </div>
       {#if parentPath(path, sep) !== path}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
@@ -776,14 +851,58 @@
     text-align: right;
   }
   .size {
-    width: 58px;
+    width: var(--w-size, 58px);
   }
   .when {
-    width: 108px;
+    width: var(--w-when, 108px);
   }
   .perm {
-    width: 70px;
+    width: var(--w-perm, 70px);
     font-family: var(--mono);
+  }
+  /* The column headings stay at the top while the list scrolls. */
+  .head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 8px;
+    color: var(--text-faint);
+    font-size: 11px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+  .h-gap {
+    flex: none;
+    width: 35px;
+  }
+  .h-name {
+    flex: 1;
+    min-width: 110px;
+  }
+  .h-col {
+    position: relative;
+    flex: none;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .grip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 7px;
+    cursor: col-resize;
+    border-left: 1px solid var(--border-strong);
+  }
+  .grip:hover {
+    border-left-color: var(--accent);
   }
   /* Names and sizes come first: dates and permissions only appear when there is room. */
   @container (max-width: 560px) {

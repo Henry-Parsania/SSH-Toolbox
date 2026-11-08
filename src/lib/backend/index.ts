@@ -181,6 +181,8 @@ export interface Settings {
   auto_reconnect: boolean;
   /** A folder for text copies of every session, or empty for none. */
   log_folder: string;
+  /** Selecting text in a terminal copies it at once. */
+  copy_on_select: boolean;
   /** Show an icon in the system tray (after a restart). */
   tray_icon: boolean;
   /** Closing the window hides it to the tray. */
