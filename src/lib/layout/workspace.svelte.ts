@@ -2,7 +2,7 @@
 // the screen draws.
 
 import type { SavedLayout, SavedPane, SessionSpec } from "../backend";
-import { keepAlive, type WindowPayload } from "./detach";
+import { keepAlive, type WindowPayload } from "./detach";
 import {
   closePane,
   findLeaf,
@@ -284,6 +284,23 @@ export class Workspace {
     if (group) this.focusGroup(group);
     this.splitGroup(direction);
     return this.newTab(leaf.spec, leaf.title);
+  }
+
+  /** A copy of the tab's session in a full new tab of its own (no split). */
+  duplicateTabAsTab(tabId: string): Tab | null {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    const leaf = tab ? (findLeaf(tab.root, tab.active) ?? leaves(tab.root)[0]) : undefined;
+    if (!tab || !leaf) return null;
+    return this.newTab(leaf.spec, leaf.title);
+  }
+
+  /** Shows a tab handed over by another window. Its sessions are picked up, not restarted. */
+  adoptTab(payload: { title: string; root: PaneNode; attach: Record<string, string>; active: string }): Tab {
+    Object.assign(this.attach, payload.attach);
+    const tab = this.newTab(null, payload.title);
+    tab.root = payload.root;
+    tab.active = payload.active;
+    return tab;
   }
 
   /** Divides the window: a new pane beside (or below) the current one. */

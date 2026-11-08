@@ -27,9 +27,11 @@
     onagent: () => void;
     /** Moves a tab into a window of its own. */
     ondetach: (tabId: string) => void;
+    /** A tab was dragged away from the tab bar and let go at this point on the screen. */
+    ondropout: (tabId: string, screenX: number, screenY: number) => void;
   }
 
-  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent, ondetach }: Props = $props();
+  let { workspace, options, onnew, onsettings, onsidebar, sidebarOpen, filesOpen, onfiles, dockerOpen, ondocker, agentOpen, onagent, ondetach, ondropout }: Props = $props();
   let menuOpen = $state(false);
   // The right-click menu on a tab.
   let tabMenu = $state<{ x: number; y: number; id: string } | null>(null);
@@ -44,6 +46,8 @@
   let draft = $state("");
   let strip: HTMLDivElement | undefined = $state();
   let dragging = $state<string | null>(null);
+  // True while a tab has been pulled out of the bar: letting go then moves it to a window.
+  let tearing = $state(false);
 
   /** The colour chosen for the SSH session a tab was opened from, if any. */
   function colorOf(tab: Tab): string | undefined {
@@ -71,13 +75,17 @@
   function startDrag(e: PointerEvent, id: string) {
     if (e.button !== 0 || editing || !strip) return;
     const startX = e.clientX;
+    const startY = e.clientY;
     let moved = false;
     const bar = strip;
 
     const move = (ev: PointerEvent) => {
-      if (!moved && Math.abs(ev.clientX - startX) < 5) return;
+      if (!moved && Math.abs(ev.clientX - startX) < 5 && Math.abs(ev.clientY - startY) < 5) return;
       moved = true;
       dragging = id;
+      const box = bar.getBoundingClientRect();
+      tearing = ev.clientY < box.top - 40 || ev.clientY > box.bottom + 40 || ev.clientX < -4 || ev.clientX > window.innerWidth + 4;
+      if (tearing) return;
       const tabs = Array.from(bar.querySelectorAll<HTMLElement>("[data-tab]"));
       const from = workspace.tabs.findIndex((t) => t.id === id);
       let to = tabs.findIndex((el) => {
@@ -87,11 +95,17 @@
       if (to < 0) to = ev.clientX < tabs[0].getBoundingClientRect().left ? 0 : tabs.length - 1;
       workspace.moveTab(from, to);
     };
-    const stop = () => {
+    const stop = (ev: Event) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);
+      const out = tearing && ev.type === "pointerup";
       dragging = null;
+      tearing = false;
+      if (out) {
+        const p = ev as PointerEvent;
+        ondropout(id, p.screenX, p.screenY);
+      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", stop);
@@ -105,6 +119,7 @@
   {@const target = tabMenu}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <ul class="menu ctx" role="menu" use:fitMenu={{ x: target.x, y: target.y }} onpointerdown={(e) => e.stopPropagation()} oncontextmenu={(e) => e.preventDefault()}>
+    <li><button onclick={() => act(() => workspace.duplicateTabAsTab(target.id))}><Icon name="plus" size={14} /> Duplicate in a new tab</button></li>
     <li><button onclick={() => act(() => workspace.duplicateTab(target.id, "row"))}><Icon name="split-h" size={14} /> Duplicate to the right <span class="hintkey">(side by side)</span></button></li>
     <li><button onclick={() => act(() => workspace.duplicateTab(target.id, "column"))}><Icon name="split-v" size={14} /> Duplicate below <span class="hintkey">(top and bottom)</span></button></li>
     <li class="sep" role="separator"></li>
@@ -126,7 +141,7 @@
     <Icon name="sidebar" size={17} />
   </button>
 
-  <div class="tabs" bind:this={strip} role="tablist">
+  <div class="tabs" class:tearing bind:this={strip} role="tablist" title={tearing ? "Let go to move this tab to its own window" : undefined}>
     {#each workspace.tabs as tab (tab.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -281,6 +296,11 @@
 </div>
 
 <style>
+  .tabs.tearing {
+    cursor: grabbing;
+    outline: 1px dashed var(--accent);
+    outline-offset: -1px;
+  }
   .bar {
     display: flex;
     align-items: center;

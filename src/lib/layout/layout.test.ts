@@ -304,6 +304,24 @@ describe("panes from the empty-pane chooser", () => {
 });
 
 describe("Workspace.duplicateTab", () => {
+  it("can open the copy as a full new tab, without splitting", () => {
+    const w = new Workspace();
+    const ssh = w.newTab({ type: "ssh", saved_session_id: "s1" }, "server");
+    const copy = w.duplicateTabAsTab(ssh.id);
+    expect(copy?.root).toMatchObject({ spec: { type: "ssh", saved_session_id: "s1" } });
+    expect(w.groupCount).toBe(1);
+    expect(w.tabs).toHaveLength(2);
+    expect(w.activeTabId).toBe(copy?.id);
+  });
+
+  it("takes in a tab handed over by another window", () => {
+    const w = new Workspace();
+    const tab = w.adoptTab({ title: "t", root: { kind: "leaf", pane_id: "p1", title: "t", spec: null } as never, attach: { p1: "sess" }, active: "p1" });
+    expect(w.attach.p1).toBe("sess");
+    expect(tab.active).toBe("p1");
+    expect(w.tabs).toHaveLength(1);
+  });
+
   it("opens a copy of the connection in a new pane beside the tab, or below it", () => {
     const w = new Workspace();
     const ssh = w.newTab({ type: "ssh", saved_session_id: "s1" }, "server");

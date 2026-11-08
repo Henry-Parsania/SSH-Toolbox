@@ -14,7 +14,8 @@
   } from "./lib/backend";
   import GroupLayout from "./lib/layout/GroupLayout.svelte";
   import TabBar, { type NewTabOption } from "./lib/layout/TabBar.svelte";
-  import { encodePayload } from "./lib/layout/detach";
+  import { decodePayload, encodePayload } from "./lib/layout/detach";
+  import { onTabReceived, otherWindowsAt, sendTabTo } from "./lib/backend/window";
   import { leaves, newLeaf } from "./lib/layout/panes";
   import { shortcutFor } from "./lib/layout/shortcuts";
   import { Workspace } from "./lib/layout/workspace.svelte";
@@ -240,6 +241,29 @@
     if (tab) detachTab(tab.id);
   }
 
+  // A tab handed over by another window (dragged here from a window of its own).
+  $effect(() => {
+    let stop = () => {};
+    let gone = false;
+    void onTabReceived((text) => {
+      const payload = decodePayload(text);
+      if (payload) workspace.adoptTab(payload);
+    }).then((fn) => (gone ? fn() : (stop = fn)));
+    return () => {
+      gone = true;
+      stop();
+    };
+  });
+
+  // A tab dragged out of the tab bar: onto another SSH Toolbox window it joins that window,
+  // anywhere else it gets a window of its own.
+  async function dropOut(id: string, screenX: number, screenY: number) {
+    const targets = (await otherWindowsAt(screenX, screenY).catch(() => [] as string[])).filter((l) => l === "main");
+    if (targets.length === 0) return detachTab(id);
+    const payload = workspace.detachTab(id);
+    if (payload) await sendTabTo(targets[0], encodePayload(payload)).catch(() => {});
+  }
+
   function detachTab(id: string) {
     const payload = workspace.detachTab(id);
     if (payload) void windowOpen(payload.title, encodePayload(payload)).catch(() => {});
@@ -320,6 +344,7 @@
       items: [
         { label: "Split side by side", hint: "Ctrl+Shift+E", accelerator: "CmdOrCtrl+D", onselect: () => workspace.split("row") },
         { label: "Split top and bottom", hint: "Ctrl+Shift+O", accelerator: "CmdOrCtrl+Shift+D", onselect: () => workspace.split("column") },
+        { label: "Duplicate this tab in a new tab", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTabAsTab(workspace.activeTabId) },
         { label: "Duplicate this tab to the right", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "row") },
         { label: "Duplicate this tab below", disabled: !workspace.activeTab, onselect: () => workspace.duplicateTab(workspace.activeTabId, "column") },
         { label: "Close pane", hint: "Ctrl+Shift+W", accelerator: "CmdOrCtrl+W", onselect: () => workspace.closeActivePane() },
@@ -547,6 +572,7 @@
       {agentOpen}
       onagent={() => (agentOpen = !agentOpen)}
       ondetach={detachTab}
+      ondropout={dropOut}
     />
       <main class="tabs">
         <GroupLayout
