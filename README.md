@@ -1,10 +1,35 @@
+<div align="center">
+
 # SSH Toolbox
 
-A lightweight, personal desktop app in the style of MobaXterm, for Windows 11 and Ubuntu 26.04 (macOS later). Built with Tauri 2, Rust, Svelte and xterm.js.
+### The free, fast, all-in-one SSH terminal for Windows, Linux and macOS.
 
-It is a personal project: builds are for the owner's own machines, with no code signing or auto-update.
+**Terminals, SSH, a file explorer, Docker and an AI assistant in one small window.** If you live in a terminal and juggle servers, this is the tool you keep open all day.
+
+[**Download**](https://github.com/Henry-Parsania/SSH-Toolbox/releases/latest) &nbsp;|&nbsp; [What it does](#what-it-does) &nbsp;|&nbsp; [Build it yourself](#running-and-building)
+
+*If it saves you time, please give it a star. It helps other people find it.*
+
+</div>
 
 ![SSH Toolbox: sessions list, Docker, Files and the Agent panel](docs/images/screenshot.jpg)
+
+## Why you will want it
+
+You like what an all-in-one tool like MobaXterm gives you: saved servers, a file browser beside the terminal, tabs, splits. But you want it **free, light and on every system you use**. That is this app.
+
+| | |
+|---|---|
+| **Light and fast** | A native app, not a browser in disguise: a 7 MB installer, about 150 MB of memory with a terminal open, ready in about a second. It is built with Rust and Tauri. |
+| **Your servers, organised** | Saved sessions in folders, with a live dot showing which ones answer. Jump servers (up to 3 hops), port forwarding, auto-reconnect when a connection drops. |
+| **Key exchange in two clicks** | Make or pick a key and install it on the server, like `ssh-copy-id`, from the same window where you add the host. Passwords and passphrases live in the system keychain, never in a file. |
+| **File explorer built in** | Browse your computer and the server side by side (SFTP, FTP, FTPS). Drag to copy, edit a remote file in the built-in editor, compare two folders and copy what is missing. |
+| **Docker, local or over SSH** | See containers, logs, images, volumes and networks, open a shell in a container, and run Compose, on your machine or on any server you can reach. |
+| **AI assistant that asks first** | Use Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model with your own API key. It can look at the active server, and anything that changes something is shown to you before it runs. |
+| **Themes you can make** | Eight built-in themes plus a theme builder with live preview. Colour a server's tab red for production, so you never type into the wrong one. |
+| **Safe by default** | Host keys are checked, secrets never go in files or logs, and pasting several lines asks you first. Open source, Apache-2.0. |
+
+Also: split panes, a command palette (`Ctrl+Shift+P`), snippets, session logs, serial ports, an X11 server option, network and port scanners, a process monitor, and a live CPU, memory and network footer for the server you are on.
 
 ## What it does
 
@@ -71,6 +96,8 @@ Security problems: please report them privately (GitHub's "Report a vulnerabilit
 
 [Apache License 2.0](LICENSE). You may use, copy and modify it, including commercially, under the terms of that licence. The software comes with no warranty.
 
-## Status
+## Download and status
 
-Windows is the tested platform. The Ubuntu rendering check has not been run yet, and macOS is untested.
+Get the Windows installer, the Linux `.deb` or AppImage, or the macOS disk image (Apple Silicon) from the [Releases page](https://github.com/Henry-Parsania/SSH-Toolbox/releases/latest).
+
+The installers are not code-signed yet, so Windows may show SmartScreen (More info, Run anyway) and macOS asks you to allow the app once (System Settings, Privacy & Security, Open Anyway). Windows is the most tested platform. The Linux and macOS builds run and work, but have had less testing: bug reports are very welcome.
