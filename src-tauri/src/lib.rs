@@ -104,7 +104,10 @@ pub fn run() {
         .manage(commands::docker::Engines::default())
         .manage(commands::scan::Scans::default())
         .manage(commands::edit::Edits::new())
-        .manage(commands::agent::Agent::new(&config.join("providers.json")))
+        .manage(commands::agent::Agent::new(
+            &config.join("providers.json"),
+            &config.join("agent_settings.json"),
+        ))
         .manage(toolbox_core::ssh::forward::Forwards::new())
         .manage(commands::terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
@@ -131,6 +134,8 @@ pub fn run() {
             commands::agent::agent_complete,
             commands::agent::agent_cancel,
             commands::agent::agent_classify,
+            commands::agent::agent_settings_get,
+            commands::agent::agent_settings_set,
             commands::agent::agent_redact,
             commands::agent::agent_exec,
             commands::agent::agent_read_file,

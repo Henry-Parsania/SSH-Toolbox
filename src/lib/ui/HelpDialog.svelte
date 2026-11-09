@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appVersion } from "../backend";
+  import { appVersion, openLink } from "../backend";
   // A list of what the app can do and how to reach it, so nothing gets forgotten.
 
   interface Props {
@@ -32,7 +32,7 @@
     ["X11 windows", "Tick \"Show windows of programs on the server (X11)\" in a session to run programs with windows on the server and see them here. On Windows the app starts VcXsrv for this when it is installed; Tools, X server shows its state."],
     ["Snippets", "Saved commands. Terminal menu, Snippets: send one to this pane, every pane of the tab or every open pane. Stored as plain text, so no passwords in them."],
     ["Command palette and quick connect", "Ctrl+Shift+P opens a box where you type to jump to a saved session, an open tab or any menu command. Typing something like pi@10.0.0.5:22 offers to connect to it: the new session form opens filled in, and saving it connects."],
-    ["Agent", "An assistant for the SSH server in the active tab (the sparkle button, or View menu). It can read the terminal and files and run commands; anything that changes something is shown to you first. Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model: set one up with the gear in the panel."],
+    ["Agent", "The gear in the panel opens the agent settings: providers and keys, the instructions the model is given (editable), limits, a safety page with the one switch that lets normally blocked commands be proposed (each still needs your approval), and a short explanation of how it works. An assistant for the SSH server in the active tab (the sparkle button, or View menu). It can read the terminal and files and run commands; anything that changes something is shown to you first. Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model: set one up with the gear in the panel."],
     ["Serial ports", "Open a serial device with its settings, and set DTR, RTS or send a break. File menu."],
     ["Footer", "CPU, memory, network speed, graphics card, disk, load and uptime of this computer or of the active SSH server, with small graphs of the last few minutes. Click the gear at its right end (or right-click the footer) to choose what shows: each reading can be hidden, and its bar, numbers and graph switched on or off. Graphs are off until you turn them on. Your choices are kept. Settings turns the whole footer on or off."],
     ["Long commands", "When a tab that isn't showing has printed output for a while and then goes quiet, a check mark appears on its tab. It goes away when you open the tab."],
@@ -98,10 +98,15 @@
       </dl>
     {:else}
       <p>
-        SSH Toolbox is a personal terminal and server toolbox for Windows and Ubuntu: terminals, SSH, files, serial
-        ports and Docker in one window.
+        <strong>SSH Toolbox</strong>: a free, fast terminal and server toolbox for Windows, Linux and macOS. Terminals,
+        SSH, a file explorer, Docker and an AI assistant in one window.
       </p>
       <p><strong>Version {version}</strong></p>
+      <p>Created by <strong>Henry Parsania</strong>.</p>
+      <p>
+        Free and open source under the Apache-2.0 licence. Ideas, bug reports and a star are welcome at
+        <button class="link" onclick={() => void openLink("https://github.com/Henry-Parsania/SSH-Toolbox").catch(() => {})}>github.com/Henry-Parsania/SSH-Toolbox</button>.
+      </p>
       <p class="muted">Passwords and passphrases are kept in your system keychain, never in the app's files.</p>
     {/if}
 
@@ -112,6 +117,15 @@
 </div>
 
 <style>
+  .link {
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+  }
   .modal.wide {
     width: min(660px, 94vw);
   }

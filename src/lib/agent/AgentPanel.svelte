@@ -66,6 +66,7 @@
     read_only: "Looks only",
     changes: "Changes things",
     blocked: "Blocked",
+    dangerous: "Dangerous",
   };
   const stateLabel: Record<ToolStep["state"], string> = {
     waiting: "Waiting for you",
@@ -127,7 +128,7 @@
       {:else if step.kind === "note"}
         <p class="note-line">{step.text}</p>
       {:else}
-        <div class="tool" class:waiting={step.state === "waiting"} class:bad={step.risk === "blocked" || step.state === "failed"}>
+        <div class="tool" class:waiting={step.state === "waiting"} class:bad={step.risk === "blocked" || step.risk === "dangerous" || step.state === "failed"}>
           <div class="tool-head">
             <strong>{step.title}</strong>
             <span class="badge {step.risk}">{riskLabel[step.risk]}</span>
@@ -138,7 +139,7 @@
           {#if step.state === "waiting"}
             <div class="approve">
               <button class="btn small" onclick={() => chat.answer(step.id, false)}>Deny</button>
-              <button class="btn small primary" onclick={() => chat.answer(step.id, true)}>Approve</button>
+              <button class="btn small {step.risk === 'dangerous' ? 'danger' : 'primary'}" onclick={() => chat.answer(step.id, true)}>{step.risk === "dangerous" ? "Run anyway" : "Approve"}</button>
             </div>
           {/if}
           {#if step.result}
@@ -325,6 +326,11 @@
   }
   .badge.blocked {
     color: var(--danger);
+  }
+  .badge.dangerous {
+    color: #fff;
+    background: var(--danger-strong);
+    font-weight: 600;
   }
   pre {
     margin: 4px 0;

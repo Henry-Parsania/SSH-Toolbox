@@ -11,6 +11,7 @@ use toolbox_core::agent::llm::{self, Endpoint, Message, Reply, ToolDef};
 use toolbox_core::agent::policy::{self, Risk};
 use toolbox_core::agent::providers::{Provider, ProviderStore};
 use toolbox_core::agent::redact::redact;
+use toolbox_core::agent::settings::{AgentSettings, AgentSettingsStore};
 use toolbox_core::agent::tools::{self, ExecResult};
 use toolbox_core::keychain::{Keychain, SecretKind};
 use toolbox_core::secret::Secret;
@@ -21,6 +22,7 @@ use super::files::Files;
 
 pub struct Agent {
     providers: ProviderStore,
+    settings: AgentSettingsStore,
     /// Keys kept only for this run, when the system keychain can't hold them.
     memory_keys: Mutex<HashMap<String, String>>,
     /// Requests that are waiting for a model, so they can be stopped.
@@ -28,9 +30,10 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub fn new(file: &std::path::Path) -> Self {
+    pub fn new(file: &std::path::Path, settings_file: &std::path::Path) -> Self {
         Self {
             providers: ProviderStore::load(file),
+            settings: AgentSettingsStore::load(settings_file),
             memory_keys: Mutex::default(),
             runs: Mutex::default(),
         }
@@ -187,8 +190,24 @@ pub fn agent_cancel(agent: State<'_, Agent>, request_id: String) {
 
 /// How risky a command is, for the screen to show before asking.
 #[tauri::command]
-pub fn agent_classify(command: String) -> Risk {
-    policy::classify(&command)
+pub fn agent_classify(agent: State<'_, Agent>, command: String) -> Risk {
+    policy::classify_with(&command, agent.settings.get().allow_dangerous)
+}
+
+/// How the agent is set to behave.
+#[tauri::command]
+pub fn agent_settings_get(agent: State<'_, Agent>) -> AgentSettings {
+    agent.settings.get()
+}
+
+/// Saves the agent's behaviour settings. Only the settings window calls this; the model has no
+/// way to.
+#[tauri::command]
+pub fn agent_settings_set(
+    agent: State<'_, Agent>,
+    settings: AgentSettings,
+) -> Result<(), AppError> {
+    agent.settings.set(settings)
 }
 
 /// Text with secrets removed, for anything the screen sends to the model itself.
@@ -201,6 +220,7 @@ pub fn agent_redact(text: String) -> String {
 /// `approved`; blocked ones never run.
 #[tauri::command]
 pub async fn agent_exec(
+    agent: State<'_, Agent>,
     services: State<'_, Arc<SshServices>>,
     saved_session_id: String,
     command: String,
@@ -216,7 +236,8 @@ pub async fn agent_exec(
                 "That SSH session isn't connected.",
             )
         })?;
-    tools::run_command(&shared.handle, &command, approved).await
+    let allow_dangerous = agent.settings.get().allow_dangerous;
+    tools::run_command(&shared.handle, &command, approved, allow_dangerous).await
 }
 
 #[tauri::command]

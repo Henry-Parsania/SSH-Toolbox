@@ -52,7 +52,25 @@ export interface Reply {
   output_tokens: number;
 }
 
-export type Risk = "read_only" | "changes" | "blocked";
+export type Risk = "read_only" | "changes" | "blocked" | "dangerous";
+
+/** How the agent behaves. Empty text means the built-in one. */
+export interface AgentSettings {
+  system_prompt: string;
+  extra_instructions: string;
+  max_rounds: number;
+  token_cap: number;
+  /** Lets normally blocked commands be proposed (each still needs approval). */
+  allow_dangerous: boolean;
+}
+
+export function agentSettingsGet(): Promise<AgentSettings> {
+  return invoke<AgentSettings>("agent_settings_get");
+}
+
+export function agentSettingsSet(settings: AgentSettings): Promise<void> {
+  return invoke<void>("agent_settings_set", { settings });
+}
 
 export function agentProviders(): Promise<ProviderView[]> {
   return invoke<ProviderView[]>("agent_providers");

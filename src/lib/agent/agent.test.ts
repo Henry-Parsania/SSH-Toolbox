@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Message, Reply, Risk } from "../backend/agent";
-import { AgentChat, type Context, type Deps, type ToolStep } from "./agent.svelte";
+import type { AgentSettings, Message, Reply, Risk } from "../backend/agent";
+import { AgentChat, DEFAULT_RULES, DEFAULTS, systemPrompt, type Context, type Deps, type ToolStep } from "./agent.svelte";
 
 const ctx: Context = { sessionName: "web1", savedSessionId: "s1", terminalSession: "t1" };
 
@@ -23,6 +23,7 @@ function setup(replies: Partial<Reply>[], overrides: Partial<Deps> = {}) {
     complete: model.complete,
     cancel: vi.fn(async () => {}),
     classify: vi.fn(async (c: string): Promise<Risk> => (c.startsWith("rm -rf /") ? "blocked" : /^(ls|df|cat)\b/.test(c) ? "read_only" : "changes")),
+    settings: vi.fn(async () => DEFAULTS),
     exec: vi.fn(async () => ({ code: 0, output: "output" })),
     openFiles: vi.fn(async () => "f1"),
     closeFiles: vi.fn(async () => {}),
@@ -208,5 +209,62 @@ describe("the agent loop", () => {
     await chat.send("hi", () => ctx);
     expect(deps.complete).not.toHaveBeenCalled();
     expect(chat.steps[0].kind).toBe("note");
+  });
+});
+
+describe("the agent's settings", () => {
+  const settings = (over: Partial<AgentSettings>): AgentSettings => ({ ...DEFAULTS, ...over });
+
+  it("uses the built-in instructions by default and the user's text when set", () => {
+    expect(systemPrompt(ctx)).toContain(DEFAULT_RULES);
+    const custom = systemPrompt(ctx, false, settings({ system_prompt: "Be a pirate.", extra_instructions: "Answer in German." }));
+    expect(custom).toContain("Be a pirate.");
+    expect(custom).not.toContain("careful system administrator");
+    expect(custom).toContain("Extra instructions from the user:\nAnswer in German.");
+    // Where the user is connected is always added, whatever the instructions say.
+    expect(custom).toContain('"web1"');
+  });
+
+  it("stops after the number of steps the user chose", async () => {
+    const turns = Array.from({ length: 5 }, (_, i) => ({ stop: "tools" as const, tool_calls: [call("list_dir", { path: "/" }, `c${i}`)] }));
+    const { chat, model } = setup(turns, { settings: vi.fn(async () => settings({ max_rounds: 2 })) });
+    await chat.send("go", () => ctx);
+    expect(model.complete).toHaveBeenCalledTimes(2);
+    expect(chat.steps.at(-1)).toMatchObject({ kind: "note", text: expect.stringContaining("Stopped after 2 steps") });
+  });
+
+  it("sends the settings' instructions to the model", async () => {
+    const { chat, model } = setup([{ text: "hi" }], { settings: vi.fn(async () => settings({ extra_instructions: "Never restart anything." })) });
+    await chat.send("hi", () => ctx);
+    expect(model.complete.mock.calls[0][2]).toContain("Never restart anything.");
+  });
+
+  it("a dangerous command always waits for the user, even when looking-only commands run without asking", async () => {
+    const { chat, deps } = setup([{ stop: "tools", tool_calls: [call("run_command", { command: "wipe-everything" })] }, { text: "done" }], {
+      classify: vi.fn(async (): Promise<Risk> => "dangerous"),
+    });
+    chat.setAutoRead(true);
+    const done = chat.send("wipe it", () => ctx);
+    await tick();
+    await tick();
+    const step = tools(chat)[0];
+    expect(step.risk).toBe("dangerous");
+    expect(step.state).toBe("waiting");
+    expect(deps.exec).not.toHaveBeenCalled();
+    chat.answer(step.id, true);
+    await done;
+    expect(deps.exec).toHaveBeenCalledWith("s1", "wipe-everything", true);
+  });
+
+  it("a dangerous command that is denied does not run", async () => {
+    const { chat, deps } = setup([{ stop: "tools", tool_calls: [call("run_command", { command: "wipe-everything" })] }, { text: "ok" }], {
+      classify: vi.fn(async (): Promise<Risk> => "dangerous"),
+    });
+    const done = chat.send("wipe it", () => ctx);
+    await tick();
+    await tick();
+    chat.answer(tools(chat)[0].id, false);
+    await done;
+    expect(deps.exec).not.toHaveBeenCalled();
   });
 });

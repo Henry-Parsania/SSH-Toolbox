@@ -5,7 +5,7 @@
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 
-use super::policy::{Risk, classify};
+use super::policy::{Risk, classify_with};
 use super::redact::redact;
 use crate::error::{AppError, ErrorCode};
 use crate::files::FileBackend;
@@ -52,7 +52,16 @@ pub fn shorten(text: &str) -> String {
 /// Whether the rules allow running this command. `approved` is the user's say-so, which can allow
 /// a change but never a blocked command.
 pub fn allow(command: &str, approved: bool) -> Result<Risk, AppError> {
-    match classify(command) {
+    allow_with(command, approved, false)
+}
+
+/// Like [`allow`]. When the user has allowed dangerous commands, those need `approved` too.
+pub fn allow_with(command: &str, approved: bool, allow_dangerous: bool) -> Result<Risk, AppError> {
+    match classify_with(command, allow_dangerous) {
+        Risk::Dangerous if !approved => Err(AppError::new(
+            ErrorCode::PermissionDenied,
+            "That command is dangerous, so the user has to approve it first.",
+        )),
         Risk::Blocked => Err(AppError::new(
             ErrorCode::PermissionDenied,
             "That command is too dangerous to run from here, even with approval.",
@@ -70,8 +79,9 @@ pub async fn run_command(
     connection: &Connection,
     command: &str,
     approved: bool,
+    allow_dangerous: bool,
 ) -> Result<ExecResult, AppError> {
-    allow(command, approved)?;
+    allow_with(command, approved, allow_dangerous)?;
     let out = run_exec(connection, command, None).await?;
     let mut text = out.stdout;
     if !out.stderr.trim().is_empty() {
@@ -185,6 +195,20 @@ mod tests {
         assert!(allow("ls -la", false).is_ok());
         assert!(allow("systemctl restart nginx", false).is_err());
         assert!(allow("systemctl restart nginx", true).is_ok());
+    }
+
+    #[test]
+    fn dangerous_commands_are_blocked_unless_allowed_and_then_still_need_approval() {
+        let cmd = "rm -rf / --no-preserve-root";
+        // By default nothing can run it, approved or not.
+        assert!(allow_with(cmd, true, false).is_err());
+        assert!(allow(cmd, true).is_err());
+        // When the user allows them, it needs approval, one command at a time.
+        assert!(allow_with(cmd, false, true).is_err());
+        assert_eq!(allow_with(cmd, true, true).unwrap(), Risk::Dangerous);
+        // The switch changes nothing for ordinary commands.
+        assert!(allow_with("ls -la", false, true).is_ok());
+        assert!(allow_with("systemctl restart nginx", false, true).is_err());
         // A blocked command stays blocked even when approved.
         assert!(allow("rm -rf /", true).is_err());
     }

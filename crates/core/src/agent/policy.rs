@@ -17,6 +17,9 @@ pub enum Risk {
     ReadOnly,
     Changes,
     Blocked,
+    /// A command that would be blocked, shown because the user has allowed those. It always
+    /// needs the user's approval, and is never run without asking.
+    Dangerous,
 }
 
 /// Commands that only look. Each is checked further below for flags that make them do more.
@@ -273,6 +276,15 @@ fn part_is_read_only(part: &str) -> bool {
         "hostnamectl" => args.is_empty() || args.first().is_some_and(|a| *a == "status"),
         "dig" | "nslookup" | "ss" | "netstat" | "lsof" | "pgrep" => true,
         _ => true,
+    }
+}
+
+/// Like [`classify`], but a blocked command is `Dangerous` (needs approval) when the user has
+/// allowed those in the agent settings.
+pub fn classify_with(command: &str, allow_dangerous: bool) -> Risk {
+    match classify(command) {
+        Risk::Blocked if allow_dangerous => Risk::Dangerous,
+        risk => risk,
     }
 }
 

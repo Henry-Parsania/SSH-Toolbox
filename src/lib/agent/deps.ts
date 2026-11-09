@@ -8,6 +8,7 @@ import {
   agentExec,
   agentReadFile,
   agentRedact,
+  agentSettingsGet,
   agentWriteFile,
 } from "../backend/agent";
 import { filesClose, filesList, filesOpenSftp } from "../backend/files";
@@ -19,6 +20,7 @@ export const realDeps: Deps = {
   complete: agentComplete,
   cancel: agentCancel,
   classify: agentClassify,
+  settings: agentSettingsGet,
   exec: agentExec,
   async openFiles(savedSessionId) {
     // The session is already connected, so this opens SFTP on the same connection and asks nothing.

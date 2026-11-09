@@ -75,9 +75,11 @@ async fn commands_follow_the_rules_and_their_output_loses_its_secrets() {
     let connection = &shared.handle;
 
     // Looking is allowed without approval, and what comes back has no secrets in it.
-    let out = run_command(connection, "echo hello", false).await.unwrap();
+    let out = run_command(connection, "echo hello", false, false)
+        .await
+        .unwrap();
     assert_eq!((out.code, out.output.trim()), (Some(0), "hello"));
-    let out = run_command(connection, "echo DB_PASSWORD=hunter2", false)
+    let out = run_command(connection, "echo DB_PASSWORD=hunter2", false, false)
         .await
         .unwrap();
     assert!(
@@ -88,18 +90,18 @@ async fn commands_follow_the_rules_and_their_output_loses_its_secrets() {
 
     // A change needs approval; with it, it runs.
     let made = home.path().join("made.txt");
-    let err = run_command(connection, "touch \"$HOME/made.txt\"", false)
+    let err = run_command(connection, "touch \"$HOME/made.txt\"", false, false)
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::PermissionDenied);
     assert!(!made.exists());
-    run_command(connection, "touch \"$HOME/made.txt\"", true)
+    run_command(connection, "touch \"$HOME/made.txt\"", true, false)
         .await
         .unwrap();
     assert!(made.exists());
 
     // A blocked command never runs, approved or not.
-    let err = run_command(connection, "rm -rf / --no-preserve-root", true)
+    let err = run_command(connection, "rm -rf / --no-preserve-root", true, false)
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::PermissionDenied);

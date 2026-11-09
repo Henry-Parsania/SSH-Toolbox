@@ -47,7 +47,7 @@ Also: split panes, a command palette (`Ctrl+Shift+P`), snippets, session logs, s
 - **Process monitor.** Opens btop, htop or top for a session.
 - **Network tools.** Network scanner and port scanner.
 - **Serial ports.** Open a device with its settings.
-- **Agent.** An optional assistant for the active SSH server; anything that changes something is shown first.
+- **Agent.** An optional assistant for the active SSH server; anything that changes something is shown first. The agent settings let you choose the provider and key, edit the instructions the model is given, set limits, and decide how careful it must be.
 - **Also:** search and save terminal output, type into all panes at once, import from `~/.ssh/config`, back up and restore sessions, a trusted-servers (known hosts) manager, an optional tray icon, a check mark on a background tab when a long command goes quiet, a footer with CPU, memory and disk, and a Help window listing every feature and shortcut.
 
 ## Keyboard shortcuts
@@ -91,6 +91,10 @@ Installers are built by CI.
 This is a personal project and I decide what goes into it. Feature requests and bug reports are welcome as GitHub issues. If you want to send a change, open an issue first so we can agree on it before you write code. Pull requests are merged at my discretion, and by sending one you agree it can be released under the licence below. Please don't include secrets, passwords or keys in issues or code.
 
 Security problems: please report them privately (GitHub's "Report a vulnerability" on the Security tab) rather than in a public issue.
+
+## Author
+
+Created and maintained by Henry Parsania.
 
 ## Licence
 

@@ -11,6 +11,7 @@
     type ProviderView,
   } from "../backend/agent";
   import Icon from "../ui/Icon.svelte";
+  import AgentOptions from "./AgentOptions.svelte";
 
   interface Props {
     onclose: () => void;
@@ -31,6 +32,7 @@
     { name: "Other", kind: "open_ai_compatible", base_url: "https://", model: "" },
   ];
 
+  let tab = $state<"providers" | "instructions" | "safety" | "info">("providers");
   let providers = $state<ProviderView[]>([]);
   let form = $state<(Provider & { hasKey: boolean; forNow: boolean }) | null>(null);
   let apiKey = $state("");
@@ -115,8 +117,15 @@
 </script>
 
 <div class="modal-backdrop">
-  <div class="modal wide" role="dialog" aria-label="Agent providers" tabindex="-1" onkeydown={(e) => e.key === "Escape" && onclose()}>
-    <h2>Agent providers</h2>
+  <div class="modal wide" role="dialog" aria-label="Agent settings" tabindex="-1" onkeydown={(e) => e.key === "Escape" && onclose()}>
+    <h2>Agent settings</h2>
+    <div class="seg" role="tablist" aria-label="Agent settings">
+      {#each [["providers", "Providers"], ["instructions", "Instructions"], ["safety", "Safety"], ["info", "How it works"]] as [id, label] (id)}
+        <button type="button" role="tab" aria-selected={tab === id} class:picked={tab === id} onclick={() => (tab = id as typeof tab)}>{label}</button>
+      {/each}
+    </div>
+
+    {#if tab === "providers"}
     <p class="lead">Pick the service that powers the agent. Anything the agent reads (terminal text, files, command output) is sent to it, with passwords and keys removed first.</p>
 
     <div class="cols">
@@ -180,6 +189,9 @@
         {/if}
       </div>
     </div>
+    {:else}
+      <AgentOptions {tab} />
+    {/if}
 
     <div class="modal-actions">
       <button class="btn" onclick={onclose}>Close</button>
@@ -188,6 +200,9 @@
 </div>
 
 <style>
+  .seg {
+    margin: 0 0 14px;
+  }
   .cols {
     display: grid;
     grid-template-columns: 220px 1fr;
