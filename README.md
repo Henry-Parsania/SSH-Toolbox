@@ -20,7 +20,7 @@ You like what an all-in-one tool like MobaXterm gives you: saved servers, a file
 
 | | |
 |---|---|
-| **Light and fast** | A native app, not a browser in disguise: a 7 MB installer, about 150 MB of memory with a terminal open, ready in about a second. It is built with Rust and Tauri. |
+| **Light and fast** | A 7 MB installer and about 220 MB of memory with a terminal open (measured in Task Manager; most of it is the system's web view), opening in a second or two. Built with Rust and Tauri, so there is no bundled browser to download. |
 | **Your servers, organised** | Saved sessions in folders, with a live dot showing which ones answer. Jump servers (up to 3 hops), port forwarding, auto-reconnect when a connection drops. |
 | **Key exchange in two clicks** | Make or pick a key and install it on the server, like `ssh-copy-id`, from the same window where you add the host. Passwords and passphrases live in the system keychain, never in a file. |
 | **File explorer built in** | Browse your computer and the server side by side (SFTP, FTP, FTPS). Drag to copy, edit a remote file in the built-in editor, compare two folders and copy what is missing. |
