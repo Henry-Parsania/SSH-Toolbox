@@ -1,35 +1,20 @@
-<div align="center">
-
 # SSH Toolbox
 
-### The free, fast, all-in-one SSH terminal for Windows, Linux and macOS.
+A free, open-source SSH terminal and server toolbox for Windows, Linux and macOS, in the style of MobaXterm. It puts terminals, saved SSH sessions, a file browser, Docker and an optional AI assistant in one window.
 
-**Terminals, SSH, a file explorer, Docker and an AI assistant in one small window.** If you live in a terminal and juggle servers, this is the tool you keep open all day.
-
-[**Download**](https://github.com/Henry-Parsania/SSH-Toolbox/releases/latest) &nbsp;|&nbsp; [What it does](#what-it-does) &nbsp;|&nbsp; [Build it yourself](#running-and-building)
-
-*If it saves you time, please give it a star. It helps other people find it.*
-
-</div>
+[Download](https://github.com/Henry-Parsania/SSH-Toolbox/releases/latest) | [Features](#what-it-does) | [Build it yourself](#running-and-building)
 
 ![SSH Toolbox: sessions list, Docker, Files and the Agent panel](docs/images/screenshot.jpg)
 
-## Why you will want it
+## In short
 
-You like what an all-in-one tool like MobaXterm gives you: saved servers, a file browser beside the terminal, tabs, splits. But you want it **free, light and on every system you use**. That is this app.
-
-| | |
-|---|---|
-| **Light and fast** | Low memory use, a 7 MB installer and a quick start. Built with Rust and Tauri, so there is no bundled browser to download. |
-| **Your servers, organised** | Saved sessions in folders, with a live dot showing which ones answer. Jump servers (up to 3 hops), port forwarding, auto-reconnect when a connection drops. |
-| **Key exchange in two clicks** | Make or pick a key and install it on the server, like `ssh-copy-id`, from the same window where you add the host. Passwords and passphrases live in the system keychain, never in a file. |
-| **File explorer built in** | Browse your computer and the server side by side (SFTP, FTP, FTPS). Drag to copy, edit a remote file in the built-in editor, compare two folders and copy what is missing. |
-| **Docker, local or over SSH** | See containers, logs, images, volumes and networks, open a shell in a container, and run Compose, on your machine or on any server you can reach. |
-| **AI assistant that asks first** | Use Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model with your own API key. It can look at the active server, and anything that changes something is shown to you before it runs. |
-| **Themes you can make** | Eight built-in themes plus a theme builder with live preview. Colour a server's tab red for production, so you never type into the wrong one. |
-| **Safe by default** | Host keys are checked, secrets never go in files or logs, and pasting several lines asks you first. Open source, Apache-2.0. |
-
-Also: split panes, a command palette (`Ctrl+Shift+P`), snippets, session logs, serial ports, an X11 server option, network and port scanners, a process monitor, and a live CPU, memory and network footer for the server you are on.
+- **Small and light.** A native app built with Rust and Tauri. The Windows installer is about 7 MB and memory use is low.
+- **Saved servers.** Sessions in folders, jump hosts (up to 3 hops), port forwarding, auto-reconnect, and a dot showing which servers answer.
+- **Keys.** Make or pick a key and install it on a server, like `ssh-copy-id`, from the new-session window. Passwords and passphrases go in the system keychain.
+- **Files.** Browse this computer and a server side by side over SFTP, FTP or FTPS, edit remote files, compare folders.
+- **Docker.** Containers, logs, images, volumes, networks and Compose, on this computer or over SSH.
+- **AI assistant (optional).** Works with Claude, OpenAI, DeepSeek, Qwen, OpenRouter or a local Ollama model, using your own API key. Anything that changes something is shown to you first, and the instructions and safety settings can be edited.
+- **Themes.** Eight built-in themes and a theme builder with live preview. Sessions can have their own colour.
 
 ## What it does
 
@@ -91,6 +76,8 @@ Installers are built by CI.
 This is a personal project and I decide what goes into it. Feature requests and bug reports are welcome as GitHub issues. If you want to send a change, open an issue first so we can agree on it before you write code. Pull requests are merged at my discretion, and by sending one you agree it can be released under the licence below. Please don't include secrets, passwords or keys in issues or code.
 
 Security problems: please report them privately (GitHub's "Report a vulnerability" on the Security tab) rather than in a public issue.
+
+If you find the project useful, a star on GitHub helps other people find it.
 
 ## Author
 

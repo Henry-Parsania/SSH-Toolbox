@@ -20,7 +20,9 @@ pub struct VsCodeTheme {
 }
 
 /// Where an install of VS Code keeps its built-in extensions. Newer versions put everything one
-/// folder down, under a folder named after the build.
+/// folder down, under a folder named after the build. (Windows and Linux only: on a Mac the
+/// app is a single bundle with a known path.)
+#[cfg(any(windows, target_os = "linux"))]
 fn install_extensions(base: PathBuf, out: &mut Vec<PathBuf>) {
     out.push(base.join("resources/app/extensions"));
     if let Ok(entries) = std::fs::read_dir(&base) {
