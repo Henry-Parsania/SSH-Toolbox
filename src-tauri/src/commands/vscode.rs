@@ -63,7 +63,9 @@ fn roots() -> Vec<PathBuf> {
         install_extensions(PathBuf::from(base), &mut out);
     }
     #[cfg(target_os = "macos")]
-    out.push(PathBuf::from("/Applications/Visual Studio Code.app/Contents/Resources/app/extensions"));
+    out.push(PathBuf::from(
+        "/Applications/Visual Studio Code.app/Contents/Resources/app/extensions",
+    ));
     out.into_iter().filter(|p| p.is_dir()).collect()
 }
 
@@ -94,11 +96,18 @@ fn localized(dir: &Path, text: &str) -> String {
 fn scan() -> Vec<VsCodeTheme> {
     let mut out = Vec::new();
     for root in roots() {
-        let Ok(entries) = std::fs::read_dir(&root) else { continue };
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let dir = entry.path();
-            let Some(package) = read_json(&dir.join("package.json")) else { continue };
-            let Some(themes) = package.pointer("/contributes/themes").and_then(|t| t.as_array()) else {
+            let Some(package) = read_json(&dir.join("package.json")) else {
+                continue;
+            };
+            let Some(themes) = package
+                .pointer("/contributes/themes")
+                .and_then(|t| t.as_array())
+            else {
                 continue;
             };
             let source = package
@@ -107,7 +116,9 @@ fn scan() -> Vec<VsCodeTheme> {
                 .map(|n| localized(&dir, n))
                 .unwrap_or_else(|| "VS Code".to_string());
             for theme in themes {
-                let Some(rel) = theme.get("path").and_then(|p| p.as_str()) else { continue };
+                let Some(rel) = theme.get("path").and_then(|p| p.as_str()) else {
+                    continue;
+                };
                 let file = dir.join(rel);
                 if !file.is_file() {
                     continue;
@@ -173,19 +184,32 @@ pub async fn vscode_themes() -> Result<VsCodeThemes, AppError> {
 #[tauri::command]
 pub async fn vscode_theme_read(path: String) -> Result<String, AppError> {
     tokio::task::spawn_blocking(move || {
-        let wanted = std::fs::canonicalize(&path)
-            .map_err(|_| AppError::new(ErrorCode::NotFound, "That theme file isn't there any more."))?;
+        let wanted = std::fs::canonicalize(&path).map_err(|_| {
+            AppError::new(ErrorCode::NotFound, "That theme file isn't there any more.")
+        })?;
         let allowed = roots()
             .iter()
             .filter_map(|r| std::fs::canonicalize(r).ok())
             .any(|r| wanted.starts_with(r));
-        if !allowed || wanted.extension().and_then(|e| e.to_str()).is_none_or(|e| !e.eq_ignore_ascii_case("json") && !e.eq_ignore_ascii_case("jsonc")) {
-            return Err(AppError::new(ErrorCode::PermissionDenied, "That isn't a VS Code theme file."));
+        if !allowed
+            || wanted
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_none_or(|e| !e.eq_ignore_ascii_case("json") && !e.eq_ignore_ascii_case("jsonc"))
+        {
+            return Err(AppError::new(
+                ErrorCode::PermissionDenied,
+                "That isn't a VS Code theme file.",
+            ));
         }
-        let meta = std::fs::metadata(&wanted)
-            .map_err(|_| AppError::new(ErrorCode::NotFound, "That theme file isn't there any more."))?;
+        let meta = std::fs::metadata(&wanted).map_err(|_| {
+            AppError::new(ErrorCode::NotFound, "That theme file isn't there any more.")
+        })?;
         if meta.len() > 4 * 1024 * 1024 {
-            return Err(AppError::new(ErrorCode::InvalidInput, "That theme file is too big."));
+            return Err(AppError::new(
+                ErrorCode::InvalidInput,
+                "That theme file is too big.",
+            ));
         }
         std::fs::read_to_string(&wanted)
             .map_err(|_| AppError::new(ErrorCode::Internal, "Couldn't read that theme file."))
@@ -211,7 +235,14 @@ mod tests {
             assert!(text.contains("colors"));
         }
         let outside = std::env::current_exe().unwrap().with_extension("json");
-        assert!(tauri::async_runtime::block_on(vscode_theme_read(outside.to_string_lossy().into_owned())).is_err());
-        assert!(tauri::async_runtime::block_on(vscode_theme_read("C:/Windows/win.ini".into())).is_err());
+        assert!(
+            tauri::async_runtime::block_on(vscode_theme_read(
+                outside.to_string_lossy().into_owned()
+            ))
+            .is_err()
+        );
+        assert!(
+            tauri::async_runtime::block_on(vscode_theme_read("C:/Windows/win.ini".into())).is_err()
+        );
     }
 }
